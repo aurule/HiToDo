@@ -3,7 +3,7 @@
 from gi.repository import Gtk, Gdk
 
 # Define the gui and its actions.
-class HiToDo:
+class HiToDo(object):
     def __init__(self):
         self.builder = Gtk.Builder()
         self.builder.add_from_file("hitodo.ui")
