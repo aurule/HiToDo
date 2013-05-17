@@ -58,7 +58,9 @@ class HiToDo(Gtk.Window):
         self.title = "HiToDo"
         
         #create core tree store
-        self.tasklist = Gtk.TreeStore(int, int, object, object, object, object, object, object, object, str, str, str, bool, str, object)
+        self.tasklist = Gtk.TreeStore()
+        #TODO externalize column defs to separate structure, for descriptions and more dynamic initialization
+        self.tasklist.set_column_types([int, int, object, object, object, object, object, object, object, str, str, str, bool, str, object])
         #cols:
         #   priority by letter - spin/int
         #   pct. complete - int (no input)
@@ -75,7 +77,6 @@ class HiToDo(Gtk.Window):
         #   done - bool/checkbox
         #   text - str
         #   notes - object (to allow for formatting later on)
-        
         
         #create action groups
         top_actions = Gtk.ActionGroup("top_actions")
@@ -136,6 +137,19 @@ class HiToDo(Gtk.Window):
     
     def skip(self, widget=None, data=None):
         pass
+    
+    def open_file(self):
+        #placeholder
+        pass
+        #when adding lots of rows (like from a new file)...
+        self.task_view.freeze_child_notify()
+        self.task_view.set_model(None)
+        self.tasklist.clear()
+        #disable model sorting
+        #load the file and add rows to self.tasklist
+        #re-enable model sorting
+        self.task_view.set_model(self.tasklist)
+        self.task_view.thaw_child_notify()
     
     def task_selected(self, widget, data=None):
         #set notes from task
