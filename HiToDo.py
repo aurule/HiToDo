@@ -89,6 +89,7 @@ class HiToDo(Gtk.Window):
         uimanager.insert_action_group(task_actions)
         menubar = uimanager.get_widget("/MenuBar")
         toolbar = uimanager.get_widget("/ToolBar")
+        toolbar.get_style_context().add_class(Gtk.STYLE_CLASS_PRIMARY_TOOLBAR)
         
         #start with a simple stacked layout
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
