@@ -58,9 +58,23 @@ class HiToDo(Gtk.Window):
         self.title = "HiToDo"
         
         #create core tree store
-        self.tasklist = Gtk.TreeStore()
-        #TODO externalize column defs to separate structure, for descriptions and more dynamic initialization
-        self.tasklist.set_column_types([int, int, object, object, object, object, object, object, object, str, str, str, bool, str, object])
+        self.tasklist = Gtk.TreeStore(
+            int,    #priority
+            int,    #pct complete
+            object, #est time taken
+            object, #act time taken
+            object, #est begin
+            object, #est complete
+            object, #act begin
+            object, #act complete
+            object, #due
+            str,    #from
+            str,    #to
+            str,    #status
+            bool,   #done
+            str,    #title
+            object  #notes
+        )
         #cols:
         #   priority by letter - spin/int
         #   pct. complete - int (no input)
@@ -108,7 +122,8 @@ class HiToDo(Gtk.Window):
         task_scroll_win.set_hexpand(True)
         task_scroll_win.set_vexpand(True)
         self.task_view = Gtk.TreeView(self.tasklist)
-        #TODO set up columns
+        #set up columns
+        #TODO
         select = self.task_view.get_selection()
         select.connect("changed", self.task_selected)
         task_scroll_win.add(self.task_view)
