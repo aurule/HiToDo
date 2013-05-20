@@ -262,7 +262,7 @@ class HiToDo(Gtk.Window):
     
     def commit_done(self):
         #TODO
-        #self.title_cell.set_property("strikethrough", True)
+        #self.title_cell.set_properties(strikethrough=True, foreground="#bbb")
         pass
     
     def del_current_task(self, widget=None):
@@ -319,6 +319,15 @@ class HiToDo(Gtk.Window):
     def select_all(self, widget=None):
         self.selection.select_all()
     
+    def select_inv(self, widget=None):
+        if self.selcount == 0:
+            self.select_all()
+        elif self.selcount == len(self.tasklist):
+            self.select_none()
+        else:
+            pass
+            #TODO
+    
     def open_file(self):
         #placeholder
         return
@@ -333,10 +342,14 @@ class HiToDo(Gtk.Window):
         self.task_view.thaw_child_notify()
     
     def task_selected(self, widget):
-        #set notes from task
-        self.commit_all()
-        self.sellist = widget.get_selected_rows()[1]
         self.selcount = widget.count_selected_rows()
+        self.sellist = widget.get_selected_rows()[1]
+        
+        #if there's anything in the list, commit our changes
+        if self.selcount != 0:
+            self.commit_all()
+        
+        #set internal selection vars    
         if self.selcount == 1:
             self.seliter = self.tasklist.get_iter(self.sellist[0])
             self.notes_buff.set_text(self.tasklist[self.seliter][14])
@@ -439,7 +452,7 @@ class HiToDo(Gtk.Window):
             ("undo", Gtk.STOCK_UNDO, None, "<Primary>Z", "Undo", self.skip),
             ("redo", Gtk.STOCK_REDO, None, "<Primary><Shift>Z", "Redo", self.skip),
             ("sel_all", Gtk.STOCK_SELECT_ALL, None, "<Primary>A", None, self.select_all),
-            ("sel_inv", None, "_Invert Selection", None, None, self.skip),
+            ("sel_inv", None, "_Invert Selection", None, None, self.select_inv),
             ("sel_none", None, "Select _None", "<Primary><Shift>A", None, self.select_none)
         ])
     
