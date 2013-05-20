@@ -61,7 +61,7 @@ UI_XML = """
 class HiToDo(Gtk.Window):
     def __init__(self):
         Gtk.Window.__init__(self, title="HiToDo")
-        self.set_default_size(900, 600)
+        self.set_default_size(1100, 700)
         self.title = "HiToDo"
         
         #create core tree store
@@ -161,7 +161,7 @@ class HiToDo(Gtk.Window):
         
         #now we create a horizontal pane
         task_pane = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
-        task_pane.set_position(600)
+        task_pane.set_position(900)
         
         #add task list area
         task_scroll_win = Gtk.ScrolledWindow()
@@ -176,9 +176,8 @@ class HiToDo(Gtk.Window):
         self.selection = self.task_view.get_selection()
         self.selection.set_mode(Gtk.SelectionMode.MULTIPLE)
         self.sel_changed_handler = self.selection.connect("changed", self.task_selected)
-        self.task_view.set_properties(expander_column=self.col_title, enable_tree_lines=True, reorderable=True)
+        self.task_view.set_properties(expander_column=self.col_title, enable_tree_lines=True, reorderable=True, enable_search=True, search_column=13, rules_hint=True)
         self.task_view.connect('key-press-event', self.tasks_keys_dn)
-        self.task_view.connect('key-release-event', self.tasks_keys_up)
         task_scroll_win.add(self.task_view)
         task_pane.pack1(task_scroll_win, True, True)
         
@@ -339,7 +338,7 @@ class HiToDo(Gtk.Window):
     
     def commit_done(self):
         #TODO
-        #self.title_cell.set_properties(strikethrough=True, foreground="#bbb")
+        #self.title_cell.set_properties(strikethrough=True, foreground="#999")
         pass
     
     def del_current_task(self, widget=None):
@@ -383,12 +382,14 @@ class HiToDo(Gtk.Window):
         kvn = Gdk.keyval_name(event.keyval)
         if kvn == "Delete":
             self.del_current_task()
+            return True
         if kvn == "F2":
             path = self.tasklist.get_path(self.seliter)
             self.task_view.set_cursor_on_cell(path, self.col_title, self.title_cell, True)
-    
-    def tasks_keys_up(self, widget=None, event=None):
-        kvn = Gdk.keyval_name(event.keyval)
+            return True
+        if kvn == "space":
+            #TODO mark all selected tasks as done or not done
+            return True
     
     def title_keys_dn(self, widget=None, event=None):
         kvn = Gdk.keyval_name(event.keyval)
@@ -466,6 +467,14 @@ class HiToDo(Gtk.Window):
         
         cell.set_property("text", str(out))
     
+    def completed_render(self, col, cell, model, tree_iter, data):
+        val = model[tree_iter][7]
+        duetime = model[tree_iter][15]
+        
+        fmt = "%x %X" if duetime else "%x"
+        out = "" if val is None else val.strftime(fmt)
+        
+        cell.set_property("text", str(out))
     def note_render(self, col, cell, model, tree_iter, data):
         val = model[tree_iter][14]
         out = '' if val == '' else "[%s]" % val.replace(linesep, ' ')
@@ -478,32 +487,40 @@ class HiToDo(Gtk.Window):
         col_priority.set_sort_column_id(0)
         self.task_view.append_column(col_priority)
         
+        pct = Gtk.CellRendererProgress()
+        col_pct = Gtk.TreeViewColumn("%", pct, value=1)
+        col_pct.set_sort_column_id(1)
+        self.task_view.append_column(col_pct)
+        
+        #TODO est, spent
+        
         due = Gtk.CellRendererText()
         col_due = Gtk.TreeViewColumn("Due", due)
         col_due.set_sort_column_id(8)
         col_due.set_cell_data_func(due, self.due_render)
         self.task_view.append_column(col_due)
         
-        pct = Gtk.CellRendererProgress()
-        col_pct = Gtk.TreeViewColumn("%", pct, value=1)
-        col_pct.set_sort_column_id(1)
-        self.task_view.append_column(col_pct)
+        completed = Gtk.CellRendererText()
+        col_completed = Gtk.TreeViewColumn("Completed", completed)
+        col_completed.set_sort_column_id(7)
+        col_completed.set_cell_data_func(completed, self.completed_render)
+        self.task_view.append_column(col_completed)
         
         assigner = Gtk.CellRendererCombo(model=self.assigners, has_entry=True, editable=True)
         assigner.connect("edited", self.commit_assigner)
-        col_assigner = Gtk.TreeViewColumn("From", assigner, text_column=9, text=9)
+        col_assigner = Gtk.TreeViewColumn("From", assigner, text_column=1, text=9)
         col_assigner.set_sort_column_id(9)
         self.task_view.append_column(col_assigner)
         
         assignee = Gtk.CellRendererCombo(model=self.assignees, has_entry=True, editable=True)
         assignee.connect("edited", self.commit_assignee)
-        col_assignee = Gtk.TreeViewColumn("To", assignee, text_column=10, text=10)
+        col_assignee = Gtk.TreeViewColumn("To", assignee, text_column=1, text=10)
         col_assignee.set_sort_column_id(10)
         self.task_view.append_column(col_assignee)
         
         status = Gtk.CellRendererCombo(model=self.statii, has_entry=True, editable=True)
         status.connect("edited", self.commit_status)
-        col_stats = Gtk.TreeViewColumn("Status", status, text_column=11, text=11)
+        col_stats = Gtk.TreeViewColumn("Status", status, text_column=1, text=11)
         col_stats.set_sort_column_id(11)
         self.task_view.append_column(col_stats)
         
@@ -516,7 +533,7 @@ class HiToDo(Gtk.Window):
         self.title_cell.connect("edited", self.commit_title)
         self.title_cell.connect("editing-started", self.title_edit_start)
         self.title_cell.connect("editing-canceled", self.commit_title, None, None, True)
-        note = Gtk.CellRendererText(editable=False, ellipsize=Pango.EllipsizeMode.MIDDLE, foreground="#bbb")
+        note = Gtk.CellRendererText(editable=False, ellipsize=Pango.EllipsizeMode.MIDDLE, foreground="#999")
         self.col_title = Gtk.TreeViewColumn("Title")
         self.col_title.pack_start(self.title_cell, True)
         self.col_title.pack_start(note, False)
