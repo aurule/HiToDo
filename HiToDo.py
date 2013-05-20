@@ -22,9 +22,9 @@ UI_XML = """
             <menuitem action='undo' />
             <menuitem action='redo' />
             <separator />
-            <menuitem action='sel_inv' />
             <menuitem action='sel_all' />
             <menuitem action='sel_none' />
+            <menuitem action='sel_inv' />
         </menu>
         <menu action='TaskMenu'>
             <menuitem action='task_new' />
@@ -232,6 +232,7 @@ class HiToDo(Gtk.Window):
             if self.title_editor is None: return
             path = self.title_edit_path
             new_title = self.title_editor.get_text()
+            self.title_editor.disconnect(self.title_key_press_catcher)
         self.title_editor = None #clear this to prevent eating too much memory
         
         old_title = self.tasklist[path][13]
@@ -257,6 +258,7 @@ class HiToDo(Gtk.Window):
         self.title_edit_path = str(path)
         self.title_edit_old_val = self.tasklist[path][13]
         self.title_editor = editor
+        self.title_key_press_catcher = editor.connect("key-press-event", self.title_keys_dn)
     
     def commit_done(self):
         #TODO
@@ -306,8 +308,16 @@ class HiToDo(Gtk.Window):
     def tasks_keys_up(self, widget=None, event=None):
         kvn = Gdk.keyval_name(event.keyval)
     
+    def title_keys_dn(self, widget=None, event=None):
+        kvn = Gdk.keyval_name(event.keyval)
+        if kvn == "Escape":
+            self.commit_title(write=False)
+    
     def select_none(self, widget=None):
         self.selection.unselect_all()
+    
+    def select_all(self, widget=None):
+        self.selection.select_all()
     
     def open_file(self):
         #placeholder
@@ -324,6 +334,7 @@ class HiToDo(Gtk.Window):
     
     def task_selected(self, widget):
         #set notes from task
+        self.commit_all()
         self.sellist = widget.get_selected_rows()[1]
         self.selcount = widget.count_selected_rows()
         if self.selcount == 1:
@@ -387,7 +398,7 @@ class HiToDo(Gtk.Window):
         self.title_cell = Gtk.CellRendererText(editable=True, ellipsize=Pango.EllipsizeMode.NONE)
         self.title_cell.connect("edited", self.commit_title)
         self.title_cell.connect("editing-started", self.title_edit_start)
-        self.title_cell.connect("editing-canceled", self.commit_title, None, None, False)
+        self.title_cell.connect("editing-canceled", self.commit_title, None, None, True)
         note = Gtk.CellRendererText(editable=False, ellipsize=Pango.EllipsizeMode.MIDDLE, foreground="#bbb")
         self.col_title = Gtk.TreeViewColumn("Title")
         self.col_title.pack_start(self.title_cell, True)
@@ -419,7 +430,7 @@ class HiToDo(Gtk.Window):
         
     def create_task_actions(self, action_group):
         action_group.add_actions([
-            ("task_new", Gtk.STOCK_ADD, "New _Task", "<Primary>N", "New task", self.add_task),
+            ("task_new", Gtk.STOCK_ADD, "_New Task", "<Primary>N", "New task", self.add_task),
             ("task_newsub", Gtk.STOCK_INDENT, "New S_ubtask", "<Primary><Shift>N", "New subtask", self.add_subtask),
             ("task_del", Gtk.STOCK_REMOVE, None, None, "Delete task", self.del_current_task),
             ("task_cut", Gtk.STOCK_CUT, None, None, "Cut task", self.skip),
@@ -427,7 +438,7 @@ class HiToDo(Gtk.Window):
             ("task_paste", Gtk.STOCK_PASTE, None, None, "Paste task", self.skip),
             ("undo", Gtk.STOCK_UNDO, None, "<Primary>Z", "Undo", self.skip),
             ("redo", Gtk.STOCK_REDO, None, "<Primary><Shift>Z", "Redo", self.skip),
-            ("sel_all", Gtk.STOCK_SELECT_ALL, None, "<Primary>A", None, self.skip),
+            ("sel_all", Gtk.STOCK_SELECT_ALL, None, "<Primary>A", None, self.select_all),
             ("sel_inv", None, "_Invert Selection", None, None, self.skip),
             ("sel_none", None, "Select _None", "<Primary><Shift>A", None, self.select_none)
         ])
