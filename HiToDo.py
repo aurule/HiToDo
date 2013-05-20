@@ -147,7 +147,7 @@ class HiToDo(Gtk.Window):
         #set up selection handling and add the completed table widget
         self.selection = self.task_view.get_selection()
         self.selection.set_mode(Gtk.SelectionMode.MULTIPLE)
-        self.selection.connect("changed", self.task_selected)
+        self.sel_changed_handler = self.selection.connect("changed", self.task_selected)
         self.task_view.set_properties(expander_column=self.col_title, enable_tree_lines=True, reorderable=True)
         self.task_view.connect('key-press-event', self.tasks_keys_dn)
         self.task_view.connect('key-release-event', self.tasks_keys_up)
@@ -221,6 +221,8 @@ class HiToDo(Gtk.Window):
         if self.seliter is None: return
         if self.notes_view.has_focus():
             self.task_view.grab_focus()
+        else:
+            return
         
         start = self.notes_buff.get_iter_at_offset(0)
         end = self.notes_buff.get_iter_at_offset(-1)
@@ -233,7 +235,7 @@ class HiToDo(Gtk.Window):
             path = self.title_edit_path
             new_title = self.title_editor.get_text()
             self.title_editor.disconnect(self.title_key_press_catcher)
-        self.title_editor = None #clear this to prevent eating too much memory
+        self.title_editor = None #clear this to prevent eating memory
         
         old_title = self.tasklist[path][13]
         
@@ -273,6 +275,8 @@ class HiToDo(Gtk.Window):
         #only then can we remove them without invalidating paths
         for ref in refs:
             self.tasklist.remove(ref)
+        
+        self.seliter = None
     
     def del_task(self, path):
         treeiter = self.tasklist.get_iter(path)
@@ -311,7 +315,7 @@ class HiToDo(Gtk.Window):
     def title_keys_dn(self, widget=None, event=None):
         kvn = Gdk.keyval_name(event.keyval)
         if kvn == "Escape":
-            self.commit_title(write=False)
+            self.commit_title(path=self.title_edit_path, new_title='', write=False)
     
     def select_none(self, widget=None):
         self.selection.unselect_all()
@@ -325,8 +329,26 @@ class HiToDo(Gtk.Window):
         elif self.selcount == len(self.tasklist):
             self.select_none()
         else:
-            pass
-            #TODO
+            #disconnect selection changed handler
+            self.selection.disconnect(self.sel_changed_handler)
+            #invert recursively
+            self.__invert_tasklist_selection(self.tasklist.get_iter_first())
+            #reconnect selection changed handler
+            self.sel_changed_handler = self.selection.connect("changed", self.task_selected)
+            self.task_selected(self.selection)
+    
+    def __invert_tasklist_selection(self, treeiter):
+        while treeiter != None:
+            #swap selection state on iter
+            if self.selection.iter_is_selected(treeiter):
+                self.selection.unselect_iter(treeiter)
+            else:
+                self.selection.select_iter(treeiter)
+            #probe children
+            if self.tasklist.iter_has_child(treeiter):
+                childiter = store.iter_children(treeiter)
+                self.__invert_tasklist_selection(childiter)
+            treeiter = self.tasklist.iter_next(treeiter)
     
     def open_file(self):
         #placeholder
@@ -346,8 +368,7 @@ class HiToDo(Gtk.Window):
         self.sellist = widget.get_selected_rows()[1]
         
         #if there's anything in the list, commit our changes
-        if self.selcount != 0:
-            self.commit_all()
+        self.commit_all()
         
         #set internal selection vars    
         if self.selcount == 1:
@@ -355,6 +376,7 @@ class HiToDo(Gtk.Window):
             self.notes_buff.set_text(self.tasklist[self.seliter][14])
         else:
             self.seliter = None
+            self.notes_buff.set_text('')
     
     def due_render(self, col, cell, model, tree_iter, data):
         val = model[tree_iter][8]
