@@ -47,6 +47,9 @@ UI_XML = """
         <toolitem action='task_newsub' />
         <toolitem action='task_del' />
         <separator />
+        <toolitem action='undo' />
+        <toolitem action='redo' />
+        <separator />
         <toolitem action='task_cut' />
         <toolitem action='task_copy' />
         <toolitem action='task_paste' />
@@ -80,10 +83,33 @@ class HiToDo(Gtk.Window):
             str,    #notes
             bool    #use due time
         )
+        self.tasklist.set_sort_func(8, self.datecompare, None)
+        
+        self.defaults = [
+            5,      #default priority
+            0,      #pct complete
+            None,   #est time taken
+            None,   #act time taken
+            None,   #est begin
+            None,   #est complete
+            None,   #act begin
+            None,   #act complete
+            None,   #due
+            "",     #from
+            "",     #to
+            "",     #status
+            False,  #done
+            "",     #title
+            "",     #notes
+            False   #use due time
+        ]
         
         self.assignees = Gtk.ListStore(str)
+        self.assignees_list = []
         self.assigners = Gtk.ListStore(str)
+        self.assigners_list = []
         self.statii = Gtk.ListStore(str)
+        self.statii_list = []
         self.priority_adj = Gtk.Adjustment(5, 0, 26, 1, 5, 5)
         self.seliter = None
         self.sellist = None
@@ -91,6 +117,8 @@ class HiToDo(Gtk.Window):
         self.title_editor = None
         self.notes_ctl_mask = False
         self.notes_shift_mask = False
+        self.parent = None
+        self.title_key_press_catcher = None
         
         #cols:
         #   priority by letter - spin/int
@@ -181,26 +209,46 @@ class HiToDo(Gtk.Window):
     def skip(self, widget=None):
         pass
     
+    def datecompare(self, model, row1, row2, data=None):
+        sort_column, _ = model.get_sort_column_id()
+        value1 = model.get_value(row1, sort_column)
+        value2 = model.get_value(row2, sort_column)
+        
+        if value1 < value2:
+            return -1
+        elif value1 == value2:
+            return 0
+        else:
+            return 1
+    
     def add_task(self, widget=None, parent_iter=None):
         self.commit_all()
+        
+        #we can inherit some things if we're a new child
+        if parent_iter is None and self.parent is not None:
+            parent_iter = self.parent
+            parent = self.tasklist[parent_iter]
+        else:
+            parent = self.defaults
+        
         new_row_iter = self.tasklist.append(parent_iter, [
-            5,      #default priority TODO inherit from parent
-            0,      #pct complete
-            None,   #est time taken TODO if not set explicitly, this can be calculated as sum(children's est duration)
-            None,   #act time taken TODO if not set explicitly, this can be calculated as sum(children's act duration)
-            None,   #est begin TODO if not set explicitly, this can be calculated from the earliest child est begin
-            None,   #est complete TODO if not set explicitly, this can be calculated from the latest child est complete
-            None,   #act begin TODO if not set explicitly, this can be calculated from the earliest child act begin
-            None,   #act complete TODO if not set explicitly, this can be calculated from the earliest child act complete
-            None,   #due TODO inherit from parent, if present
-            "",     #from TODO inherit from parent, if present
-            "",     #to TODO inerherit from parent, if present
-            "",     #status
-            False,  #done
-            "",     #title
-            "",     #notes
-            False   #use due time TODO inerherit from parent, if present
-            ])
+            parent[0],  #default priority (inherit from parent)
+            0,          #pct complete
+            None,       #est time taken TODO if not set explicitly, this can be calculated as sum(children's est duration)
+            None,       #act time taken TODO if not set explicitly, this can be calculated as sum(children's act duration)
+            None,       #est begin TODO if not set explicitly, this can be calculated from the earliest child est begin
+            None,       #est complete
+            None,       #act begin TODO if not set explicitly, this can be calculated from the earliest child act begin
+            None,       #act complete
+            parent[8],  #due (inherit from parent)
+            parent[9],  #from (inherit from parent)
+            parent[10], #to (inherit from parent)
+            "",         #status
+            False,      #done
+            "",         #title
+            "",         #notes
+            parent[15]  #use due time (inherit from parent)
+        ])
         #select new row and immediately edit title field
         self.selection.select_iter(new_row_iter)
         path = self.tasklist.get_path(new_row_iter)
@@ -215,7 +263,34 @@ class HiToDo(Gtk.Window):
         '''Commit all possibly-in-progress edits.'''
         self.commit_title()
         self.commit_notes()
+        self.commit_status()
+        self.commit_assigner()
+        self.commit_assignee()
         #TODO commit other editable fields (from, to, status, and maybe others)
+    
+    def commit_status(self, widget=None, path=None, new_status=None):
+        if path is None: return
+        
+        if new_status != '' and new_status not in self.statii_list:
+            self.statii.append([new_status])
+            self.statii_list.append(new_status)
+        self.tasklist[path][11] = new_status
+    
+    def commit_assigner(self, widget=None, path=None, new_assigner=None):
+        if path is None: return
+        
+        if new_assigner != '' and new_assigner not in self.assigners_list:
+            self.assigners.append([new_assigner])
+            self.assigners_list.append(new_assigner)
+        self.tasklist[path][9] = new_assigner
+    
+    def commit_assignee(self, widget=None, path=None, new_assignee=None):
+        if path is None: return
+        
+        if new_assignee != '' and new_assignee not in self.assignees_list:
+            self.assignees.append([new_assignee])
+            self.assignees_list.append(new_assignee)
+        self.tasklist[path][10] = new_assignee
     
     def commit_notes(self, widget=None, data=None):
         if self.seliter is None: return
@@ -308,6 +383,9 @@ class HiToDo(Gtk.Window):
         kvn = Gdk.keyval_name(event.keyval)
         if kvn == "Delete":
             self.del_current_task()
+        if kvn == "F2":
+            path = self.tasklist.get_path(self.seliter)
+            self.task_view.set_cursor_on_cell(path, self.col_title, self.title_cell, True)
     
     def tasks_keys_up(self, widget=None, event=None):
         kvn = Gdk.keyval_name(event.keyval)
@@ -346,7 +424,7 @@ class HiToDo(Gtk.Window):
                 self.selection.select_iter(treeiter)
             #probe children
             if self.tasklist.iter_has_child(treeiter):
-                childiter = store.iter_children(treeiter)
+                childiter = self.tasklist.iter_children(treeiter)
                 self.__invert_tasklist_selection(childiter)
             treeiter = self.tasklist.iter_next(treeiter)
     
@@ -373,6 +451,7 @@ class HiToDo(Gtk.Window):
         #set internal selection vars    
         if self.selcount == 1:
             self.seliter = self.tasklist.get_iter(self.sellist[0])
+            self.parent = self.tasklist.iter_parent(self.seliter)
             self.notes_buff.set_text(self.tasklist[self.seliter][14])
         else:
             self.seliter = None
@@ -411,17 +490,20 @@ class HiToDo(Gtk.Window):
         self.task_view.append_column(col_pct)
         
         assigner = Gtk.CellRendererCombo(model=self.assigners, has_entry=True, editable=True)
-        col_assigner = Gtk.TreeViewColumn("From", assigner, text_column=9)
+        assigner.connect("edited", self.commit_assigner)
+        col_assigner = Gtk.TreeViewColumn("From", assigner, text_column=9, text=9)
         col_assigner.set_sort_column_id(9)
         self.task_view.append_column(col_assigner)
         
         assignee = Gtk.CellRendererCombo(model=self.assignees, has_entry=True, editable=True)
-        col_assignee = Gtk.TreeViewColumn("To", assignee, text_column=10)
+        assignee.connect("edited", self.commit_assignee)
+        col_assignee = Gtk.TreeViewColumn("To", assignee, text_column=10, text=10)
         col_assignee.set_sort_column_id(10)
         self.task_view.append_column(col_assignee)
         
         status = Gtk.CellRendererCombo(model=self.statii, has_entry=True, editable=True)
-        col_stats = Gtk.TreeViewColumn("Status", status, text_column=11)
+        status.connect("edited", self.commit_status)
+        col_stats = Gtk.TreeViewColumn("Status", status, text_column=11, text=11)
         col_stats.set_sort_column_id(11)
         self.task_view.append_column(col_stats)
         
