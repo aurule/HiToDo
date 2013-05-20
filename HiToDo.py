@@ -86,6 +86,8 @@ class HiToDo(Gtk.Window):
         self.statii = Gtk.ListStore(str)
         self.priority_adj = Gtk.Adjustment(5, 0, 26, 1, 5, 5)
         self.seliter = None
+        self.sellist = None
+        self.selcount = 0
         self.title_editor = None
         self.notes_ctl_mask = False
         self.notes_shift_mask = False
@@ -147,6 +149,8 @@ class HiToDo(Gtk.Window):
         self.selection.set_mode(Gtk.SelectionMode.MULTIPLE)
         self.selection.connect("changed", self.task_selected)
         self.task_view.set_properties(expander_column=self.col_title, enable_tree_lines=True, reorderable=True)
+        self.task_view.connect('key-press-event', self.tasks_keys_dn)
+        self.task_view.connect('key-release-event', self.tasks_keys_up)
         task_scroll_win.add(self.task_view)
         task_pane.pack1(task_scroll_win, True, True)
         
@@ -260,7 +264,12 @@ class HiToDo(Gtk.Window):
         pass
     
     def del_current_task(self, widget=None):
-        for ref in self.selrefs:
+        refs = []
+        #first we get references to each row
+        for path in self.sellist:
+            refs.append(self.tasklist.get_iter(path))
+        #only then can we remove them without invalidating paths
+        for ref in refs:
             self.tasklist.remove(ref)
     
     def del_task(self, path):
@@ -289,6 +298,14 @@ class HiToDo(Gtk.Window):
         if kvn == "Control_L" or kvn == "Control_R":
             self.notes_ctl_mask = False
     
+    def tasks_keys_dn(self, widget=None, event=None):
+        kvn = Gdk.keyval_name(event.keyval)
+        if kvn == "Delete":
+            self.del_current_task()
+    
+    def tasks_keys_up(self, widget=None, event=None):
+        kvn = Gdk.keyval_name(event.keyval)
+    
     def select_none(self, widget=None):
         self.selection.unselect_all()
     
@@ -308,10 +325,6 @@ class HiToDo(Gtk.Window):
     def task_selected(self, widget):
         #set notes from task
         self.sellist = widget.get_selected_rows()[1]
-        self.selrefs = []
-        model = self.tasklist
-        for path in self.sellist:
-            self.selrefs.append(model.get_iter(path))
         self.selcount = widget.count_selected_rows()
         if self.selcount == 1:
             self.seliter = self.tasklist.get_iter(self.sellist[0])
