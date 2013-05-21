@@ -371,6 +371,7 @@ class HiToDo(Gtk.Window):
             self.notes_ctl_mask = True
         if kvn == "Return" and self.notes_ctl_mask:
             self.commit_notes()
+            self.notes_ctl_mask = False
             return True
     
     def notes_keys_up(self, widget=None, event=None):
