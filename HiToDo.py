@@ -269,6 +269,23 @@ class HiToDo(Gtk.Window):
         self.commit_due()
         self.commit_priority()
     
+    def commit_done(self, renderer=None, path=None, data=None):
+        if path is None: return
+        
+        done = renderer.get_active()
+        if not done:
+            #we're transitioning from not-done to done
+            #TODO mark all children done
+            #TODO if we have a parent, tell them to recalculate their pct complete
+            pct = 100
+        else:
+            #we're transitioning from done to not-done
+            #TODO recalculate our pct complete based on children's done flag
+            pct = 0
+        
+        self.tasklist[path][12] = not done
+        self.tasklist[path][1] = pct
+    
     def commit_priority(self, widget=None, path=None, new_priority=None):
         if path is None: return
         
@@ -368,6 +385,7 @@ class HiToDo(Gtk.Window):
         editor.connect("icon-press", self.due_pick)
     
     def due_pick(self, entry, pos, event, data=None):
+        #TODO add calendar picker popup
         pass
     
     def complete_edit_start(self, renderer, editor, path):
@@ -375,11 +393,7 @@ class HiToDo(Gtk.Window):
         editor.connect("icon-press", self.complete_pick)
     
     def complete_pick(self, entry, pos, event, data=None):
-        pass
-    
-    def commit_done(self):
-        #TODO
-        #self.title_cell.set_properties(strikethrough=True, foreground="#999")
+        #TODO add calendar picker popup
         pass
     
     def del_current_task(self, widget=None):
@@ -524,9 +538,9 @@ class HiToDo(Gtk.Window):
         cell.set_property("text", out)
     
     def create_view_columns(self):
-        priority = Gtk.CellRendererText(editable=True)
+        priority = Gtk.CellRendererText(editable=True, foreground="#999")
         priority.connect("edited", self.commit_priority)
-        col_priority = Gtk.TreeViewColumn("!", priority, text=0)
+        col_priority = Gtk.TreeViewColumn("!", priority, text=0, foreground_set=12)
         col_priority.set_sort_column_id(0)
         self.task_view.append_column(col_priority)
         
@@ -537,46 +551,47 @@ class HiToDo(Gtk.Window):
         
         #TODO est, spent
         
-        due = Gtk.CellRendererText(editable=True)
+        due = Gtk.CellRendererText(editable=True, foreground="#999")
         due.connect("edited", self.commit_due)
         due.connect("editing-started", self.due_edit_start)
-        col_due = Gtk.TreeViewColumn("Due", due)
+        col_due = Gtk.TreeViewColumn("Due", due, foreground_set=12)
         col_due.set_sort_column_id(8)
         col_due.set_cell_data_func(due, self.due_render)
         self.task_view.append_column(col_due)
         
-        completed = Gtk.CellRendererText(editable=True)
+        completed = Gtk.CellRendererText(editable=True, foreground="#999")
         completed.connect("edited", self.commit_complete)
         completed.connect("editing-started", self.complete_edit_start)
-        col_completed = Gtk.TreeViewColumn("Completed", completed)
+        col_completed = Gtk.TreeViewColumn("Completed", completed, foreground_set=12)
         col_completed.set_sort_column_id(7)
         col_completed.set_cell_data_func(completed, self.completed_render)
         self.task_view.append_column(col_completed)
         
-        assigner = Gtk.CellRendererCombo(model=self.assigners, has_entry=True, editable=True)
+        assigner = Gtk.CellRendererCombo(model=self.assigners, has_entry=True, editable=True, foreground="#999")
         assigner.connect("edited", self.commit_assigner)
-        col_assigner = Gtk.TreeViewColumn("From", assigner, text_column=1, text=9)
+        col_assigner = Gtk.TreeViewColumn("From", assigner, text_column=1, text=9, foreground_set=12)
         col_assigner.set_sort_column_id(9)
         self.task_view.append_column(col_assigner)
         
-        assignee = Gtk.CellRendererCombo(model=self.assignees, has_entry=True, editable=True)
+        assignee = Gtk.CellRendererCombo(model=self.assignees, has_entry=True, editable=True, foreground="#999")
         assignee.connect("edited", self.commit_assignee)
-        col_assignee = Gtk.TreeViewColumn("To", assignee, text_column=1, text=10)
+        col_assignee = Gtk.TreeViewColumn("To", assignee, text_column=1, text=10, foreground_set=12)
         col_assignee.set_sort_column_id(10)
         self.task_view.append_column(col_assignee)
         
-        status = Gtk.CellRendererCombo(model=self.statii, has_entry=True, editable=True)
+        status = Gtk.CellRendererCombo(model=self.statii, has_entry=True, editable=True, foreground="#999")
         status.connect("edited", self.commit_status)
-        col_stats = Gtk.TreeViewColumn("Status", status, text_column=1, text=11)
+        col_stats = Gtk.TreeViewColumn("Status", status, text_column=1, text=11, foreground_set=12)
         col_stats.set_sort_column_id(11)
         self.task_view.append_column(col_stats)
         
         done = Gtk.CellRendererToggle(activatable=True, radio=False)
+        done.connect("toggled", self.commit_done)
         col_done = Gtk.TreeViewColumn(u"\u2713", done, active=12)
         col_done.set_sort_column_id(12)
         self.task_view.append_column(col_done)
         
-        self.title_cell = Gtk.CellRendererText(editable=True, ellipsize=Pango.EllipsizeMode.NONE)
+        self.title_cell = Gtk.CellRendererText(editable=True, ellipsize=Pango.EllipsizeMode.NONE, foreground="#999")
         self.title_cell.connect("edited", self.commit_title)
         self.title_cell.connect("editing-started", self.title_edit_start)
         self.title_cell.connect("editing-canceled", self.commit_title, None, None, True)
@@ -585,7 +600,10 @@ class HiToDo(Gtk.Window):
         self.col_title.pack_start(self.title_cell, True)
         self.col_title.pack_start(note, False)
         self.col_title.add_attribute(self.title_cell, "text", 13)
+        self.col_title.add_attribute(self.title_cell, "foreground-set", 12)
+        self.col_title.add_attribute(self.title_cell, "strikethrough", 12)
         self.col_title.set_cell_data_func(note, self.note_render)
+        self.col_title.add_attribute(note, "strikethrough", 12)
         self.col_title.set_sort_column_id(13)
         self.task_view.append_column(self.col_title)
         '''
