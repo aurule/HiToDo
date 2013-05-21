@@ -3,6 +3,7 @@
 from gi.repository import Gtk, Gdk, Pango
 from datetime import datetime, timedelta as td
 from os import linesep
+from dateutil.parser import parse as dateparse
 
 import testing
 
@@ -265,7 +266,33 @@ class HiToDo(Gtk.Window):
         self.commit_status()
         self.commit_assigner()
         self.commit_assignee()
-        #TODO commit other editable fields (from, to, status, and maybe others)
+        self.commit_due()
+        self.commit_priority()
+    
+    def commit_priority(self, widget=None, path=None, new_priority=None):
+        if path is None: return
+        
+        if new_priority.isdigit():
+            self.tasklist[path][0] = int(new_priority)
+    
+    def commit_due(self, widget=None, path=None, new_due=None):
+        if path is None: return
+        
+        try:
+            dt = dateparse(new_due, fuzzy=True)
+            self.tasklist[path][8] = dt
+        except ValueError:
+            pass
+    
+    def commit_complete(self, widget=None, path=None, new_complete=None):
+        if path is None: return
+        
+        try:
+            dt = dateparse(new_complete, fuzzy=True)
+            self.tasklist[path][7] = dt
+            #TODO stop and commit the duration timer if needed
+        except ValueError:
+            pass
     
     def commit_status(self, widget=None, path=None, new_status=None):
         if path is None: return
@@ -335,6 +362,20 @@ class HiToDo(Gtk.Window):
         self.title_edit_old_val = self.tasklist[path][13]
         self.title_editor = editor
         self.title_key_press_catcher = editor.connect("key-press-event", self.title_keys_dn)
+    
+    def due_edit_start(self, renderer, editor, path):
+        editor.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "appointment-new")
+        editor.connect("icon-press", self.due_pick)
+    
+    def due_pick(self, entry, pos, event, data=None):
+        pass
+    
+    def complete_edit_start(self, renderer, editor, path):
+        editor.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "appointment-new")
+        editor.connect("icon-press", self.complete_pick)
+    
+    def complete_pick(self, entry, pos, event, data=None):
+        pass
     
     def commit_done(self):
         #TODO
@@ -483,7 +524,8 @@ class HiToDo(Gtk.Window):
         cell.set_property("text", out)
     
     def create_view_columns(self):
-        priority = Gtk.CellRendererSpin(editable=True, digits=2, adjustment=self.priority_adj)
+        priority = Gtk.CellRendererText(editable=True)
+        priority.connect("edited", self.commit_priority)
         col_priority = Gtk.TreeViewColumn("!", priority, text=0)
         col_priority.set_sort_column_id(0)
         self.task_view.append_column(col_priority)
@@ -495,13 +537,17 @@ class HiToDo(Gtk.Window):
         
         #TODO est, spent
         
-        due = Gtk.CellRendererText()
+        due = Gtk.CellRendererText(editable=True)
+        due.connect("edited", self.commit_due)
+        due.connect("editing-started", self.due_edit_start)
         col_due = Gtk.TreeViewColumn("Due", due)
         col_due.set_sort_column_id(8)
         col_due.set_cell_data_func(due, self.due_render)
         self.task_view.append_column(col_due)
         
-        completed = Gtk.CellRendererText()
+        completed = Gtk.CellRendererText(editable=True)
+        completed.connect("edited", self.commit_complete)
+        completed.connect("editing-started", self.complete_edit_start)
         col_completed = Gtk.TreeViewColumn("Completed", completed)
         col_completed.set_sort_column_id(7)
         col_completed.set_cell_data_func(completed, self.completed_render)
