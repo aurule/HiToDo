@@ -4,6 +4,7 @@ from gi.repository import Gtk, Gdk, Pango
 from datetime import datetime, timedelta as td
 from os import linesep
 from dateutil.parser import parse as dateparse
+from math import floor
 
 import testing
 
@@ -82,7 +83,8 @@ class HiToDo(Gtk.Window):
             bool,   #done
             str,    #title
             str,    #notes
-            bool    #use due time
+            bool,   #use due time
+            bool    #inverted done flag
         )
         self.tasklist.set_sort_func(8, self.datecompare, None)
         
@@ -247,7 +249,8 @@ class HiToDo(Gtk.Window):
             False,      #done
             "",         #title
             "",         #notes
-            parent[15]  #use due time (inherit from parent)
+            parent[15], #use due time (inherit from parent)
+            True        #inverted done
         ])
         #select new row and immediately edit title field
         self.selection.select_iter(new_row_iter)
@@ -275,16 +278,71 @@ class HiToDo(Gtk.Window):
         done = renderer.get_active()
         if not done:
             #we're transitioning from not-done to done
-            #TODO mark all children done
-            #TODO if we have a parent, tell them to recalculate their pct complete
+            
+            #we're now 100% complete
             pct = 100
+            
+            self.force_children_done(path)
         else:
             #we're transitioning from done to not-done
-            #TODO recalculate our pct complete based on children's done flag
-            pct = 0
+            #we are now utterly incomplete
+            pct = self.calc_pct_from_children(path)
         
         self.tasklist[path][12] = not done
+        self.tasklist[path][16] = done
         self.tasklist[path][1] = pct
+        
+        #recalculate our parent's pct complete, if we have one
+        self.recalc_parent_pct(path)
+    
+    def recalc_parent_pct(self, path):
+        parts = path.rpartition(':')
+        parent_path = parts[0]
+        if parent_path == '': return
+        
+        parent_iter = self.tasklist.get_iter(parent_path)
+        if self.tasklist[parent_iter][12]: return #skip calculation if parent is marked "done"
+        
+        n_children = self.tasklist.iter_n_children(parent_iter)
+        childiter = self.tasklist.iter_children(parent_iter)
+        total_pct = 0
+        while childiter != None:
+            total_pct += self.tasklist[childiter][1]
+            childiter = self.tasklist.iter_next(childiter)
+        
+        self.tasklist[parent_iter][1] = int(floor(total_pct / n_children))
+        self.recalc_parent_pct(parent_path)
+    
+    def calc_pct_from_children(self, path):
+        #Assumes the children are already calculated out and does not recurse.
+        #Just peeks at the top level children's pct completes.
+        treeiter = self.tasklist.get_iter(path)
+        if self.tasklist.iter_has_child(treeiter):
+            n_children = self.tasklist.iter_n_children(treeiter)
+            child_iter = self.tasklist.iter_children(treeiter)
+            total_pct = 0
+            while child_iter is not None:
+                total_pct += self.tasklist[child_iter][1]
+                child_iter = self.tasklist.iter_next(child_iter)
+            
+            return int(floor(total_pct / n_children))
+        else:
+            return 0
+    
+    def force_children_done(self, path):
+        treeiter = self.tasklist.get_iter(path)
+        childiter = self.tasklist.iter_children(treeiter)
+        self.__force_peers_done(childiter)
+    
+    def __force_peers_done(self, treeiter):
+        while treeiter != None:
+            self.tasklist[treeiter][1] = 100
+            self.tasklist[treeiter][12] = True
+            self.tasklist[treeiter][16] = False
+            if self.tasklist.iter_has_child(treeiter):
+                child_iter = self.tasklist.iter_children(treeiter)
+                self.__force_peers_done(child_iter)
+            treeiter = self.tasklist.iter_next(treeiter)
     
     def commit_priority(self, widget=None, path=None, new_priority=None):
         if path is None: return
@@ -545,7 +603,7 @@ class HiToDo(Gtk.Window):
         self.task_view.append_column(col_priority)
         
         pct = Gtk.CellRendererProgress()
-        col_pct = Gtk.TreeViewColumn("%", pct, value=1)
+        col_pct = Gtk.TreeViewColumn("%", pct, value=1, visible=16)
         col_pct.set_sort_column_id(1)
         self.task_view.append_column(col_pct)
         
