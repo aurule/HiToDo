@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from __future__ import division
 from gi.repository import Gtk, Gdk, Pango
 from datetime import datetime, timedelta as td
 from os import linesep
@@ -70,8 +71,8 @@ class HiToDo(Gtk.Window):
         self.tasklist = Gtk.TreeStore(
             int,    #priority
             int,    #pct complete
-            object, #est time taken
-            object, #act time taken
+            int,    #est time taken in seconds
+            int,    #act time taken in seconds
             object, #est begin
             object, #est complete
             object, #act begin
@@ -91,8 +92,8 @@ class HiToDo(Gtk.Window):
         self.defaults = [
             5,      #default priority
             0,      #pct complete
-            None,   #est time taken
-            None,   #act time taken
+            0,      #est time taken
+            0,      #act time taken
             None,   #est begin
             None,   #est complete
             None,   #act begin
@@ -104,7 +105,8 @@ class HiToDo(Gtk.Window):
             False,  #done
             "",     #title
             "",     #notes
-            False   #use due time
+            False,  #use due time
+            True    #inverted done
         ]
         
         self.assignees = Gtk.ListStore(str)
@@ -235,22 +237,22 @@ class HiToDo(Gtk.Window):
         
         new_row_iter = self.tasklist.append(parent_iter, [
             parent[0],  #default priority (inherit from parent)
-            0,          #pct complete
-            None,       #est time taken TODO if not set explicitly, this can be calculated as sum(children's est duration)
-            None,       #act time taken TODO if not set explicitly, this can be calculated as sum(children's act duration)
-            None,       #est begin TODO if not set explicitly, this can be calculated from the earliest child est begin
-            None,       #est complete
-            None,       #act begin TODO if not set explicitly, this can be calculated from the earliest child act begin
-            None,       #act complete
+            self.defaults[1],          #pct complete
+            self.defaults[2],          #est time taken TODO if not set explicitly, this can be calculated as sum(children's est duration)
+            self.defaults[3],          #act time taken TODO if not set explicitly, this can be calculated as sum(children's act duration)
+            self.defaults[4],       #est begin TODO if not set explicitly, this can be calculated from the earliest child est begin
+            self.defaults[5],       #est complete
+            self.defaults[6],       #act begin TODO if not set explicitly, this can be calculated from the earliest child act begin
+            self.defaults[7],       #act complete
             parent[8],  #due (inherit from parent)
             parent[9],  #from (inherit from parent)
             parent[10], #to (inherit from parent)
-            "",         #status
-            False,      #done
-            "",         #title
-            "",         #notes
+            self.defaults[11],         #status
+            self.defaults[12],      #done
+            self.defaults[13],         #title
+            self.defaults[14],         #notes
             parent[15], #use due time (inherit from parent)
-            True        #inverted done
+            self.defaults[16]        #inverted done
         ])
         #select new row and immediately edit title field
         self.selection.select_iter(new_row_iter)
@@ -578,7 +580,6 @@ class HiToDo(Gtk.Window):
         
         fmt = "%x %X" if duetime else "%x"
         out = "" if val is None else val.strftime(fmt)
-        
         cell.set_property("text", str(out))
     
     def completed_render(self, col, cell, model, tree_iter, data):
@@ -587,12 +588,21 @@ class HiToDo(Gtk.Window):
         
         fmt = "%x %X" if duetime else "%x"
         out = "" if val is None else val.strftime(fmt)
-        
         cell.set_property("text", str(out))
+    
     def note_render(self, col, cell, model, tree_iter, data):
         val = model[tree_iter][14]
         out = '' if val == '' else "[%s]" % val.replace(linesep, ' ')
-        
+        cell.set_property("text", out)
+    
+    def est_render(self, col, cell, model, tree_iter, data):
+        val = model[tree_iter][2]
+        out = '' if val == 0 else '%1.2fH' % (val/3600)
+        cell.set_property("text", out)
+    
+    def spent_render(self, col, cell, model, tree_iter, data):
+        val = model[tree_iter][3]
+        out = '' if val == 0 else '%1.2fH' % (val/3600)
         cell.set_property("text", out)
     
     def create_view_columns(self):
@@ -607,7 +617,17 @@ class HiToDo(Gtk.Window):
         col_pct.set_sort_column_id(1)
         self.task_view.append_column(col_pct)
         
-        #TODO est, spent
+        est = Gtk.CellRendererText(foreground="#999")
+        col_est = Gtk.TreeViewColumn("Est", est, foreground_set=12)
+        col_est.set_sort_column_id(2)
+        col_est.set_cell_data_func(est, self.est_render)
+        self.task_view.append_column(col_est)
+        
+        spent = Gtk.CellRendererText(foreground="#999")
+        col_spent = Gtk.TreeViewColumn("Spent", spent, foreground_set=12)
+        col_spent.set_sort_column_id(3)
+        col_spent.set_cell_data_func(spent, self.spent_render)
+        self.task_view.append_column(col_spent)
         
         due = Gtk.CellRendererText(editable=True, foreground="#999")
         due.connect("edited", self.commit_due)
