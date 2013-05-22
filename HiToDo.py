@@ -273,6 +273,18 @@ class HiToDo(Gtk.Window):
         self.commit_assignee()
         self.commit_due()
         self.commit_priority()
+        self.commit_est()
+    
+    def commit_est(self, widget=None, path=None, new_est=None):
+        if path is None: return
+        
+        if is_number(new_est):
+            out = floor(float(new_est) * 3600)
+            self.tasklist[path][2] = out
+        
+    def est_edit_start(self, renderer, editor, path):
+        val = self.tasklist[path][2]
+        editor.set_text(str(val/3600)) #don't display the H suffix during editing
     
     def commit_done(self, renderer=None, path=None, data=None):
         if path is None: return
@@ -349,6 +361,7 @@ class HiToDo(Gtk.Window):
     def commit_priority(self, widget=None, path=None, new_priority=None):
         if path is None: return
         
+        #priorities have to be integers
         if new_priority.isdigit():
             self.tasklist[path][0] = int(new_priority)
     
@@ -617,7 +630,9 @@ class HiToDo(Gtk.Window):
         col_pct.set_sort_column_id(1)
         self.task_view.append_column(col_pct)
         
-        est = Gtk.CellRendererText(foreground="#999")
+        est = Gtk.CellRendererText(foreground="#999", editable=True)
+        est.connect("edited", self.commit_est)
+        est.connect("editing-started", self.est_edit_start)
         col_est = Gtk.TreeViewColumn("Est", est, foreground_set=12)
         col_est.set_sort_column_id(2)
         col_est.set_cell_data_func(est, self.est_render)
@@ -741,6 +756,13 @@ class HiToDo(Gtk.Window):
 def main():
     Gtk.main()
     return
+
+def is_number(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
 
 # If the program is run directly or passed as an argument to the python
 # interpreter then create a Picker instance and show it
