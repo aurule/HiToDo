@@ -6,8 +6,10 @@ from datetime import datetime, timedelta as td
 from os import linesep
 from dateutil.parser import parse as dateparse
 from math import floor
+import xml.etree.ElementTree as et
 
 import testing
+import dialogs
 
 UI_XML = """
 <ui>
@@ -124,6 +126,8 @@ class HiToDo(Gtk.Window):
         self.notes_shift_mask = False
         self.parent = None
         self.title_key_press_catcher = None
+        self.file_name = None
+        self.file_dirty = True
         
         #cols:
         #   priority by letter - spin/int
@@ -209,6 +213,8 @@ class HiToDo(Gtk.Window):
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)       
         self.connect("delete-event", Gtk.main_quit)
         self.show_all()
+        
+        self.open_dlg = dialogs.htd_open(self)
     
     def skip(self, widget=None):
         pass
@@ -551,16 +557,53 @@ class HiToDo(Gtk.Window):
             treeiter = self.tasklist.iter_next(treeiter)
     
     def open_file(self, widget=None):
-        return
-        #when adding lots of rows (like from a new file)...
+        if not self.confirm_discard(): return
+        
+        retcode = self.open_dlg.run()
+        self.open_dlg.hide()
+        if retcode != -3: return #cancel out if requested
+        
+        fname = self.open_dlg.get_filename()
+        #TODO get type and based on that, pick the reader needed
+        
+        #when adding lots of rows, we want to disable the display until we're done
         self.task_view.freeze_child_notify()
         self.task_view.set_model(None)
         self.tasklist.clear()
-        #disable model sorting
-        #load the file and add rows to self.tasklist
-        #re-enable model sorting
+        
+        #TODO add rows to self.tasklist
+        
+        #reconnect model to view
         self.task_view.set_model(self.tasklist)
         self.task_view.thaw_child_notify()
+        
+        self.update_title()
+    
+    def confirm_discard(self):
+        #TODO if current file is dirty with unsaved changes, prompt the user to save or discard the file, or cancel the originating operation
+        #close w/o saving -> discard and continue
+        #save -> save and continue
+        #cancel -> don't close at all
+        return True
+    
+    def save_file(self, widget=None):
+        #TODO show save dialog
+        self.file_name = "" #TODO get filename from save dialog
+        self.update_title()
+        self.file_dirty = False
+    
+    def update_title(self):
+        if self.file_name is not None:
+            pass
+            #TODO set self.filename to be "fname (fpath truncated) - HiToDo"
+        else:
+            self.filename = "Untitled List - HiToDo"
+        
+        self.set_title(self.title)
+    
+    def new_file(self, widget=None):
+        self.update_title()
+        pass
     
     def task_selected(self, widget):
         self.selcount = widget.count_selected_rows()
@@ -700,8 +743,8 @@ class HiToDo(Gtk.Window):
     def create_top_actions(self, action_group):
         action_group.add_actions([
             ("new_file", Gtk.STOCK_NEW, None, "", None, self.skip),
-            ("open_file", Gtk.STOCK_OPEN, None, None, "Open file", self.skip),
-            ("save_file", Gtk.STOCK_SAVE, None, None, "Save file", self.skip),
+            ("open_file", Gtk.STOCK_OPEN, None, None, "Open file", self.open_file),
+            ("save_file", Gtk.STOCK_SAVE, None, None, "Save file", self.save_file),
             ("saveas_file", Gtk.STOCK_SAVE_AS, None, None, None, self.skip),
             ("quit", Gtk.STOCK_QUIT, None, None, None, self.destroy),
             ("help_about", Gtk.STOCK_ABOUT, None, None, None, self.skip),
