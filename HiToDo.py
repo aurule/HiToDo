@@ -297,6 +297,7 @@ class HiToDo(Gtk.Window):
             pct = 100
             
             self.force_children_done(path)
+            self.tasklist[path][7] = datetime.now()
         else:
             #we're transitioning from done to not-done
             #we are now utterly incomplete
@@ -377,12 +378,15 @@ class HiToDo(Gtk.Window):
     def commit_complete(self, widget=None, path=None, new_complete=None):
         if path is None: return
         
-        try:
-            dt = dateparse(new_complete, fuzzy=True)
-            self.tasklist[path][7] = dt
-            #TODO stop and commit the duration timer if needed
-        except ValueError:
-            pass
+        if new_complete == '':
+            self.tasklist[path][7] = None
+        else:
+            try:
+                dt = dateparse(new_complete, fuzzy=True)
+                self.tasklist[path][7] = dt
+                #TODO stop and commit the duration timer if needed
+            except ValueError:
+                pass
     
     def commit_status(self, widget=None, path=None, new_status=None):
         if path is None: return
@@ -484,15 +488,6 @@ class HiToDo(Gtk.Window):
         treeiter = self.tasklist.get_iter(path)
         self.tasklist.remove(treeiter)
     
-    def update_task(self, widget=None):
-        #TODO
-        #when Done is True, we need to mark our pct complete as 100, then ping our parent so it can update its percent complete
-        #when our pct complete is updated, we also need to ping our parent
-        #pct complete is calculated differently by whether or not we have children:
-        #   with chlidren, pct complete = number of children * 100 / sum(children's pct completes)
-        #   sans children, pct complete = 100 * Done
-        pass
-    
     def notes_keys_dn(self, widget=None, event=None):
         kvn = Gdk.keyval_name(event.keyval)
         if kvn == "Control_L" or kvn == "Control_R":
@@ -515,9 +510,6 @@ class HiToDo(Gtk.Window):
         if kvn == "F2":
             path = self.tasklist.get_path(self.seliter)
             self.task_view.set_cursor_on_cell(path, self.col_title, self.title_cell, True)
-            return True
-        if kvn == "space":
-            #TODO mark all selected tasks as done or not done
             return True
     
     def title_keys_dn(self, widget=None, event=None):
@@ -558,8 +550,7 @@ class HiToDo(Gtk.Window):
                 self.__invert_tasklist_selection(childiter)
             treeiter = self.tasklist.iter_next(treeiter)
     
-    def open_file(self):
-        #placeholder
+    def open_file(self, widget=None):
         return
         #when adding lots of rows (like from a new file)...
         self.task_view.freeze_child_notify()
@@ -655,7 +646,7 @@ class HiToDo(Gtk.Window):
         completed = Gtk.CellRendererText(editable=True, foreground="#999")
         completed.connect("edited", self.commit_complete)
         completed.connect("editing-started", self.complete_edit_start)
-        col_completed = Gtk.TreeViewColumn("Completed", completed, foreground_set=12)
+        col_completed = Gtk.TreeViewColumn("Completed", completed, foreground_set=12, visible=12)
         col_completed.set_sort_column_id(7)
         col_completed.set_cell_data_func(completed, self.completed_render)
         self.task_view.append_column(col_completed)
