@@ -65,9 +65,10 @@ UI_XML = """
 # Define the gui and its actions.
 class HiToDo(Gtk.Window):
     def __init__(self):
-        Gtk.Window.__init__(self, title="HiToDo")
+        Gtk.Window.__init__(self)
         self.set_default_size(1100, 700)
-        self.title = "HiToDo"
+        self.title = "Untitled List - HiToDo"
+        self.set_title(self.title)
         
         #create core tree store
         self.tasklist = Gtk.TreeStore(
@@ -89,7 +90,10 @@ class HiToDo(Gtk.Window):
             bool,   #use due time
             bool    #inverted done flag
         )
+        self.tasklist.set_sort_func(7, self.datecompare, None)
         self.tasklist.set_sort_func(8, self.datecompare, None)
+        self.tasklist.connect("row-changed", self.make_dirty)
+        self.tasklist.connect("row-deleted", self.make_dirty)
         
         self.defaults = [
             5,      #default priority
@@ -126,7 +130,7 @@ class HiToDo(Gtk.Window):
         self.notes_shift_mask = False
         self.parent = None
         self.title_key_press_catcher = None
-        self.file_name = None
+        self.file_name = ""
         self.file_dirty = True
         
         #cols:
@@ -593,17 +597,24 @@ class HiToDo(Gtk.Window):
         self.file_dirty = False
     
     def update_title(self):
-        if self.file_name is not None:
-            pass
-            #TODO set self.filename to be "fname (fpath truncated) - HiToDo"
+        if self.file_name != "":
+            ttl = "fname (fpath truncated) - HiToDo"
         else:
-            self.filename = "Untitled List - HiToDo"
+            ttl = "Untitled List - HiToDo"
+        
+        self.title = "*"+ttl if self.dirty else ttl
         
         self.set_title(self.title)
     
-    def new_file(self, widget=None):
+    def make_dirty(self, path=None, it=None, data=None):
+        self.dirty = True
         self.update_title()
-        pass
+    
+    def new_file(self, widget=None):
+        self.confirm_discard()
+        self.tasklist.clear()
+        self.file_name = ""
+        self.dirty = False
     
     def task_selected(self, widget):
         self.selcount = widget.count_selected_rows()
@@ -742,7 +753,7 @@ class HiToDo(Gtk.Window):
     
     def create_top_actions(self, action_group):
         action_group.add_actions([
-            ("new_file", Gtk.STOCK_NEW, None, "", None, self.skip),
+            ("new_file", Gtk.STOCK_NEW, None, "", None, self.new_file),
             ("open_file", Gtk.STOCK_OPEN, None, None, "Open file", self.open_file),
             ("save_file", Gtk.STOCK_SAVE, None, None, "Save file", self.save_file),
             ("saveas_file", Gtk.STOCK_SAVE_AS, None, None, None, self.skip),
@@ -782,10 +793,6 @@ class HiToDo(Gtk.Window):
     
     def destroy(self, widget):
         Gtk.main_quit()
-    
-    def update_title(self, title):
-        self.title = title
-        self.window.set_title(self.title)
 
 def main():
     Gtk.main()
