@@ -219,6 +219,7 @@ class HiToDo(Gtk.Window):
         self.show_all()
         
         self.open_dlg = dialogs.htd_open(self)
+        self.save_dlg = dialogs.htd_save(self)
     
     def skip(self, widget=None):
         pass
@@ -284,17 +285,80 @@ class HiToDo(Gtk.Window):
         self.commit_due()
         self.commit_priority()
         self.commit_est()
+        self.commit_spent()
     
     def commit_est(self, widget=None, path=None, new_est=None):
         if path is None: return
         
-        if is_number(new_est):
-            out = floor(float(new_est) * 3600)
-            self.tasklist[path][2] = out
+        if not is_number(new_est): return
+        new_est = float(new_est)
+        out = floor(new_est * 3600)
+        self.tasklist[path][2] = int(out)
+    
+        parts = path.rpartition(':')
+        parent_path = parts[0]
+        if parent_path != "":
+            parent_est = self.tasklist[parent_path][2]
+            pest = (parent_est + out - old_est)/3600
+            self.commit_est(path=parent_path, new_est=pest)
         
     def est_edit_start(self, renderer, editor, path):
         val = self.tasklist[path][2]
         editor.set_text(str(val/3600)) #don't display the H suffix during editing
+        editor.set_icon_from_stock(Gtk.EntryIconPosition.SECONDARY, Gtk.STOCK_REFRESH)
+        editor.set_icon_tooltip_text(Gtk.EntryIconPosition.SECONDARY, "Recalculate from children")
+        editor.connect("icon-press", self.derive_est, path)
+    
+    def derive_est(self, entry=None, pos=None, event=None, path=None):
+        #Assumes the children are already calculated out and does not recurse.
+        #Just peeks at the top level children's est totals.
+        total_est = 0
+        treeiter = self.tasklist.get_iter(path)
+        if self.tasklist.iter_has_child(treeiter):
+            n_children = self.tasklist.iter_n_children(treeiter)
+            child_iter = self.tasklist.iter_children(treeiter)
+            while child_iter is not None:
+                total_est += self.tasklist[child_iter][3]
+                child_iter = self.tasklist.iter_next(child_iter)
+        self.tasklist[path][3] = total_est
+    
+    def commit_spent(self, widget=None, path=None, new_spent=None):
+        if path is None or path == "": return
+        
+        old_spent = self.tasklist[path][3]
+        
+        if not is_number(new_spent): return
+        
+        new_spent = float(new_spent)
+        out = floor(new_spent * 3600)
+        self.tasklist[path][3] = int(out)
+    
+        parts = path.rpartition(':')
+        parent_path = parts[0]
+        if parent_path != "":
+            parent_spent = self.tasklist[parent_path][3]
+            pspent = (parent_spent + out - old_spent)/3600
+            self.commit_spent(path=parent_path, new_spent=pspent)
+        
+    def spent_edit_start(self, renderer, editor, path):
+        val = self.tasklist[path][3]
+        editor.set_text(str(val/3600)) #don't display the H suffix during editing
+        editor.set_icon_from_stock(Gtk.EntryIconPosition.SECONDARY, Gtk.STOCK_REFRESH)
+        editor.set_icon_tooltip_text(Gtk.EntryIconPosition.SECONDARY, "Recalculate from children")
+        editor.connect("icon-press", self.derive_spent, path)
+    
+    def derive_spent(self, entry=None, pos=None, event=None, path=None):
+        #Assumes the children are already calculated out and does not recurse.
+        #Just peeks at the top level children's spent totals.
+        total_spent = 0
+        treeiter = self.tasklist.get_iter(path)
+        if self.tasklist.iter_has_child(treeiter):
+            n_children = self.tasklist.iter_n_children(treeiter)
+            child_iter = self.tasklist.iter_children(treeiter)
+            while child_iter is not None:
+                total_spent += self.tasklist[child_iter][3]
+                child_iter = self.tasklist.iter_next(child_iter)
+        self.tasklist[path][3] = total_spent
     
     def commit_done(self, renderer=None, path=None, data=None):
         if path is None: return
@@ -310,7 +374,6 @@ class HiToDo(Gtk.Window):
             self.tasklist[path][7] = datetime.now()
         else:
             #we're transitioning from done to not-done
-            #we are now utterly incomplete
             pct = self.calc_pct_from_children(path)
         
         self.tasklist[path][12] = not done
@@ -591,18 +654,29 @@ class HiToDo(Gtk.Window):
         return True
     
     def save_file(self, widget=None):
-        #TODO show save dialog
-        self.file_name = "" #TODO get filename from save dialog
+        if self.file_name == "":
+            self.save_file_as()
+            return
+        
+        #TODO write to self.file_name
         self.update_title()
         self.file_dirty = False
     
+    def save_file_as(self, widget=None):
+        retcode = self.save_dlg.run()
+        self.save_dlg.hide()
+        if retcode != -3: return #cancel out if requested
+        fname = self.open_dlg.get_filename()
+        self.file_name = fname
+        self.save_file()
+    
     def update_title(self):
         if self.file_name != "":
-            ttl = "fname (fpath truncated) - HiToDo"
+            ttl = "fname (fpath truncated) - HiToDo" #TODO use actual file name and path
         else:
             ttl = "Untitled List - HiToDo"
         
-        self.title = "*"+ttl if self.dirty else ttl
+        self.title = "*"+ttl if self.file_dirty else ttl
         
         self.set_title(self.title)
     
@@ -683,7 +757,9 @@ class HiToDo(Gtk.Window):
         col_est.set_cell_data_func(est, self.est_render)
         self.task_view.append_column(col_est)
         
-        spent = Gtk.CellRendererText(foreground="#999")
+        spent = Gtk.CellRendererText(foreground="#999", editable=True)
+        spent.connect("edited", self.commit_spent)
+        spent.connect("editing-started", self.spent_edit_start)
         col_spent = Gtk.TreeViewColumn("Spent", spent, foreground_set=12)
         col_spent.set_sort_column_id(3)
         col_spent.set_cell_data_func(spent, self.spent_render)
@@ -756,7 +832,7 @@ class HiToDo(Gtk.Window):
             ("new_file", Gtk.STOCK_NEW, None, "", None, self.new_file),
             ("open_file", Gtk.STOCK_OPEN, None, None, "Open file", self.open_file),
             ("save_file", Gtk.STOCK_SAVE, None, None, "Save file", self.save_file),
-            ("saveas_file", Gtk.STOCK_SAVE_AS, None, None, None, self.skip),
+            ("saveas_file", Gtk.STOCK_SAVE_AS, None, None, None, self.save_file_as),
             ("quit", Gtk.STOCK_QUIT, None, None, None, self.destroy),
             ("help_about", Gtk.STOCK_ABOUT, None, None, None, self.skip),
             ("FileMenu", None, "_File"),
