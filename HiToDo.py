@@ -7,6 +7,7 @@ from os import linesep
 from dateutil.parser import parse as dateparse
 from math import floor
 import xml.etree.ElementTree as et
+from os.path import basename, dirname
 
 import testing
 import dialogs
@@ -730,13 +731,13 @@ class HiToDo(Gtk.Window):
         retcode = self.save_dlg.run()
         self.save_dlg.hide()
         if retcode != -3: return #cancel out if requested
-        fname = self.open_dlg.get_filename()
+        fname = self.save_dlg.get_filename()
         self.file_name = fname
         self.save_file()
     
     def update_title(self):
         if self.file_name != "":
-            ttl = "fname (fpath truncated) - HiToDo" #TODO use actual file name and path
+            ttl = "%s (%s) - HiToDo" % (basename(self.file_name), dirname(self.file_name))
         else:
             ttl = "Untitled List - HiToDo"
         
