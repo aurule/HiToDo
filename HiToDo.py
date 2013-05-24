@@ -58,6 +58,8 @@ UI_XML = """
         <toolitem action='task_cut' />
         <toolitem action='task_copy' />
         <toolitem action='task_paste' />
+        <separator />
+        <toolitem action='track_spent' />
     </toolbar>
 </ui>
 """
@@ -88,7 +90,8 @@ class HiToDo(Gtk.Window):
             str,    #title
             str,    #notes
             bool,   #use due time
-            bool    #inverted done flag
+            bool,   #inverted done flag
+            bool    #whether this row's spent time is currently tracked
         )
         self.tasklist.set_sort_func(7, self.datecompare, None)
         self.tasklist.set_sort_func(8, self.datecompare, None)
@@ -112,7 +115,8 @@ class HiToDo(Gtk.Window):
             "",     #title
             "",     #notes
             False,  #use due time
-            True    #inverted done
+            True,   #inverted done
+            False   #spent tracked
         ]
         
         self.assignees = Gtk.ListStore(str)
@@ -132,6 +136,8 @@ class HiToDo(Gtk.Window):
         self.title_key_press_catcher = None
         self.file_name = ""
         self.file_dirty = True
+        self.tracking = None
+        self.timer_start = None
         
         #cols:
         #   priority by letter - spin/int
@@ -249,8 +255,8 @@ class HiToDo(Gtk.Window):
         new_row_iter = self.tasklist.append(parent_iter, [
             parent[0],  #default priority (inherit from parent)
             self.defaults[1],          #pct complete
-            self.defaults[2],          #est time taken TODO if not set explicitly, this can be calculated as sum(children's est duration)
-            self.defaults[3],          #act time taken TODO if not set explicitly, this can be calculated as sum(children's act duration)
+            self.defaults[2],          #est time taken
+            self.defaults[3],          #act time taken
             self.defaults[4],       #est begin TODO if not set explicitly, this can be calculated from the earliest child est begin
             self.defaults[5],       #est complete
             self.defaults[6],       #act begin TODO if not set explicitly, this can be calculated from the earliest child act begin
@@ -263,7 +269,8 @@ class HiToDo(Gtk.Window):
             self.defaults[13],         #title
             self.defaults[14],         #notes
             parent[15], #use due time (inherit from parent)
-            self.defaults[16]        #inverted done
+            self.defaults[16],       #inverted done
+            self.defaults[17]        #spent tracked
         ])
         #select new row and immediately edit title field
         self.selection.select_iter(new_row_iter)
@@ -360,6 +367,34 @@ class HiToDo(Gtk.Window):
                 child_iter = self.tasklist.iter_next(child_iter)
         self.tasklist[path][3] = total_spent
     
+    def track_spent(self, action=None, data=None):
+        on = action.get_active()
+        if on:
+            if self.seliter is None:
+                action.set_active(False)
+                return
+            if self.tasklist[self.seliter][12]:
+                action.set_active(False)
+                return
+            
+            self.tracking = self.seliter
+            self.timer_start = datetime.now()
+            title = self.tasklist[self.tracking][13]
+            self.tasklist[self.tracking][17] = True
+            action.set_tooltip("Stop tracking time toward '%s'" % title)
+        else:
+            if self.seliter is None: return
+            if self.tasklist[self.seliter][12]: return
+            
+            diff = datetime.now() - self.timer_start
+            secs = int(diff.total_seconds())
+            self.tasklist[self.tracking][3] += secs
+            self.tasklist[self.tracking][17] = False
+            
+            self.tracking = None
+            self.timer_start = None
+            action.set_tooltip("Start tracking time toward current task")
+    
     def commit_done(self, renderer=None, path=None, data=None):
         if path is None: return
         
@@ -372,6 +407,8 @@ class HiToDo(Gtk.Window):
             
             self.force_children_done(path)
             self.tasklist[path][7] = datetime.now()
+            if self.tasklist[path][17]:
+                self.track_action.set_active(False)
         else:
             #we're transitioning from done to not-done
             pct = self.calc_pct_from_children(path)
@@ -457,7 +494,6 @@ class HiToDo(Gtk.Window):
             try:
                 dt = dateparse(new_complete, fuzzy=True)
                 self.tasklist[path][7] = dt
-                #TODO stop and commit the duration timer if needed
             except ValueError:
                 pass
     
@@ -550,6 +586,9 @@ class HiToDo(Gtk.Window):
         refs = []
         #first we get references to each row
         for path in self.sellist:
+            #stop tracking if needed
+            if self.tasklist[path][17]:
+                self.track_action.set_active(False)
             refs.append(self.tasklist.get_iter(path))
         #only then can we remove them without invalidating paths
         for ref in refs:
@@ -558,6 +597,9 @@ class HiToDo(Gtk.Window):
         self.seliter = None
     
     def del_task(self, path):
+        #stop tracking if needed
+        if self.tasklist[path][17]:
+            self.track_action.set_active(False)
         treeiter = self.tasklist.get_iter(path)
         self.tasklist.remove(treeiter)
     
@@ -589,6 +631,22 @@ class HiToDo(Gtk.Window):
         kvn = Gdk.keyval_name(event.keyval)
         if kvn == "Escape":
             self.commit_title(path=self.title_edit_path, new_title='', write=False)
+    
+    def task_selected(self, widget):
+        self.selcount = widget.count_selected_rows()
+        self.sellist = widget.get_selected_rows()[1]
+        
+        #if there's anything in the list, commit our changes
+        self.commit_all()
+        
+        #set internal selection vars    
+        if self.selcount == 1:
+            self.seliter = self.tasklist.get_iter(self.sellist[0])
+            self.parent = self.tasklist.iter_parent(self.seliter)
+            self.notes_buff.set_text(self.tasklist[self.seliter][14])
+        else:
+            self.seliter = None
+            self.notes_buff.set_text('')
     
     def select_none(self, widget=None):
         self.selection.unselect_all()
@@ -690,22 +748,6 @@ class HiToDo(Gtk.Window):
         self.file_name = ""
         self.dirty = False
     
-    def task_selected(self, widget):
-        self.selcount = widget.count_selected_rows()
-        self.sellist = widget.get_selected_rows()[1]
-        
-        #if there's anything in the list, commit our changes
-        self.commit_all()
-        
-        #set internal selection vars    
-        if self.selcount == 1:
-            self.seliter = self.tasklist.get_iter(self.sellist[0])
-            self.parent = self.tasklist.iter_parent(self.seliter)
-            self.notes_buff.set_text(self.tasklist[self.seliter][14])
-        else:
-            self.seliter = None
-            self.notes_buff.set_text('')
-    
     def due_render(self, col, cell, model, tree_iter, data):
         val = model[tree_iter][8]
         duetime = model[tree_iter][15]
@@ -764,6 +806,10 @@ class HiToDo(Gtk.Window):
         col_spent.set_sort_column_id(3)
         col_spent.set_cell_data_func(spent, self.spent_render)
         self.task_view.append_column(col_spent)
+        
+        tracking = Gtk.CellRendererText(foreground="#900", text=u"\u231A")
+        col_tracking = Gtk.TreeViewColumn(u"\u231A", tracking, visible=17)
+        self.task_view.append_column(col_tracking)
         
         due = Gtk.CellRendererText(editable=True, foreground="#999")
         due.connect("edited", self.commit_due)
@@ -855,6 +901,10 @@ class HiToDo(Gtk.Window):
             ("sel_inv", None, "_Invert Selection", None, None, self.select_inv),
             ("sel_none", None, "Select _None", "<Primary><Shift>A", None, self.select_none)
         ])
+        self.track_action = Gtk.ToggleAction("track_spent", "Track", "Track time worked toward this task", None)
+        self.track_action.set_properties(icon_name="appointment-soon")
+        self.track_action.connect("activate", self.track_spent)
+        action_group.add_action(self.track_action)
     
     def create_ui_manager(self):
         uimanager = Gtk.UIManager()
