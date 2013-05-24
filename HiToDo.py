@@ -391,6 +391,7 @@ class HiToDo(Gtk.Window):
             secs = int(diff.total_seconds())
             self.tasklist[self.tracking][3] += secs
             self.tasklist[self.tracking][17] = False
+            self.file_dirty = True
             
             self.tracking = None
             self.timer_start = None
@@ -812,7 +813,7 @@ class HiToDo(Gtk.Window):
         col_spent.set_cell_data_func(spent, self.spent_render)
         self.task_view.append_column(col_spent)
         
-        tracking = Gtk.CellRendererText(foreground="#900", text=u"\u231A")
+        tracking = Gtk.CellRendererText(foreground="#b00", text=u"\u231A")
         col_tracking = Gtk.TreeViewColumn(u"\u231A", tracking, visible=17)
         self.task_view.append_column(col_tracking)
         
