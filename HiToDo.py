@@ -39,6 +39,7 @@ UI_XML = """
             <menuitem action='task_cut' />
             <menuitem action='task_copy' />
             <menuitem action='task_paste' />
+            <menuitem action='task_paste_into' />
         </menu>
         <menu action='HelpMenu'>
             <menuitem action='help_about' />
@@ -689,6 +690,10 @@ class HiToDo(Gtk.Window):
         if retcode != -3: return #cancel out if requested
         
         fname = self.open_dlg.get_filename()
+        self.file_name = fname
+        self.file_dirty = False
+        self.update_title()
+        
         #TODO get type and based on that, pick the reader needed
         
         #when adding lots of rows, we want to disable the display until we're done
@@ -716,7 +721,7 @@ class HiToDo(Gtk.Window):
             self.save_file_as()
             return
         
-        #TODO write to self.file_name
+        #TODO write to self.file_name with the writer needed
         self.update_title()
         self.file_dirty = False
     
@@ -895,6 +900,7 @@ class HiToDo(Gtk.Window):
             ("task_cut", Gtk.STOCK_CUT, None, None, "Cut task", self.skip),
             ("task_copy", Gtk.STOCK_COPY, None, None, "Copy task", self.skip),
             ("task_paste", Gtk.STOCK_PASTE, None, None, "Paste task", self.skip),
+            ("task_paste_into", None, "Paste as _Child", "<Primary><Shift>V", "Paste as child", self.skip),
             ("undo", Gtk.STOCK_UNDO, None, "<Primary>Z", "Undo", self.skip),
             ("redo", Gtk.STOCK_REDO, None, "<Primary><Shift>Z", "Redo", self.skip),
             ("sel_all", Gtk.STOCK_SELECT_ALL, None, "<Primary>A", None, self.select_all),
