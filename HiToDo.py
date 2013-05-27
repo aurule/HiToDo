@@ -137,27 +137,11 @@ class HiToDo(Gtk.Window):
         self.parent = None
         self.title_key_press_catcher = None
         self.file_name = ""
+        self.file_filter = None
         self.file_dirty = True
         self.tracking = None
         self.timer_start = None
-        
-        #cols:
-        #   priority by letter - spin/int
-        #   pct. complete - int (no input)
-        #   est. time taken - time
-        #   act. time taken - time
-        #   est. begin - datetime
-        #   est. completion - datetime
-        #   act. begin - datetime
-        #   act. completion - datetime
-        #   due - datetime
-        #   from - combo/names
-        #   to - combo/names
-        #   status - combo
-        #   done - bool/checkbox
-        #   text - str
-        #   notes - str
-        #   use due time - bool
+        self.last_save = datetime.now()
         
         #create action groups
         top_actions = Gtk.ActionGroup("top_actions")
@@ -586,6 +570,7 @@ class HiToDo(Gtk.Window):
         pass
     
     def del_current_task(self, widget=None):
+        if self.sellist is None: return
         refs = []
         #first we get references to each row
         for path in self.sellist:
@@ -691,48 +676,82 @@ class HiToDo(Gtk.Window):
         self.open_dlg.hide()
         if retcode != -3: return #cancel out if requested
         
-        fname = self.open_dlg.get_filename()
-        self.file_name = fname
+        self.file_name = self.open_dlg.get_filename()
+        self.file_filter = self.save_dlg.get_filter()
         self.file_dirty = False
         self.update_title()
-        
-        #TODO get type and based on that, pick the reader needed
         
         #when adding lots of rows, we want to disable the display until we're done
         self.task_view.freeze_child_notify()
         self.task_view.set_model(None)
         self.tasklist.clear()
         
-        #TODO add rows to self.tasklist
+        #add rows to self.tasklist
+        self.file_filter.read_to_store(self.file_name, self.tasklist)
         
         #reconnect model to view
         self.task_view.set_model(self.tasklist)
         self.task_view.thaw_child_notify()
         
         self.update_title()
+        self.last_save = datetime.now()
     
     def confirm_discard(self):
-        #TODO if current file is dirty with unsaved changes, prompt the user to save or discard the file, or cancel the originating operation
-        #close w/o saving -> discard and continue
-        #save -> save and continue
-        #cancel -> don't close at all
-        return True
+        if not self.dirty: return True
+        
+        diff = datetime.now() - self.last_save
+        sec = diff.total_seconds()
+        if sec > 86400:
+            diff_num = int(sec / 86400)
+            diff_unit = "day"
+        elif sec > 3600:
+            diff_num = int(sec / 3600)
+            diff_unit = "hour"
+        elif sec > 60:
+            diff_num = int(sec / 60)
+            diff_unit = "minute"
+        else:
+            diff_num = int(sec)
+            diff_unit = "second"
+        
+        diff_text = "%s %s" % (diff_num, diff_unit)
+        if diff_num > 1: diff_text += "s"
+        
+        fname = "Untitled List" if self.file_name == ""  else self.file_name
+        
+        dlg = dialogs.htd_warn_discard(self, fname, diff_text)
+        retval = dlg.run()
+        dlg.destroy()
+        
+        if retval == -3:
+            #save
+            self.save_file()
+            return True
+        elif retval == -7:
+            #discard
+            return True
+        else:
+            #cancel or any other code (like from esc key)
+            return False
     
     def save_file(self, widget=None):
         if self.file_name == "":
             self.save_file_as()
             return
         
-        #TODO write to self.file_name with the writer needed
-        self.update_title()
+        self.file_filter.write(self.file_name)
+        
         self.file_dirty = False
+        self.update_title()
+        self.last_save = datetime.now()
     
     def save_file_as(self, widget=None):
         retcode = self.save_dlg.run()
         self.save_dlg.hide()
         if retcode != -3: return #cancel out if requested
-        fname = self.save_dlg.get_filename()
-        self.file_name = fname
+        
+        self.file_name = self.save_dlg.get_filename()
+        self.file_filter = self.save_dlg.get_filter()
         self.save_file()
     
     def update_title(self):
@@ -926,6 +945,7 @@ class HiToDo(Gtk.Window):
         return uimanager
     
     def destroy(self, widget):
+        if not self.confirm_discard(): return
         Gtk.main_quit()
 
 def main():

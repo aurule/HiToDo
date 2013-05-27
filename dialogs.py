@@ -1,4 +1,5 @@
 from gi.repository import Gtk, Gdk
+import file_parsers
 
 class htd_open(Gtk.FileChooserDialog):
     def __init__(self, parent):
@@ -8,23 +9,10 @@ class htd_open(Gtk.FileChooserDialog):
         self.set_local_only(True)
         
         #set supported types
-        all_files = Gtk.FileFilter()
-        all_files.add_pattern("*.*")
-        all_files.set_name("All Files")
-        #self.add_filter(all_files)
-        tdl = Gtk.FileFilter()
-        tdl.add_pattern("*.tdl")
-        tdl.set_name("ToDoList Files (*.tdl)")
-        #self.add_filter(tdl)
-        htd = Gtk.FileFilter()
-        htd.add_pattern("*.htd")
-        htd.set_name("HiToDo Files (*.htd)")
+        htd = file_parsers.htd_filter()
         self.add_filter(htd)
-        todotxt = Gtk.FileFilter()
-        todotxt.add_pattern("todo.txt")
-        todotxt.set_name("Todo.txt Files (todo.txt)")
-        #self.add_filter(todotxt)
         
+        #set default filter
         self.set_filter(htd)
 
 class htd_save(Gtk.FileChooserDialog):
@@ -35,21 +23,17 @@ class htd_save(Gtk.FileChooserDialog):
         self.set_local_only(True)
         
         #set supported types
-        all_files = Gtk.FileFilter()
-        all_files.add_pattern("*.*")
-        all_files.set_name("All Files")
-        #self.add_filter(all_files)
-        tdl = Gtk.FileFilter()
-        tdl.add_pattern("*.tdl")
-        tdl.set_name("ToDoList Files (*.tdl)")
-        #self.add_filter(tdl)
-        htd = Gtk.FileFilter()
-        htd.add_pattern("*.htd")
-        htd.set_name("HiToDo Files (*.htd)")
+        htd = file_parsers.htd_filter()
         self.add_filter(htd)
-        todotxt = Gtk.FileFilter()
-        todotxt.add_pattern("todo.txt")
-        todotxt.set_name("Todo.txt Files (todo.txt)")
-        #self.add_filter(todotxt)
         
+        #set default filter
         self.set_filter(htd)
+
+class htd_warn_discard(Gtk.MessageDialog):
+    def __init__(self, parent, fname, time_since_save):
+        flags = Gtk.DialogFlags.MODAL & Gtk.DialogFlags.DESTROY_WITH_PARENT
+        Gtk.MessageDialog.__init__(self, parent, flags, Gtk.MessageType.WARNING, Gtk.ButtonsType.NONE, "Save changes to \"%s\" before closing?" % fname)
+        self.format_secondary_text("If you don't save, changes from the last %s will be permanently lost." % time_since_save)
+        self.add_button("Close Without Saving", Gtk.ResponseType.CLOSE)
+        self.add_button(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
+        self.add_button(Gtk.STOCK_SAVE, Gtk.ResponseType.ACCEPT)

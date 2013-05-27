@@ -1,0 +1,29 @@
+<htd>
+    <assigners>
+        <name>name</name>
+    </assigners>
+    <assignees>
+        <name>name</name>
+    </assignees>
+    <statii>
+        <name>name</name>
+    </statii>
+    <tasklist>
+        <task done=False useDueTime=False priority="5">
+            <pct>0</pct>
+            <est>0</est>
+            <spent>0</spent>
+            <due>datetime</due>
+            <completed>datetime</completed>
+            <assigner>name</assigner>
+            <assignee><name></assignee>
+            <status>status</status>
+            <title>title</title>
+            <notes>notes text</notes>
+            <tasklist>
+                <task></task>
+                ...
+            </tasklist>
+        </task>
+    </tasklist>
+</htd>
