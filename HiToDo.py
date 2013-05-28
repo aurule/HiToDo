@@ -2,7 +2,7 @@
 
 from __future__ import division
 from gi.repository import Gtk, Gdk, Pango
-from datetime import datetime, timedelta as td
+from datetime import datetime, timedelta
 from os import linesep
 from dateutil.parser import parse as dateparse
 from math import floor
@@ -138,7 +138,7 @@ class HiToDo(Gtk.Window):
         self.title_key_press_catcher = None
         self.file_name = ""
         self.file_filter = None
-        self.file_dirty = True
+        self.file_dirty = False
         self.tracking = None
         self.timer_start = None
         self.last_save = datetime.now()
@@ -284,6 +284,7 @@ class HiToDo(Gtk.Window):
         if path is None: return
         
         if not is_number(new_est): return
+        old_est = self.tasklist[path][2]
         new_est = float(new_est)
         out = floor(new_est * 3600)
         self.tasklist[path][2] = int(out)
@@ -688,7 +689,14 @@ class HiToDo(Gtk.Window):
         
         #add rows to self.tasklist
         self.file_filter.read_to_store(self.file_name, self.assigners_list, self.assignees_list, self.statii_list, self.tasklist)
-        #TODO iterate assigners, assignees, and statii to put names into respective liststores
+        
+        #iterate assigners, assignees, and statii to put names into respective liststores
+        for n in self.assigners_list:
+            self.assigners.append([n])
+        for n in self.assignees_list:
+            self.assignees.append([n])
+        for n in self.statii_list:
+            self.statii.append([n])
         
         #reconnect model to view
         self.task_view.set_model(self.tasklist)
@@ -740,7 +748,7 @@ class HiToDo(Gtk.Window):
             self.save_file_as()
             return
         
-        self.file_filter.write(self.file_name, self.assignees_list, self.assigners_list, self.statii_list, self.tasklist)
+        self.file_filter.write(self.file_name, self.assigners_list, self.assignees_list, self.statii_list, self.tasklist)
         
         self.file_dirty = False
         self.update_title()
@@ -857,21 +865,21 @@ class HiToDo(Gtk.Window):
         col_completed.set_cell_data_func(completed, self.completed_render)
         self.task_view.append_column(col_completed)
         
-        assigner = Gtk.CellRendererCombo(model=self.assigners, has_entry=True, editable=True, foreground="#999")
+        assigner = Gtk.CellRendererCombo(model=self.assigners, has_entry=True, editable=True, foreground="#999", text_column=0)
         assigner.connect("edited", self.commit_assigner)
-        col_assigner = Gtk.TreeViewColumn("From", assigner, text_column=1, text=9, foreground_set=12)
+        col_assigner = Gtk.TreeViewColumn("From", assigner, text=9, foreground_set=12)
         col_assigner.set_sort_column_id(9)
         self.task_view.append_column(col_assigner)
         
-        assignee = Gtk.CellRendererCombo(model=self.assignees, has_entry=True, editable=True, foreground="#999")
+        assignee = Gtk.CellRendererCombo(model=self.assignees, has_entry=True, editable=True, foreground="#999", text_column=0)
         assignee.connect("edited", self.commit_assignee)
-        col_assignee = Gtk.TreeViewColumn("To", assignee, text_column=1, text=10, foreground_set=12)
+        col_assignee = Gtk.TreeViewColumn("To", assignee, text=10, foreground_set=12)
         col_assignee.set_sort_column_id(10)
         self.task_view.append_column(col_assignee)
         
-        status = Gtk.CellRendererCombo(model=self.statii, has_entry=True, editable=True, foreground="#999")
+        status = Gtk.CellRendererCombo(model=self.statii, has_entry=True, editable=True, foreground="#999", text_column=0)
         status.connect("edited", self.commit_status)
-        col_stats = Gtk.TreeViewColumn("Status", status, text_column=1, text=11, foreground_set=12)
+        col_stats = Gtk.TreeViewColumn("Status", status, text=11, foreground_set=12)
         col_stats.set_sort_column_id(11)
         self.task_view.append_column(col_stats)
         

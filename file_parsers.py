@@ -2,6 +2,8 @@ from gi.repository import Gtk
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element
 from xml.etree.ElementTree import SubElement
+from dateutil.parser import parse as dateparse
+from datetime import datetime
 
 class htd_filter(Gtk.FileFilter):
     def __init__(self):
@@ -19,7 +21,70 @@ class htd_filter(Gtk.FileFilter):
 * stats is a list where status strings will be stored
 * taskstore is a GtkTreeStore which will be populated from tasks in the file'''
         document = ElementTree.parse(fname)
-        #TODO read through elements
+        
+        #get assigners, assignees, and statii lists
+        assigners = document.find("assigners")
+        for n in assigners.findall('name'):
+            if n.text not in froms:
+                froms.append(n.text)
+        assignees = document.find("assignees")
+        for n in assignees.findall('name'):
+            if n.text not in tos:
+                tos.append(n.text)
+        statii = document.find("statii")
+        for n in statii.findall('name'):
+            if n.text not in stats:
+                stats.append(n.text)
+        
+        #get highest-level tasklist element
+        tasklist = document.find("tasklist")
+        self.tasks = taskstore #store for use later
+        self.__read_tasks(tasklist, None)
+    
+    def __read_tasks(self, tasklist, parent=None):
+        '''Internal function to recursively add tasks from an XML file to the treestore self.tasks.'''
+        for task in tasklist.iterfind('./task'):
+            #make a list from subelements and attributes to add to the treestore
+            tlist = []
+            tlist.append(int(task.get('priority')))
+            tlist.append(int(task.find('pct').text))
+            tlist.append(int(task.find('est').text))
+            tlist.append(int(task.find('spent').text))
+            tlist.append(None) #est begin
+            tlist.append(None) #est complete
+            tlist.append(None) #act begin
+            completed_raw = task.find('completed').text
+            if completed_raw is None:
+                tlist.append(None)
+            else:
+                tlist.append(dateparse(completed_raw))
+            due_raw = task.find('due').text
+            if due_raw is None:
+                tlist.append(None)
+            else:
+                tlist.append(dateparse(due_raw))
+            assigner_raw = task.find('assigner').text
+            if assigner_raw is None: assigner_raw = ''
+            tlist.append(assigner_raw)
+            assignee_raw = task.find('assignee').text
+            if assignee_raw is None: assignee_raw = ''
+            tlist.append(assignee_raw)
+            status_raw = task.find('status').text
+            if status_raw is None: status_raw = ''
+            tlist.append(status_raw)
+            done = task.get('done') == "True"
+            tlist.append(done)
+            tlist.append(task.find('title').text)
+            notes_raw = task.find('notes').text
+            if notes_raw is None: notes_raw = ''
+            tlist.append(notes_raw)
+            tlist.append(task.find('due').get('useTime') == "True")
+            tlist.append(not done) #inverse done
+            tlist.append(False) #time track flag
+            
+            #append to store
+            treeiter = self.tasks.append(parent, tlist)
+            self.__read_tasks(task.find('tasklist'), treeiter)
     
     def write(self, fname, froms, tos, stats, tasks):
         '''Writes todo list data to xml file. Args:
@@ -31,15 +96,18 @@ class htd_filter(Gtk.FileFilter):
         htd = Element('htd')
         assigners = SubElement(htd, 'assigners')
         for f in sorted(froms):
-            SubElement(assigners, 'name', text=f)
+            e = SubElement(assigners, 'name')
+            e.text = f
         
         assignees = SubElement(htd, 'assignees')
         for f in sorted(tos):
-            SubElement(assignees, 'name', text=f)
+            e = SubElement(assignees, 'name')
+            e.text = f
         
         statii = SubElement(htd, 'statii')
         for f in sorted(stats):
-            SubElement(statii, 'name', text=f)
+            e = SubElement(statii, 'name')
+            e.text = f
         
         #create master tasklist element
         tasklist = SubElement(htd, 'tasklist')
@@ -49,7 +117,7 @@ class htd_filter(Gtk.FileFilter):
         
         #write to file
         ofile = open(fname, 'w')
-        ofile.write('<?xml version="1.0"?>')
+        ofile.write('<?xml version="1.0" encoding="ISO-8859-1"?>')
         ofile.write(ElementTree.tostring(htd))
         ofile.close()
     
@@ -63,9 +131,13 @@ class htd_filter(Gtk.FileFilter):
         while treeiter is not None:
             task = SubElement(taskelem, 'task')
             task.set('done', str(self.tasks[treeiter][12]))
-            SubElement(task, 'pct', text=str(self.tasks[treeiter][1])) #pct complete
-            SubElement(task, 'est', text=str(self.tasks[treeiter][2])) #est time
-            SubElement(task, 'spent', text=str(self.tasks[treeiter][3])) #time spent
+            task.set('priority', str(self.tasks[treeiter][0]))
+            e = SubElement(task, 'pct') #pct complete
+            e.text = str(self.tasks[treeiter][1])
+            e = SubElement(task, 'est') #est time
+            e.text = str(self.tasks[treeiter][2])
+            e = SubElement(task, 'spent') #time spent
+            e.text = str(self.tasks[treeiter][3])
             
             #due
             if self.tasks[treeiter][8] is not None:
@@ -74,7 +146,8 @@ class htd_filter(Gtk.FileFilter):
                 fmt = "%x %X" if duetime else "%x"
                 out = "" if val is None else val.strftime(fmt)
                 
-                due = SubElement(task, 'due', text=out)
+                due = SubElement(task, 'due')
+                due.text = out
                 due.set('useTime', str(self.tasks[treeiter][15]))
             else:
                 due = SubElement(task, 'due')
@@ -87,16 +160,21 @@ class htd_filter(Gtk.FileFilter):
                 fmt = "%x %X" if duetime else "%x"
                 out = "" if val is None else val.strftime(fmt)
                 
-                SubElement(task, 'completed', text=out)
-                pass
+                e = SubElement(task, 'completed')
+                e.text = out
             else:
                 SubElement(task, 'completed')
             
-            SubElement(task, 'assigner', text=self.tasks[treeiter][9])
-            SubElement(task, 'assignee', text=self.tasks[treeiter][10])
-            SubElement(task, 'status', text=self.tasks[treeiter][11])
-            SubElement(task, 'title', text=self.tasks[treeiter][13])
-            SubElement(task, 'notes', text=self.tasks[treeiter][14])
+            e = SubElement(task, 'assigner')
+            e.text = self.tasks[treeiter][9]
+            e = SubElement(task, 'assignee')
+            e.text = self.tasks[treeiter][10]
+            e = SubElement(task, 'status')
+            e.text = self.tasks[treeiter][11]
+            e = SubElement(task, 'title')
+            e.text = self.tasks[treeiter][13]
+            e = SubElement(task, 'notes')
+            e.text = self.tasks[treeiter][14]
             tlist = SubElement(task, 'tasklist')
             if self.tasks.iter_has_child(treeiter):
                 childiter = self.tasks.iter_children(treeiter)
