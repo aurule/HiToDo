@@ -259,6 +259,7 @@ class HiToDo(Gtk.Window):
             self.defaults[17]       #spent tracked
         ])
         #select new row and immediately edit title field
+        self.recalc_parent_pct(str(self.tasklist.get_path(new_row_iter)))
         self.selection.select_iter(new_row_iter)
         path = self.tasklist.get_path(new_row_iter)
         if parent_iter is not None:
@@ -581,7 +582,9 @@ class HiToDo(Gtk.Window):
             refs.append(self.tasklist.get_iter(path))
         #only then can we remove them without invalidating paths
         for ref in refs:
+            path = str(self.tasklist.get_path(ref))
             self.tasklist.remove(ref)
+            self.recalc_parent_pct(path)
         
         self.seliter = None
     
@@ -591,6 +594,7 @@ class HiToDo(Gtk.Window):
             self.track_action.set_active(False)
         treeiter = self.tasklist.get_iter(path)
         self.tasklist.remove(treeiter)
+        self.recalc_parent_pct(str(path))
     
     def notes_keys_dn(self, widget=None, event=None):
         kvn = Gdk.keyval_name(event.keyval)
@@ -904,12 +908,6 @@ class HiToDo(Gtk.Window):
         self.col_title.add_attribute(note, "strikethrough", 12)
         self.col_title.set_sort_column_id(13)
         self.task_view.append_column(self.col_title)
-        '''
-        renderer = Gtk.CellRendererText()
-        col_ = Gtk.TreeViewColumn("Title", renderer, text=0)
-        col_.set_sort_column_id(model data col)
-        self.task_view.append_column(col_)
-        '''
     
     def create_top_actions(self, action_group):
         action_group.add_actions([
