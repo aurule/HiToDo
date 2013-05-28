@@ -7,7 +7,7 @@ from os import linesep
 from dateutil.parser import parse as dateparse
 from math import floor
 import xml.etree.ElementTree as et
-from os.path import basename, dirname
+from os.path import basename, dirname, splitext
 
 import testing
 import dialogs
@@ -239,24 +239,24 @@ class HiToDo(Gtk.Window):
             parent = self.defaults
         
         new_row_iter = self.tasklist.append(parent_iter, [
-            parent[0],  #default priority (inherit from parent)
-            self.defaults[1],          #pct complete
-            self.defaults[2],          #est time taken
-            self.defaults[3],          #act time taken
+            parent[0],              #default priority (inherit from parent)
+            self.defaults[1],       #pct complete
+            self.defaults[2],       #est time taken
+            self.defaults[3],       #act time taken
             self.defaults[4],       #est begin TODO if not set explicitly, this can be calculated from the earliest child est begin
             self.defaults[5],       #est complete
             self.defaults[6],       #act begin TODO if not set explicitly, this can be calculated from the earliest child act begin
             self.defaults[7],       #act complete
-            parent[8],  #due (inherit from parent)
-            parent[9],  #from (inherit from parent)
-            parent[10], #to (inherit from parent)
-            self.defaults[11],         #status
+            self.defaults[8],       #due
+            parent[9],              #from (inherit from parent)
+            parent[10],             #to (inherit from parent)
+            self.defaults[11],      #status
             self.defaults[12],      #done
-            self.defaults[13],         #title
-            self.defaults[14],         #notes
-            parent[15], #use due time (inherit from parent)
-            self.defaults[16],       #inverted done
-            self.defaults[17]        #spent tracked
+            self.defaults[13],      #title
+            self.defaults[14],      #notes
+            parent[15],             #use due time (inherit from parent)
+            self.defaults[16],      #inverted done
+            self.defaults[17]       #spent tracked
         ])
         #select new row and immediately edit title field
         self.selection.select_iter(new_row_iter)
@@ -376,7 +376,7 @@ class HiToDo(Gtk.Window):
             secs = int(diff.total_seconds())
             self.tasklist[self.tracking][3] += secs
             self.tasklist[self.tracking][17] = False
-            self.file_dirty = True
+            self.make_dirty()
             
             self.tracking = None
             self.timer_start = None
@@ -687,7 +687,8 @@ class HiToDo(Gtk.Window):
         self.tasklist.clear()
         
         #add rows to self.tasklist
-        self.file_filter.read_to_store(self.file_name, self.tasklist)
+        self.file_filter.read_to_store(self.file_name, self.assigners_list, self.assignees_list, self.statii_list, self.tasklist)
+        #TODO iterate assigners, assignees, and statii to put names into respective liststores
         
         #reconnect model to view
         self.task_view.set_model(self.tasklist)
@@ -697,7 +698,7 @@ class HiToDo(Gtk.Window):
         self.last_save = datetime.now()
     
     def confirm_discard(self):
-        if not self.dirty: return True
+        if not self.file_dirty: return True
         
         diff = datetime.now() - self.last_save
         sec = diff.total_seconds()
@@ -726,7 +727,7 @@ class HiToDo(Gtk.Window):
         if retval == -3:
             #save
             self.save_file()
-            return True
+            return not self.file_dirty
         elif retval == -7:
             #discard
             return True
@@ -739,7 +740,7 @@ class HiToDo(Gtk.Window):
             self.save_file_as()
             return
         
-        self.file_filter.write(self.file_name)
+        self.file_filter.write(self.file_name, self.assignees_list, self.assigners_list, self.statii_list, self.tasklist)
         
         self.file_dirty = False
         self.update_title()
@@ -752,6 +753,9 @@ class HiToDo(Gtk.Window):
         
         self.file_name = self.save_dlg.get_filename()
         self.file_filter = self.save_dlg.get_filter()
+        ext = splitext(self.file_name)[1]
+        if ext == '':
+            self.file_name += self.file_filter.file_extension
         self.save_file()
     
     def update_title(self):
@@ -765,14 +769,14 @@ class HiToDo(Gtk.Window):
         self.set_title(self.title)
     
     def make_dirty(self, path=None, it=None, data=None):
-        self.dirty = True
+        self.file_dirty = True
         self.update_title()
     
     def new_file(self, widget=None):
         self.confirm_discard()
         self.tasklist.clear()
         self.file_name = ""
-        self.dirty = False
+        self.file_dirty = False
     
     def due_render(self, col, cell, model, tree_iter, data):
         val = model[tree_iter][8]
