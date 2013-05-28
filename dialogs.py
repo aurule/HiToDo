@@ -34,6 +34,6 @@ class htd_warn_discard(Gtk.MessageDialog):
         flags = Gtk.DialogFlags.MODAL & Gtk.DialogFlags.DESTROY_WITH_PARENT
         Gtk.MessageDialog.__init__(self, parent, flags, Gtk.MessageType.WARNING, Gtk.ButtonsType.NONE, "Save changes to \"%s\" before closing?" % fname)
         self.format_secondary_text("If you don't save, changes from the last %s will be permanently lost." % time_since_save)
-        self.add_button("Close Without Saving", Gtk.ResponseType.CLOSE)
+        self.add_button("Close _without Saving", Gtk.ResponseType.CLOSE)
         self.add_button(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
         self.add_button(Gtk.STOCK_SAVE, Gtk.ResponseType.ACCEPT)
