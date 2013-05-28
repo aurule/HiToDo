@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
 <htd>
     <assigners>
         <name>name</name>
@@ -9,11 +10,11 @@
         <name>name</name>
     </statii>
     <tasklist>
-        <task done=False useDueTime=False priority="5">
+        <task done="False" priority="5">
             <pct>0</pct>
             <est>0</est>
             <spent>0</spent>
-            <due>datetime</due>
+            <due useTime="False">datetime</due>
             <completed>datetime</completed>
             <assigner>name</assigner>
             <assignee><name></assignee>
