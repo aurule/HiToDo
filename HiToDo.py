@@ -1,5 +1,20 @@
 #!/usr/bin/env python
 
+# This file is part of HiToDo.
+#
+# HiToDo is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# HiToDo is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with HiToDo.  If not, see <http://www.gnu.org/licenses/>.
+
 from __future__ import division
 from gi.repository import Gtk, Gdk, Pango
 from datetime import datetime, timedelta
@@ -216,6 +231,7 @@ class HiToDo(Gtk.Window):
         
         self.open_dlg = dialogs.htd_open(self)
         self.save_dlg = dialogs.htd_save(self)
+        self.about_dlg = dialogs.htd_about(self)
     
     def skip(self, widget=None):
         pass
@@ -810,6 +826,10 @@ class HiToDo(Gtk.Window):
         self.file_name = ""
         self.file_dirty = False
     
+    def show_about(self, widget=None):
+        self.about_dlg.run()
+        self.about_dlg.hide()
+    
     def due_render(self, col, cell, model, tree_iter, data):
         val = model[tree_iter][8]
         duetime = model[tree_iter][15]
@@ -936,7 +956,7 @@ class HiToDo(Gtk.Window):
             ("save_file", Gtk.STOCK_SAVE, None, None, "Save file", self.save_file),
             ("saveas_file", Gtk.STOCK_SAVE_AS, None, None, None, self.save_file_as),
             ("quit", Gtk.STOCK_QUIT, None, None, None, self.destroy),
-            ("help_about", Gtk.STOCK_ABOUT, None, None, None, self.skip),
+            ("help_about", Gtk.STOCK_ABOUT, None, None, None, self.show_about),
             ("FileMenu", None, "_File"),
             ("EditMenu", None, "_Edit"),
             ("TaskMenu", None, "_Task"),
