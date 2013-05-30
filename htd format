@@ -9,6 +9,11 @@
     <statii>
         <name>name</name>
     </statii>
+    <expanded>
+        <path>0</path>
+        ...
+    </expanded>
+    <selected>0</selected>
     <tasklist>
         <task done="False" priority="5">
             <pct>0</pct>

@@ -702,7 +702,7 @@ class HiToDo(Gtk.Window):
         self.tasklist.clear()
         
         #add rows to self.tasklist
-        self.file_filter.read_to_store(self.file_name, self.assigners_list, self.assignees_list, self.statii_list, self.tasklist)
+        rows_to_expand, selme = self.file_filter.read_to_store(self.file_name, self.assigners_list, self.assignees_list, self.statii_list, self.tasklist)
         
         #iterate assigners, assignees, and statii to put names into respective liststores
         for n in self.assigners_list:
@@ -714,6 +714,12 @@ class HiToDo(Gtk.Window):
         
         #reconnect model to view
         self.task_view.set_model(self.tasklist)
+        for pathstr in rows_to_expand:
+            treeiter = self.tasklist.get_iter(pathstr)
+            path = self.tasklist.get_path(treeiter)
+            self.task_view.expand_row(path, False)
+        if selme != '':
+            self.selection.select_iter(self.tasklist.get_iter(selme))
         self.task_view.thaw_child_notify()
         
         self.update_title()
@@ -762,7 +768,11 @@ class HiToDo(Gtk.Window):
             self.save_file_as()
             return
         
-        self.file_filter.write(self.file_name, self.assigners_list, self.assignees_list, self.statii_list, self.tasklist)
+        if self.seliter is not None:
+            selpath = str(self.tasklist.get_path(self.seliter))
+        else:
+            selpath = ''
+        self.file_filter.write(self.file_name, self.assigners_list, self.assignees_list, self.statii_list, self.tasklist, self.task_view, selpath)
         
         self.file_dirty = False
         self.update_title()
