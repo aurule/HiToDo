@@ -21,13 +21,16 @@ from __future__ import division
 from gi.repository import Gtk, Gdk, Pango
 from datetime import datetime, timedelta
 from os import linesep
+from os.path import basename, dirname, splitext
+from urlparse import urlparse
+from urllib import unquote
 from dateutil.parser import parse as dateparse
 from math import floor
 import xml.etree.ElementTree as et
-from os.path import basename, dirname, splitext
 
 import testing
 import dialogs
+import file_parsers
 
 UI_XML = """
 <ui>
@@ -38,6 +41,8 @@ UI_XML = """
             <separator />
             <menuitem action="save_file" />
             <menuitem action="saveas_file" />
+            <separator />
+            <menuitem action="recents" />
             <separator />
             <menuitem action='quit' />
         </menu>
@@ -705,6 +710,13 @@ class HiToDo(Gtk.Window):
     def collapse_all(self, widget=None):
         self.task_view.collapse_all()
     
+    def open_recent(self, widget):
+        uri = widget.get_current_uri()
+        path = urlparse(uri).path
+        self.file_name = unquote(path)
+        self.file_filter = file_parsers.pick_filter(path)
+        self.__do_open()
+    
     def open_file(self, widget=None):
         if not self.confirm_discard(): return
         
@@ -714,6 +726,10 @@ class HiToDo(Gtk.Window):
         
         self.file_name = self.open_dlg.get_filename()
         self.file_filter = self.save_dlg.get_filter()
+        self.__do_open()
+
+    def __do_open(self):
+        '''Internal function to open a file from self.file_name using the reader at self.file_filter.'''
         self.file_dirty = False
         self.update_title()
         
@@ -972,6 +988,15 @@ class HiToDo(Gtk.Window):
             ("ViewMenu", None, "_View"),
             ("HelpMenu", None, "_Help")
         ])
+        recent_files = Gtk.RecentAction("recents", "_Recent Files", "Open a recently-used file", None)
+        recent_files.set_properties(icon_name="document-open-recent", local_only=True, sort_type=Gtk.RecentSortType.MRU, show_not_found=False)
+        htdl_filter = Gtk.RecentFilter()
+        htdl_filter.add_pattern("*.htdl")
+        htdl_filter.set_name("HiToDo Files (*.htdl)")
+        recent_files.add_filter(htdl_filter)
+        recent_files.connect("item-activated", self.open_recent)
+        action_group.add_action(recent_files)
+        
         
     def create_task_actions(self, action_group):
         action_group.add_actions([

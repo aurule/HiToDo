@@ -21,6 +21,13 @@ from xml.etree.ElementTree import Element
 from xml.etree.ElementTree import SubElement
 from dateutil.parser import parse as dateparse
 from datetime import datetime
+from os.path import splitext
+
+def pick_filter(file_name):
+    ext = splitext(file_name)[1]
+    if ext == '.htdl':
+        f = htd_filter()
+        return f
 
 class htd_filter(Gtk.FileFilter):
     def __init__(self):
