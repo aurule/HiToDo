@@ -1,3 +1,5 @@
+# Copyright 2013 Peter Andrews
+
 # This file is part of HiToDo.
 #
 # HiToDo is free software: you can redistribute it and/or modify
@@ -57,3 +59,9 @@ class htd_about(Gtk.AboutDialog):
     def __init__(self, parent):
         Gtk.AboutDialog.__init__(self)
         self.set_transient_for(parent)
+        self.set_program_name("HiToDO")
+        self.set_version("0.8")
+        self.set_copyright(u"Copyright \xa9 2013 Peter Andrews")
+        self.set_comments("Heirarchical task manager inspired by AbstractSpoon's ToDoList.")
+        self.set_license_type(Gtk.License.GPL_3_0)
+        self.set_website("https://github.com/aurule/HiToDo")

@@ -1,3 +1,5 @@
+# Copyright 2013 Peter Andrews
+
 # This file is part of HiToDo.
 #
 # HiToDo is free software: you can redistribute it and/or modify
