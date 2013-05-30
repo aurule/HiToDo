@@ -371,18 +371,35 @@ class HiToDo(Gtk.Window):
             self.tasklist[self.tracking][17] = True
             action.set_tooltip("Stop tracking time toward '%s'" % title)
         else:
-            if self.seliter is None: return
-            if self.tasklist[self.seliter][12]: return
+            if self.tracking is None: return
             
             diff = datetime.now() - self.timer_start
             secs = int(diff.total_seconds())
             self.tasklist[self.tracking][3] += secs
             self.tasklist[self.tracking][17] = False
+            self.recalc_parent_spent(str(self.tasklist.get_path(self.tracking)))
             self.make_dirty()
             
             self.tracking = None
             self.timer_start = None
             action.set_tooltip("Start tracking time toward current task")
+    
+    def recalc_parent_spent(self, path):
+        parts = path.rpartition(':')
+        parent_path = parts[0]
+        if parent_path == '': return
+        
+        parent_iter = self.tasklist.get_iter(parent_path)
+        
+        n_children = self.tasklist.iter_n_children(parent_iter)
+        childiter = self.tasklist.iter_children(parent_iter)
+        total_spent = 0
+        while childiter != None:
+            total_spent += self.tasklist[childiter][3]
+            childiter = self.tasklist.iter_next(childiter)
+        
+        self.tasklist[parent_iter][3] = int(floor(total_spent / n_children))
+        self.recalc_parent_spent(parent_path)
     
     def commit_done(self, renderer=None, path=None, data=None):
         if path is None: return
@@ -585,6 +602,7 @@ class HiToDo(Gtk.Window):
             path = str(self.tasklist.get_path(ref))
             self.tasklist.remove(ref)
             self.recalc_parent_pct(path)
+            self.recalc_parent_spent(path)
         
         self.seliter = None
     
@@ -595,6 +613,7 @@ class HiToDo(Gtk.Window):
         treeiter = self.tasklist.get_iter(path)
         self.tasklist.remove(treeiter)
         self.recalc_parent_pct(str(path))
+        self.recalc_parent_spent(str(path))
     
     def notes_keys_dn(self, widget=None, event=None):
         kvn = Gdk.keyval_name(event.keyval)
