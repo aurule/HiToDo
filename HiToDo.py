@@ -42,6 +42,10 @@ UI_XML = """
             <menuitem action='task_paste' />
             <menuitem action='task_paste_into' />
         </menu>
+        <menu action="ViewMenu">
+            <menuitem action='expand_all' />
+            <menuitem action='collapse_all' />
+        </menu>
         <menu action='HelpMenu'>
             <menuitem action='help_about' />
         </menu>
@@ -674,6 +678,12 @@ class HiToDo(Gtk.Window):
                 self.__invert_tasklist_selection(childiter)
             treeiter = self.tasklist.iter_next(treeiter)
     
+    def expand_all(self, widget=None):
+        self.task_view.expand_all()
+    
+    def collapse_all(self, widget=None):
+        self.task_view.collapse_all()
+    
     def open_file(self, widget=None):
         if not self.confirm_discard(): return
         
@@ -920,6 +930,7 @@ class HiToDo(Gtk.Window):
             ("FileMenu", None, "_File"),
             ("EditMenu", None, "_Edit"),
             ("TaskMenu", None, "_Task"),
+            ("ViewMenu", None, "_View"),
             ("HelpMenu", None, "_Help")
         ])
         
@@ -936,7 +947,9 @@ class HiToDo(Gtk.Window):
             ("redo", Gtk.STOCK_REDO, None, "<Primary><Shift>Z", "Redo", self.skip),
             ("sel_all", Gtk.STOCK_SELECT_ALL, None, "<Primary>A", None, self.select_all),
             ("sel_inv", None, "_Invert Selection", None, None, self.select_inv),
-            ("sel_none", None, "Select _None", "<Primary><Shift>A", None, self.select_none)
+            ("sel_none", None, "Select _None", "<Primary><Shift>A", None, self.select_none),
+            ("expand_all", None, "_Expand All", None, "Expand all tasks", self.expand_all),
+            ("collapse_all", None, "_Collapse All", None, "Collapse all tasks", self.collapse_all)
         ])
         self.track_action = Gtk.ToggleAction("track_spent", "Track", "Track time worked toward this task", None)
         self.track_action.set_properties(icon_name="appointment-soon")
