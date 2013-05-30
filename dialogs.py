@@ -65,3 +65,15 @@ class htd_about(Gtk.AboutDialog):
         self.set_comments("Heirarchical task manager inspired by AbstractSpoon's ToDoList.")
         self.set_license_type(Gtk.License.GPL_3_0)
         self.set_website("https://github.com/aurule/HiToDo")
+
+class htd_prefs(Gtk.Dialog):
+    def __init__(self, parent):
+        flags = Gtk.DialogFlags.DESTROY_WITH_PARENT
+        Gtk.Dialog.__init__(self, "HiToDo Preferences", parent, flags)
+        close = self.add_button(Gtk.STOCK_CLOSE, Gtk.ResponseType.CLOSE)
+        close.connect("clicked", self.disappear)
+        actions = self.get_action_area()
+        #TODO add settings widgets to "actions"
+    
+    def disappear(self, widget=None):
+        self.hide()

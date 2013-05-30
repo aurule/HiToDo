@@ -48,6 +48,8 @@ UI_XML = """
             <menuitem action='sel_all' />
             <menuitem action='sel_none' />
             <menuitem action='sel_inv' />
+            <separator />
+            <menuitem action='prefs' />
         </menu>
         <menu action='TaskMenu'>
             <menuitem action='task_new' />
@@ -234,6 +236,7 @@ class HiToDo(Gtk.Window):
         self.open_dlg = dialogs.htd_open(self)
         self.save_dlg = dialogs.htd_save(self)
         self.about_dlg = dialogs.htd_about(self)
+        self.prefs_dlg = dialogs.htd_prefs(self)
     
     def skip(self, widget=None):
         pass
@@ -832,6 +835,9 @@ class HiToDo(Gtk.Window):
         self.about_dlg.run()
         self.about_dlg.hide()
     
+    def set_prefs(self, widget=None):
+        self.prefs_dlg.show()
+    
     def due_render(self, col, cell, model, tree_iter, data):
         val = model[tree_iter][8]
         duetime = model[tree_iter][15]
@@ -959,6 +965,7 @@ class HiToDo(Gtk.Window):
             ("saveas_file", Gtk.STOCK_SAVE_AS, None, None, None, self.save_file_as),
             ("quit", Gtk.STOCK_QUIT, None, None, None, self.destroy),
             ("help_about", Gtk.STOCK_ABOUT, None, None, None, self.show_about),
+            ("prefs", Gtk.STOCK_PREFERENCES, None, None, None, self.set_prefs),
             ("FileMenu", None, "_File"),
             ("EditMenu", None, "_Edit"),
             ("TaskMenu", None, "_Task"),
