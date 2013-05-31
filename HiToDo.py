@@ -173,6 +173,7 @@ class HiToDo(Gtk.Window):
         self.timer_start = None
         self.last_save = datetime.now()
         self.focus = None
+        self.copied_rows = []
         
         #create action groups
         top_actions = Gtk.ActionGroup("top_actions")
@@ -897,14 +898,61 @@ class HiToDo(Gtk.Window):
     def do_cut(self, widget=None):
         if self.focus != self.task_view:
             self.focus.emit('cut-clipboard')
+        else:
+            if self.sellist is None: return
+            row_texts = []
+            self.copied_rows = []
+            for path in self.sellist:
+                row_texts.append(self.tasklist[path][13])
+                self.copied_rows.append(self.tasklist[path][:])
+            self.clipboard.set_text("\n".join(row_texts), -1)
+            self.del_current_task()
     
     def do_copy(self, widget=None):
         if self.focus != self.task_view:
             self.focus.emit('copy-clipboard')
+        else:
+            if self.sellist is None: return
+            row_texts = []
+            self.copied_rows = []
+            for path in self.sellist:
+                row_texts.append(self.tasklist[path][13])
+                self.copied_rows.append(self.tasklist[path][:])
+            self.clipboard.set_text("\n".join(row_texts), -1)
     
     def do_paste(self, widget=None):
         if self.focus != self.task_view:
             self.focus.emit('paste-clipboard')
+        else:
+            if self.seliter is None:
+                parent_iter = None
+            else:
+                path = str(self.tasklist.get_path(self.seliter))
+                parts = path.rpartition(':')
+                parent_path = parts[0]
+                if parent_path != "":
+                    parent_iter = self.tasklist.get_iter(parent_path)
+                else:
+                    parent_iter = None
+            
+            for row in self.copied_rows:
+                new_row = self.defaults
+                inherit = [0,2,4,5,8,9,10,11,13,14] #columns to preserve from original row
+                for i in inherit:
+                    new_row[i] = row[i]
+                self.tasklist.append(parent_iter, new_row)
+    
+    def do_paste_into(self, widget=None):
+        if self.focus != self.task_view: return
+        if self.seliter is None: return
+        
+        for row in self.copied_rows:
+            new_row = self.defaults
+            inherit = [0,2,4,5,8,9,10,11,13,14] #columns to preserve from original row
+            for i in inherit:
+                new_row[i] = row[i]
+            treeiter = self.tasklist.append(self.seliter, new_row)
+            self.task_view.expand_to_path(self.tasklist.get_path(treeiter))            
     
     def due_render(self, col, cell, model, tree_iter, data):
         val = model[tree_iter][8]
@@ -1062,7 +1110,7 @@ class HiToDo(Gtk.Window):
             ("task_cut", Gtk.STOCK_CUT, None, None, "Cut task", self.do_cut),
             ("task_copy", Gtk.STOCK_COPY, None, None, "Copy task", self.do_copy),
             ("task_paste", Gtk.STOCK_PASTE, None, None, "Paste task", self.do_paste),
-            ("task_paste_into", None, "Paste as _Child", "<Primary><Shift>V", "Paste as child", self.skip),
+            ("task_paste_into", None, "Paste as _Child", "<Primary><Shift>V", "Paste as child", self.do_paste_into),
             ("undo", Gtk.STOCK_UNDO, None, "<Primary>Z", "Undo", self.skip),
             ("redo", Gtk.STOCK_REDO, None, "<Primary><Shift>Z", "Redo", self.skip),
             ("sel_all", Gtk.STOCK_SELECT_ALL, None, "<Primary>A", None, self.select_all),
