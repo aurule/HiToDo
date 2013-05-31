@@ -258,7 +258,9 @@ class HiToDo(Gtk.Window):
     def datecompare(self, model, row1, row2, data=None):
         sort_column, _ = model.get_sort_column_id()
         value1 = model.get_value(row1, sort_column)
+        if value1 is None: value1 = datetime.min
         value2 = model.get_value(row2, sort_column)
+        if value2 is None: value2 = datetime.min
         
         if value1 < value2:
             return -1
@@ -752,6 +754,8 @@ class HiToDo(Gtk.Window):
         self.task_view.collapse_all()
     
     def open_recent(self, widget):
+        if not self.confirm_discard(): return
+        
         uri = widget.get_current_uri()
         path = urlparse(uri).path
         self.file_name = unquote(path)
@@ -1093,7 +1097,7 @@ class HiToDo(Gtk.Window):
             ("HelpMenu", None, "_Help")
         ])
         recent_files = Gtk.RecentAction("recents", "_Recent Files", "Open a recently-used file", None)
-        recent_files.set_properties(icon_name="document-open-recent", local_only=True, sort_type=Gtk.RecentSortType.MRU, show_not_found=False)
+        recent_files.set_properties(icon_name="document-open-recent", local_only=True, sort_type=Gtk.RecentSortType.MRU, show_not_found=False, show_numbers=True)
         htdl_filter = Gtk.RecentFilter()
         htdl_filter.add_pattern("*.htdl")
         htdl_filter.set_name("HiToDo Files (*.htdl)")
