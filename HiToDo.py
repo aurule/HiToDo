@@ -805,7 +805,7 @@ class HiToDo(Gtk.Window):
             treeiter = self.tasklist.get_iter(pathstr)
             path = self.tasklist.get_path(treeiter)
             self.task_view.expand_row(path, False)
-        if selme != '':
+        if selme != '' and selme is not None:
             self.selection.select_iter(self.tasklist.get_iter(selme))
         self.task_view.thaw_child_notify()
         
