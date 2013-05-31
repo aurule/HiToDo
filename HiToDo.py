@@ -350,10 +350,8 @@ class HiToDo(Gtk.Window):
     def commit_spent(self, widget=None, path=None, new_spent=None):
         if path is None or path == "": return
         
-        old_spent = self.tasklist[path][3]
-        
         if not is_number(new_spent): return
-        
+        old_spent = self.tasklist[path][3]
         new_spent = float(new_spent)
         out = floor(new_spent * 3600)
         self.tasklist[path][3] = int(out)
@@ -405,31 +403,15 @@ class HiToDo(Gtk.Window):
             
             diff = datetime.now() - self.timer_start
             secs = int(diff.total_seconds())
-            self.tasklist[self.tracking][3] += secs
+            path = str(self.tasklist.get_path(self.tracking))
+            nspent = (self.tasklist[self.tracking][3] + secs) / 3600
+            self.commit_spent(path=path, new_spent = nspent)
             self.tasklist[self.tracking][17] = False
-            self.recalc_parent_spent(str(self.tasklist.get_path(self.tracking)))
             self.make_dirty()
             
             self.tracking = None
             self.timer_start = None
             action.set_tooltip("Start tracking time toward current task")
-    
-    def recalc_parent_spent(self, path):
-        parts = path.rpartition(':')
-        parent_path = parts[0]
-        if parent_path == '': return
-        
-        parent_iter = self.tasklist.get_iter(parent_path)
-        
-        n_children = self.tasklist.iter_n_children(parent_iter)
-        childiter = self.tasklist.iter_children(parent_iter)
-        total_spent = 0
-        while childiter != None:
-            total_spent += self.tasklist[childiter][3]
-            childiter = self.tasklist.iter_next(childiter)
-        
-        self.tasklist[parent_iter][3] = int(floor(total_spent / n_children))
-        self.recalc_parent_spent(parent_path)
     
     def commit_done(self, renderer=None, path=None, data=None):
         if path is None: return
@@ -465,13 +447,18 @@ class HiToDo(Gtk.Window):
         if self.tasklist[parent_iter][12]: return #skip calculation if parent is marked "done"
         
         n_children = self.tasklist.iter_n_children(parent_iter)
-        childiter = self.tasklist.iter_children(parent_iter)
-        total_pct = 0
-        while childiter != None:
-            total_pct += self.tasklist[childiter][1]
-            childiter = self.tasklist.iter_next(childiter)
+        if n_children == 0:
+            final_pct = 0
+        else:
+            childiter = self.tasklist.iter_children(parent_iter)
+            total_pct = 0
+            while childiter != None:
+                total_pct += self.tasklist[childiter][1]
+                childiter = self.tasklist.iter_next(childiter)
+            
+            final_pct = int(floor(total_pct / n_children))
         
-        self.tasklist[parent_iter][1] = int(floor(total_pct / n_children))
+        self.tasklist[parent_iter][1] = final_pct
         self.recalc_parent_pct(parent_path)
     
     def calc_pct_from_children(self, path):
@@ -626,13 +613,14 @@ class HiToDo(Gtk.Window):
             #stop tracking if needed
             if self.tasklist[path][17]:
                 self.track_action.set_active(False)
-            refs.append(self.tasklist.get_iter(path))
+            refs.append((self.tasklist.get_iter(path), path))
         #only then can we remove them without invalidating paths
-        for ref in refs:
-            path = str(self.tasklist.get_path(ref))
+        for ref, path in refs:
+            self.commit_spent(path=str(path), new_spent=0)
+            self.commit_est(path=str(path), new_est=0)
+            
             self.tasklist.remove(ref)
-            self.recalc_parent_pct(path)
-            self.recalc_parent_spent(path)
+            self.recalc_parent_pct(str(path))
         
         self.seliter = None
     
@@ -641,9 +629,10 @@ class HiToDo(Gtk.Window):
         if self.tasklist[path][17]:
             self.track_action.set_active(False)
         treeiter = self.tasklist.get_iter(path)
+        self.commit_spent(path=path, new_spent=0)
+        self.commit_est(path=path, new_est=0)
         self.tasklist.remove(treeiter)
         self.recalc_parent_pct(str(path))
-        self.recalc_parent_spent(str(path))
     
     def notes_keys_dn(self, widget=None, event=None):
         kvn = Gdk.keyval_name(event.keyval)
