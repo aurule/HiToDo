@@ -31,6 +31,7 @@ import xml.etree.ElementTree as et
 import testing
 import dialogs
 import file_parsers
+import undobuffer
 
 UI_XML = """
 <ui>
@@ -166,6 +167,7 @@ class HiToDo(Gtk.Window):
         self.notes_shift_mask = False
         self.parent = None
         self.title_key_press_catcher = None
+        self.title_buff = None
         self.file_name = ""
         self.file_filter = None
         self.file_dirty = False
@@ -223,13 +225,14 @@ class HiToDo(Gtk.Window):
         notes_scroll_win = Gtk.ScrolledWindow()
         notes_scroll_win.set_hexpand(True)
         notes_scroll_win.set_vexpand(True)
+        self.notes_buff = undobuffer.UndoableTextBuffer()
         self.notes_view = Gtk.TextView()
+        self.notes_view.set_buffer(self.notes_buff)
         self.notes_view.connect('focus-in-event', self.track_focus)
         self.notes_view.connect('focus-out-event', self.commit_notes)
         self.notes_view.connect('key-press-event', self.notes_keys_dn)
         self.notes_view.connect('key-release-event', self.notes_keys_up)
         self.notes_view.set_wrap_mode(Gtk.WrapMode.WORD)
-        self.notes_buff = self.notes_view.get_buffer()
         notes_scroll_win.add(self.notes_view)
         task_pane.pack2(notes_scroll_win, True, True)
         
@@ -703,6 +706,8 @@ class HiToDo(Gtk.Window):
         else:
             self.seliter = None
             self.notes_buff.set_text('')
+        
+        self.notes_buff.clear_undo()
     
     def select_none(self, widget=None):
         if self.focus == self.task_view:
@@ -958,6 +963,14 @@ class HiToDo(Gtk.Window):
             treeiter = self.tasklist.append(self.seliter, new_row)
             self.task_view.expand_to_path(self.tasklist.get_path(treeiter))            
     
+    def do_undo(self, widget=None):
+        if self.focus == self.notes_view:
+            self.notes_buff.undo()
+    
+    def do_redo(self, widget=None):
+        if self.focus == self.notes_view:
+            self.notes_buff.redo()
+    
     def due_render(self, col, cell, model, tree_iter, data):
         val = model[tree_iter][8]
         duetime = model[tree_iter][15]
@@ -1115,8 +1128,8 @@ class HiToDo(Gtk.Window):
             ("task_copy", Gtk.STOCK_COPY, None, None, "Copy task", self.do_copy),
             ("task_paste", Gtk.STOCK_PASTE, None, None, "Paste task", self.do_paste),
             ("task_paste_into", None, "Paste as _Child", "<Primary><Shift>V", "Paste as child", self.do_paste_into),
-            ("undo", Gtk.STOCK_UNDO, None, "<Primary>Z", "Undo", self.skip),
-            ("redo", Gtk.STOCK_REDO, None, "<Primary><Shift>Z", "Redo", self.skip),
+            ("undo", Gtk.STOCK_UNDO, None, "<Primary>Z", "Undo", self.do_undo),
+            ("redo", Gtk.STOCK_REDO, None, "<Primary><Shift>Z", "Redo", self.do_redo),
             ("sel_all", Gtk.STOCK_SELECT_ALL, None, "<Primary>A", None, self.select_all),
             ("sel_inv", None, "_Invert Selection", None, None, self.select_inv),
             ("sel_none", None, "Select _None", "<Primary><Shift>A", None, self.select_none),
