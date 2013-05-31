@@ -24,9 +24,10 @@ Although it isn't completely finished, HiToDo is stable and usable day-to-day. H
 
 * Unlimited per-session undo/redo
 * Task cut, copy, paste, and paste-beneath operations
-* Task reordering via drag-and-drop
+* Task reordering via drag-and-drop (may not be possible)
 * [todo.txt](http://todotxt.com/) save/open
 * ToDoList save/open
+* Multiple lists at once via tabs
 
 # Requirements
 
