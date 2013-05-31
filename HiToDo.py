@@ -1,16 +1,36 @@
 #!/usr/bin/env python
 
+# Copyright 2013 Peter Andrews
+
+# This file is part of HiToDo.
+#
+# HiToDo is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# HiToDo is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with HiToDo.  If not, see <http://www.gnu.org/licenses/>.
+
 from __future__ import division
 from gi.repository import Gtk, Gdk, Pango
 from datetime import datetime, timedelta
 from os import linesep
+from os.path import basename, dirname, splitext
+from urlparse import urlparse
+from urllib import unquote
 from dateutil.parser import parse as dateparse
 from math import floor
 import xml.etree.ElementTree as et
-from os.path import basename, dirname, splitext
 
 import testing
 import dialogs
+import file_parsers
 
 UI_XML = """
 <ui>
@@ -22,6 +42,8 @@ UI_XML = """
             <menuitem action="save_file" />
             <menuitem action="saveas_file" />
             <separator />
+            <menuitem action="recents" />
+            <separator />
             <menuitem action='quit' />
         </menu>
         <menu action='EditMenu'>
@@ -31,6 +53,8 @@ UI_XML = """
             <menuitem action='sel_all' />
             <menuitem action='sel_none' />
             <menuitem action='sel_inv' />
+            <separator />
+            <menuitem action='prefs' />
         </menu>
         <menu action='TaskMenu'>
             <menuitem action='task_new' />
@@ -41,6 +65,10 @@ UI_XML = """
             <menuitem action='task_copy' />
             <menuitem action='task_paste' />
             <menuitem action='task_paste_into' />
+        </menu>
+        <menu action="ViewMenu">
+            <menuitem action='expand_all' />
+            <menuitem action='collapse_all' />
         </menu>
         <menu action='HelpMenu'>
             <menuitem action='help_about' />
@@ -212,6 +240,8 @@ class HiToDo(Gtk.Window):
         
         self.open_dlg = dialogs.htd_open(self)
         self.save_dlg = dialogs.htd_save(self)
+        self.about_dlg = dialogs.htd_about(self)
+        self.prefs_dlg = dialogs.htd_prefs(self)
     
     def skip(self, widget=None):
         pass
@@ -693,6 +723,19 @@ class HiToDo(Gtk.Window):
                 self.__invert_tasklist_selection(childiter)
             treeiter = self.tasklist.iter_next(treeiter)
     
+    def expand_all(self, widget=None):
+        self.task_view.expand_all()
+    
+    def collapse_all(self, widget=None):
+        self.task_view.collapse_all()
+    
+    def open_recent(self, widget):
+        uri = widget.get_current_uri()
+        path = urlparse(uri).path
+        self.file_name = unquote(path)
+        self.file_filter = file_parsers.pick_filter(path)
+        self.__do_open()
+    
     def open_file(self, widget=None):
         if not self.confirm_discard(): return
         
@@ -702,6 +745,10 @@ class HiToDo(Gtk.Window):
         
         self.file_name = self.open_dlg.get_filename()
         self.file_filter = self.save_dlg.get_filter()
+        self.__do_open()
+
+    def __do_open(self):
+        '''Internal function to open a file from self.file_name using the reader at self.file_filter.'''
         self.file_dirty = False
         self.update_title()
         
@@ -711,7 +758,7 @@ class HiToDo(Gtk.Window):
         self.tasklist.clear()
         
         #add rows to self.tasklist
-        self.file_filter.read_to_store(self.file_name, self.assigners_list, self.assignees_list, self.statii_list, self.tasklist)
+        rows_to_expand, selme = self.file_filter.read_to_store(self.file_name, self.assigners_list, self.assignees_list, self.statii_list, self.tasklist)
         
         #iterate assigners, assignees, and statii to put names into respective liststores
         for n in self.assigners_list:
@@ -723,6 +770,12 @@ class HiToDo(Gtk.Window):
         
         #reconnect model to view
         self.task_view.set_model(self.tasklist)
+        for pathstr in rows_to_expand:
+            treeiter = self.tasklist.get_iter(pathstr)
+            path = self.tasklist.get_path(treeiter)
+            self.task_view.expand_row(path, False)
+        if selme != '':
+            self.selection.select_iter(self.tasklist.get_iter(selme))
         self.task_view.thaw_child_notify()
         
         self.update_title()
@@ -771,7 +824,11 @@ class HiToDo(Gtk.Window):
             self.save_file_as()
             return
         
-        self.file_filter.write(self.file_name, self.assigners_list, self.assignees_list, self.statii_list, self.tasklist)
+        if self.seliter is not None:
+            selpath = str(self.tasklist.get_path(self.seliter))
+        else:
+            selpath = ''
+        self.file_filter.write(self.file_name, self.assigners_list, self.assignees_list, self.statii_list, self.tasklist, self.task_view, selpath)
         
         self.file_dirty = False
         self.update_title()
@@ -808,6 +865,13 @@ class HiToDo(Gtk.Window):
         self.tasklist.clear()
         self.file_name = ""
         self.file_dirty = False
+    
+    def show_about(self, widget=None):
+        self.about_dlg.run()
+        self.about_dlg.hide()
+    
+    def set_prefs(self, widget=None):
+        self.prefs_dlg.show()
     
     def due_render(self, col, cell, model, tree_iter, data):
         val = model[tree_iter][8]
@@ -935,12 +999,23 @@ class HiToDo(Gtk.Window):
             ("save_file", Gtk.STOCK_SAVE, None, None, "Save file", self.save_file),
             ("saveas_file", Gtk.STOCK_SAVE_AS, None, None, None, self.save_file_as),
             ("quit", Gtk.STOCK_QUIT, None, None, None, self.destroy),
-            ("help_about", Gtk.STOCK_ABOUT, None, None, None, self.skip),
+            ("help_about", Gtk.STOCK_ABOUT, None, None, None, self.show_about),
+            ("prefs", Gtk.STOCK_PREFERENCES, None, None, None, self.set_prefs),
             ("FileMenu", None, "_File"),
             ("EditMenu", None, "_Edit"),
             ("TaskMenu", None, "_Task"),
+            ("ViewMenu", None, "_View"),
             ("HelpMenu", None, "_Help")
         ])
+        recent_files = Gtk.RecentAction("recents", "_Recent Files", "Open a recently-used file", None)
+        recent_files.set_properties(icon_name="document-open-recent", local_only=True, sort_type=Gtk.RecentSortType.MRU, show_not_found=False)
+        htdl_filter = Gtk.RecentFilter()
+        htdl_filter.add_pattern("*.htdl")
+        htdl_filter.set_name("HiToDo Files (*.htdl)")
+        recent_files.add_filter(htdl_filter)
+        recent_files.connect("item-activated", self.open_recent)
+        action_group.add_action(recent_files)
+        
         
     def create_task_actions(self, action_group):
         action_group.add_actions([
@@ -955,7 +1030,9 @@ class HiToDo(Gtk.Window):
             ("redo", Gtk.STOCK_REDO, None, "<Primary><Shift>Z", "Redo", self.skip),
             ("sel_all", Gtk.STOCK_SELECT_ALL, None, "<Primary>A", None, self.select_all),
             ("sel_inv", None, "_Invert Selection", None, None, self.select_inv),
-            ("sel_none", None, "Select _None", "<Primary><Shift>A", None, self.select_none)
+            ("sel_none", None, "Select _None", "<Primary><Shift>A", None, self.select_none),
+            ("expand_all", None, "_Expand All", None, "Expand all tasks", self.expand_all),
+            ("collapse_all", None, "_Collapse All", None, "Collapse all tasks", self.collapse_all)
         ])
         self.track_action = Gtk.ToggleAction("track_spent", "Track", "Track time worked toward this task", None)
         self.track_action.set_properties(icon_name="appointment-soon")

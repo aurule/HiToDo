@@ -1,9 +1,33 @@
+# Copyright 2013 Peter Andrews
+
+# This file is part of HiToDo.
+#
+# HiToDo is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# HiToDo is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with HiToDo.  If not, see <http://www.gnu.org/licenses/>.
+
 from gi.repository import Gtk
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element
 from xml.etree.ElementTree import SubElement
 from dateutil.parser import parse as dateparse
 from datetime import datetime
+from os.path import splitext
+
+def pick_filter(file_name):
+    ext = splitext(file_name)[1]
+    if ext == '.htdl':
+        f = htd_filter()
+        return f
 
 class htd_filter(Gtk.FileFilter):
     def __init__(self):
@@ -40,6 +64,15 @@ class htd_filter(Gtk.FileFilter):
         tasklist = document.find("tasklist")
         self.tasks = taskstore #store for use later
         self.__read_tasks(tasklist, None)
+        
+        exp = document.find('expanded')
+        ret = []
+        for n in exp.findall('path'):
+            ret.append(n.text)
+        seldata = document.find('selected')
+        sel = seldata.text
+        
+        return (ret, sel)
     
     def __read_tasks(self, tasklist, parent=None):
         '''Internal function to recursively add tasks from an XML file to the treestore self.tasks.'''
@@ -86,7 +119,7 @@ class htd_filter(Gtk.FileFilter):
             treeiter = self.tasks.append(parent, tlist)
             self.__read_tasks(task.find('tasklist'), treeiter)
     
-    def write(self, fname, froms, tos, stats, tasks):
+    def write(self, fname, froms, tos, stats, tasks, taskview, selpath):
         '''Writes todo list data to xml file. Args:
 * fname is the file's path
 * froms is a list of assigner strings
@@ -109,6 +142,14 @@ class htd_filter(Gtk.FileFilter):
             e = SubElement(statii, 'name')
             e.text = f
         
+        #store list of expanded rows
+        exp = SubElement(htd, 'expanded')
+        taskview.map_expanded_rows(self.map_expanded, exp)
+        
+        #store path of selected row
+        sel = SubElement(htd, 'selected')
+        sel.text = selpath
+        
         #create master tasklist element
         tasklist = SubElement(htd, 'tasklist')
         
@@ -120,6 +161,10 @@ class htd_filter(Gtk.FileFilter):
         ofile.write('<?xml version="1.0" encoding="ISO-8859-1"?>')
         ofile.write(ElementTree.tostring(htd))
         ofile.close()
+    
+    def map_expanded(self, treeview, path, xml):
+        row = SubElement(xml, 'path')
+        row.text = str(path)
     
     def store_tasks(self, tasks, taskelem):
         self.tasks = tasks
