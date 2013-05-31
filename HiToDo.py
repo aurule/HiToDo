@@ -50,6 +50,11 @@ UI_XML = """
             <menuitem action='undo' />
             <menuitem action='redo' />
             <separator />
+            <menuitem action='task_cut' />
+            <menuitem action='task_copy' />
+            <menuitem action='task_paste' />
+            <menuitem action='task_paste_into' />
+            <separator />
             <menuitem action='sel_all' />
             <menuitem action='sel_none' />
             <menuitem action='sel_inv' />
@@ -61,10 +66,7 @@ UI_XML = """
             <menuitem action='task_newsub' />
             <menuitem action='task_del' />
             <separator />
-            <menuitem action='task_cut' />
-            <menuitem action='task_copy' />
-            <menuitem action='task_paste' />
-            <menuitem action='task_paste_into' />
+            <menuitem action='track_spent' />
         </menu>
         <menu action="ViewMenu">
             <menuitem action='expand_all' />
@@ -1023,7 +1025,7 @@ class HiToDo(Gtk.Window):
             ("expand_all", None, "_Expand All", None, "Expand all tasks", self.expand_all),
             ("collapse_all", None, "_Collapse All", None, "Collapse all tasks", self.collapse_all)
         ])
-        self.track_action = Gtk.ToggleAction("track_spent", "Track", "Track time worked toward this task", None)
+        self.track_action = Gtk.ToggleAction("track_spent", "Track spent time", "Track time worked toward this task", None)
         self.track_action.set_properties(icon_name="appointment-soon")
         self.track_action.connect("activate", self.track_spent)
         action_group.add_action(self.track_action)
