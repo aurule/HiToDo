@@ -172,6 +172,7 @@ class HiToDo(Gtk.Window):
         self.tracking = None
         self.timer_start = None
         self.last_save = datetime.now()
+        self.focus = None
         
         #create action groups
         top_actions = Gtk.ActionGroup("top_actions")
@@ -213,6 +214,7 @@ class HiToDo(Gtk.Window):
         self.sel_changed_handler = self.selection.connect("changed", self.task_selected)
         self.task_view.set_properties(expander_column=self.col_title, enable_tree_lines=True, reorderable=True, enable_search=True, search_column=13, rules_hint=True)
         self.task_view.connect('key-press-event', self.tasks_keys_dn)
+        self.task_view.connect('focus-in-event', self.track_focus)
         task_scroll_win.add(self.task_view)
         task_pane.pack1(task_scroll_win, True, True)
         
@@ -221,6 +223,7 @@ class HiToDo(Gtk.Window):
         notes_scroll_win.set_hexpand(True)
         notes_scroll_win.set_vexpand(True)
         self.notes_view = Gtk.TextView()
+        self.notes_view.connect('focus-in-event', self.track_focus)
         self.notes_view.connect('focus-out-event', self.commit_notes)
         self.notes_view.connect('key-press-event', self.notes_keys_dn)
         self.notes_view.connect('key-release-event', self.notes_keys_up)
@@ -247,6 +250,9 @@ class HiToDo(Gtk.Window):
     
     def skip(self, widget=None):
         pass
+    
+    def track_focus(self, widget, event=None):
+        self.focus = widget
     
     def datecompare(self, model, row1, row2, data=None):
         sort_column, _ = model.get_sort_column_id()
@@ -331,6 +337,7 @@ class HiToDo(Gtk.Window):
         
     def est_edit_start(self, renderer, editor, path):
         val = self.tasklist[path][2]
+        self.track_focus(widget = editor)
         editor.set_text(str(val/3600)) #don't display the H suffix during editing
         editor.set_icon_from_stock(Gtk.EntryIconPosition.SECONDARY, Gtk.STOCK_REFRESH)
         editor.set_icon_tooltip_text(Gtk.EntryIconPosition.SECONDARY, "Recalculate from children")
@@ -367,6 +374,7 @@ class HiToDo(Gtk.Window):
         
     def spent_edit_start(self, renderer, editor, path):
         val = self.tasklist[path][3]
+        self.track_focus(widget = editor)
         editor.set_text(str(val/3600)) #don't display the H suffix during editing
         editor.set_icon_from_stock(Gtk.EntryIconPosition.SECONDARY, Gtk.STOCK_REFRESH)
         editor.set_icon_tooltip_text(Gtk.EntryIconPosition.SECONDARY, "Recalculate from children")
@@ -529,6 +537,7 @@ class HiToDo(Gtk.Window):
             self.statii.append([new_status])
             self.statii_list.append(new_status)
         self.tasklist[path][11] = new_status
+        self.track_focus(widget = self.task_view)
     
     def commit_assigner(self, widget=None, path=None, new_assigner=None):
         if path is None: return
@@ -537,6 +546,7 @@ class HiToDo(Gtk.Window):
             self.assigners.append([new_assigner])
             self.assigners_list.append(new_assigner)
         self.tasklist[path][9] = new_assigner
+        self.track_focus(widget = self.task_view)
     
     def commit_assignee(self, widget=None, path=None, new_assignee=None):
         if path is None: return
@@ -545,6 +555,7 @@ class HiToDo(Gtk.Window):
             self.assignees.append([new_assignee])
             self.assignees_list.append(new_assignee)
         self.tasklist[path][10] = new_assignee
+        self.track_focus(widget = self.task_view)
     
     def commit_notes(self, widget=None, data=None):
         if self.seliter is None: return
@@ -589,9 +600,17 @@ class HiToDo(Gtk.Window):
         self.title_edit_path = str(path)
         self.title_edit_old_val = self.tasklist[path][13]
         self.title_editor = editor
+        self.track_focus(widget=editor)
         self.title_key_press_catcher = editor.connect("key-press-event", self.title_keys_dn)
     
+    def combo_edit_start(self, renderer, editor, path):
+        self.track_focus(widget=editor.get_child())
+    
+    def priority_edit_start(self, renderer, editor, path):
+        self.track_focus(widget = editor)
+    
     def due_edit_start(self, renderer, editor, path):
+        self.track_focus(widget = editor)
         editor.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "appointment-new")
         editor.connect("icon-press", self.due_pick)
     
@@ -600,6 +619,7 @@ class HiToDo(Gtk.Window):
         pass
     
     def complete_edit_start(self, renderer, editor, path):
+        self.track_focus(widget = editor)
         editor.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "appointment-new")
         editor.connect("icon-press", self.complete_pick)
     
@@ -682,10 +702,20 @@ class HiToDo(Gtk.Window):
             self.notes_buff.set_text('')
     
     def select_none(self, widget=None):
-        self.selection.unselect_all()
+        if self.focus == self.task_view:
+            self.selection.unselect_all()
+        elif self.focus == self.notes_view:
+            self.focus.emit('select-all', False)
+        else:
+            self.focus.select_region(0,0)
     
     def select_all(self, widget=None):
-        self.selection.select_all()
+        if self.focus == self.task_view:
+            self.selection.select_all()
+        elif self.focus == self.notes_view:
+            self.focus.emit('select-all', True)
+        else:
+            self.focus.select_region(0, -1)
     
     def select_inv(self, widget=None):
         if self.selcount == 0:
@@ -864,6 +894,18 @@ class HiToDo(Gtk.Window):
     def set_prefs(self, widget=None):
         self.prefs_dlg.show()
     
+    def do_cut(self, widget=None):
+        if self.focus != self.task_view:
+            self.focus.emit('cut-clipboard')
+    
+    def do_copy(self, widget=None):
+        if self.focus != self.task_view:
+            self.focus.emit('copy-clipboard')
+    
+    def do_paste(self, widget=None):
+        if self.focus != self.task_view:
+            self.focus.emit('paste-clipboard')
+    
     def due_render(self, col, cell, model, tree_iter, data):
         val = model[tree_iter][8]
         duetime = model[tree_iter][15]
@@ -898,6 +940,7 @@ class HiToDo(Gtk.Window):
     def create_view_columns(self):
         priority = Gtk.CellRendererText(editable=True, foreground="#999")
         priority.connect("edited", self.commit_priority)
+        priority.connect("editing-started", self.priority_edit_start)
         col_priority = Gtk.TreeViewColumn("!", priority, text=0, foreground_set=12)
         col_priority.set_sort_column_id(0)
         self.task_view.append_column(col_priority)
@@ -945,18 +988,21 @@ class HiToDo(Gtk.Window):
         
         assigner = Gtk.CellRendererCombo(model=self.assigners, has_entry=True, editable=True, foreground="#999", text_column=0)
         assigner.connect("edited", self.commit_assigner)
+        assigner.connect("editing-started", self.combo_edit_start)
         col_assigner = Gtk.TreeViewColumn("From", assigner, text=9, foreground_set=12)
         col_assigner.set_sort_column_id(9)
         self.task_view.append_column(col_assigner)
         
         assignee = Gtk.CellRendererCombo(model=self.assignees, has_entry=True, editable=True, foreground="#999", text_column=0)
         assignee.connect("edited", self.commit_assignee)
+        assignee.connect("editing-started", self.combo_edit_start)
         col_assignee = Gtk.TreeViewColumn("To", assignee, text=10, foreground_set=12)
         col_assignee.set_sort_column_id(10)
         self.task_view.append_column(col_assignee)
         
         status = Gtk.CellRendererCombo(model=self.statii, has_entry=True, editable=True, foreground="#999", text_column=0)
         status.connect("edited", self.commit_status)
+        status.connect("editing-started", self.combo_edit_start)
         col_stats = Gtk.TreeViewColumn("Status", status, text=11, foreground_set=12)
         col_stats.set_sort_column_id(11)
         self.task_view.append_column(col_stats)
@@ -1013,9 +1059,9 @@ class HiToDo(Gtk.Window):
             ("task_new", Gtk.STOCK_ADD, "_New Task", "<Primary>N", "New task", self.add_task),
             ("task_newsub", Gtk.STOCK_INDENT, "New S_ubtask", "<Primary><Shift>N", "New subtask", self.add_subtask),
             ("task_del", Gtk.STOCK_REMOVE, None, None, "Delete task", self.del_current_task),
-            ("task_cut", Gtk.STOCK_CUT, None, None, "Cut task", self.skip),
-            ("task_copy", Gtk.STOCK_COPY, None, None, "Copy task", self.skip),
-            ("task_paste", Gtk.STOCK_PASTE, None, None, "Paste task", self.skip),
+            ("task_cut", Gtk.STOCK_CUT, None, None, "Cut task", self.do_cut),
+            ("task_copy", Gtk.STOCK_COPY, None, None, "Copy task", self.do_copy),
+            ("task_paste", Gtk.STOCK_PASTE, None, None, "Paste task", self.do_paste),
             ("task_paste_into", None, "Paste as _Child", "<Primary><Shift>V", "Paste as child", self.skip),
             ("undo", Gtk.STOCK_UNDO, None, "<Primary>Z", "Undo", self.skip),
             ("redo", Gtk.STOCK_REDO, None, "<Primary><Shift>Z", "Redo", self.skip),
