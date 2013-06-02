@@ -866,6 +866,10 @@ class HiToDo(Gtk.Window):
         self.last_save = datetime.now()
     
     def save_file_as(self, widget=None):
+        if self.file_name != "":
+            self.save_dlg.set_filename(self.file_name)
+        else:
+            self.save_dlg.set_current_name("Untitled list.htdl")
         retcode = self.save_dlg.run()
         self.save_dlg.hide()
         if retcode != -3: return #cancel out if requested
