@@ -792,12 +792,14 @@ class HiToDo(Gtk.Window):
         self.tasklist.clear()
         
         #add rows to self.tasklist
+        self.cols_visible[:] = []
         data = {
             'filename': self.file_name,
             'from_list': self.assigners_list,
             'to_list': self.assignees_list,
             'status_list': self.statii_list,
             'task_store': self.tasklist,
+            'cols': self.cols_visible
         }
         rows_to_expand, selme = self.file_filter.read_to_store(data)
         
@@ -808,6 +810,8 @@ class HiToDo(Gtk.Window):
             self.assignees.append([n])
         for n in self.statii_list:
             self.statii.append([n])
+        
+        self.display_columns()
         
         #reconnect model to view
         self.task_view.set_model(self.tasklist)
@@ -877,7 +881,8 @@ class HiToDo(Gtk.Window):
             'status_list': sorted(self.statii_list),
             'task_store': self.tasklist,
             'task_view': self.task_view,
-            'selection': selpath
+            'selection': selpath,
+            'cols': self.cols_visible
         }
         self.file_filter.write(data)
         
@@ -1119,6 +1124,9 @@ class HiToDo(Gtk.Window):
         self.cols_available['title'] = self.col_title
     
     def display_columns(self):
+        for col in self.task_view.get_columns():
+            self.task_view.remove_column(col)
+        
         for col in self.cols_visible:
             self.task_view.append_column(self.cols_available[col])
     
