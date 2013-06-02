@@ -37,32 +37,27 @@ class htd_filter(Gtk.FileFilter):
         self.file_extension = ".htdl"
         self.tasks = None
     
-    def read_to_store(self, fname, froms, tos, stats, taskstore):
-        '''Reads todo list data from xml file. Args:
-* fname is the file's path
-* froms is a list where assigner strings will be stored
-* tos is a list where assignee strings will be stored
-* stats is a list where status strings will be stored
-* taskstore is a GtkTreeStore which will be populated from tasks in the file'''
-        document = ElementTree.parse(fname)
+    def read_to_store(self, data):
+        '''Reads todo list data from xml file. Data is a dictionary of data holders to fill.'''
         
+        document = ElementTree.parse(data['filename'])
         #get assigners, assignees, and statii lists
         assigners = document.find("assigners")
         for n in assigners.findall('name'):
-            if n.text not in froms:
-                froms.append(n.text)
+            if n.text not in data['from_list']:
+                data['from_list'].append(n.text)
         assignees = document.find("assignees")
         for n in assignees.findall('name'):
-            if n.text not in tos:
-                tos.append(n.text)
+            if n.text not in data['to_list']:
+                data['to_list'].append(n.text)
         statii = document.find("statii")
         for n in statii.findall('name'):
-            if n.text not in stats:
-                stats.append(n.text)
+            if n.text not in data['status_list']:
+                data['status_list'].append(n.text)
         
         #get highest-level tasklist element
         tasklist = document.find("tasklist")
-        self.tasks = taskstore #store for use later
+        self.tasks = data['task_store'] #store for use later
         self.__read_tasks(tasklist, None)
         
         exp = document.find('expanded')
@@ -119,45 +114,41 @@ class htd_filter(Gtk.FileFilter):
             treeiter = self.tasks.append(parent, tlist)
             self.__read_tasks(task.find('tasklist'), treeiter)
     
-    def write(self, fname, froms, tos, stats, tasks, taskview, selpath):
-        '''Writes todo list data to xml file. Args:
-* fname is the file's path
-* froms is a list of assigner strings
-* tos is a list of assignee strings
-* stats is a list of status strings
-* tasks is a GtkTreeStore holding the task list itself'''
+    def write(self, data):
+        '''Writes todo list data to xml file. Data is a dictionary of data pieces to store.'''
+
         htd = Element('htd')
         assigners = SubElement(htd, 'assigners')
-        for f in sorted(froms):
+        for f in data['from_list']:
             e = SubElement(assigners, 'name')
             e.text = f
         
         assignees = SubElement(htd, 'assignees')
-        for f in sorted(tos):
+        for f in data['to_list']:
             e = SubElement(assignees, 'name')
             e.text = f
         
         statii = SubElement(htd, 'statii')
-        for f in sorted(stats):
+        for f in data['status_list']:
             e = SubElement(statii, 'name')
             e.text = f
         
         #store list of expanded rows
         exp = SubElement(htd, 'expanded')
-        taskview.map_expanded_rows(self.map_expanded, exp)
+        data['task_view'].map_expanded_rows(self.map_expanded, exp)
         
         #store path of selected row
         sel = SubElement(htd, 'selected')
-        sel.text = selpath
+        sel.text = data['selection']
         
         #create master tasklist element
         tasklist = SubElement(htd, 'tasklist')
         
         #iterate tasks and add to tasklist element
-        self.store_tasks(tasks, tasklist)
+        self.store_tasks(data['task_store'], tasklist)
         
         #write to file
-        ofile = open(fname, 'w')
+        ofile = open(data['filename'], 'w')
         ofile.write('<?xml version="1.0" encoding="ISO-8859-1"?>')
         ofile.write(ElementTree.tostring(htd))
         ofile.close()

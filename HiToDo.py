@@ -765,9 +765,9 @@ class HiToDo(Gtk.Window):
         if not self.confirm_discard(): return
         
         uri = widget.get_current_uri()
-        path = urlparse(uri).path
-        self.file_name = unquote(path)
-        self.file_filter = file_parsers.pick_filter(path)
+        fpath = urlparse(uri).path
+        self.file_name = unquote(fpath)
+        self.file_filter = file_parsers.pick_filter(fpath)
         self.__do_open()
     
     def open_file(self, widget=None):
@@ -792,7 +792,14 @@ class HiToDo(Gtk.Window):
         self.tasklist.clear()
         
         #add rows to self.tasklist
-        rows_to_expand, selme = self.file_filter.read_to_store(self.file_name, self.assigners_list, self.assignees_list, self.statii_list, self.tasklist)
+        data = {
+            'filename': self.file_name,
+            'from_list': self.assigners_list,
+            'to_list': self.assignees_list,
+            'status_list': self.statii_list,
+            'task_store': self.tasklist,
+        }
+        rows_to_expand, selme = self.file_filter.read_to_store(data)
         
         #iterate assigners, assignees, and statii to put names into respective liststores
         for n in self.assigners_list:
@@ -862,7 +869,17 @@ class HiToDo(Gtk.Window):
             selpath = str(self.tasklist.get_path(self.seliter))
         else:
             selpath = ''
-        self.file_filter.write(self.file_name, self.assigners_list, self.assignees_list, self.statii_list, self.tasklist, self.task_view, selpath)
+        
+        data = {
+            'filename': self.file_name,
+            'from_list': sorted(self.assigners_list),
+            'to_list': sorted(self.assignees_list),
+            'status_list': sorted(self.statii_list),
+            'task_store': self.tasklist,
+            'task_view': self.task_view,
+            'selection': selpath
+        }
+        self.file_filter.write(data)
         
         self.file_dirty = False
         self.update_title()
