@@ -807,6 +807,8 @@ class HiToDo(Gtk.Window):
         
         for col in self.cols_visible:
             self.task_view.append_column(self.cols_available[col])
+        
+        self.task_view.set_properties(expander_column=self.col_title)
     
     def notes_keys_dn(self, widget=None, event=None):
         kvn = Gdk.keyval_name(event.keyval)
@@ -956,7 +958,7 @@ class HiToDo(Gtk.Window):
         self.selection = self.task_view.get_selection()
         self.selection.set_mode(Gtk.SelectionMode.MULTIPLE)
         self.sel_changed_handler = self.selection.connect("changed", self.task_selected)
-        self.task_view.set_properties(expander_column=self.col_title, enable_tree_lines=True, reorderable=True, enable_search=True, search_column=13, rules_hint=True)
+        self.task_view.set_properties(enable_tree_lines=True, reorderable=True, enable_search=True, search_column=13, rules_hint=True)
         self.task_view.connect('key-press-event', self.tasks_keys_dn)
         self.task_view.connect('focus-in-event', self.track_focus)
         task_scroll_win.add(self.task_view)
