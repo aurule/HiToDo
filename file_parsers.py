@@ -183,11 +183,13 @@ class htd_filter(Gtk.FileFilter):
             e = SubElement(task, 'spent') #time spent
             e.text = str(self.tasklist[treeiter][3])
             
+            #duetime flag changes datetime format
+            duetime = self.tasklist[treeiter][15]
+            fmt = "%Y-%m-%d %H:%M" if duetime else "%Y-%m-%d" #uses ISO 8601 format
+            
             #due
             if self.tasklist[treeiter][8] is not None:
                 val = self.tasklist[treeiter][8]
-                duetime = self.tasklist[treeiter][15]
-                fmt = "%x %X" if duetime else "%x"
                 out = "" if val is None else val.strftime(fmt)
                 
                 due = SubElement(task, 'due')
@@ -200,8 +202,6 @@ class htd_filter(Gtk.FileFilter):
             #completed
             if self.tasklist[treeiter][7] is not None:
                 val = self.tasklist[treeiter][7]
-                duetime = self.tasklist[treeiter][15]
-                fmt = "%x %X" if duetime else "%x"
                 out = "" if val is None else val.strftime(fmt)
                 
                 e = SubElement(task, 'completed')
