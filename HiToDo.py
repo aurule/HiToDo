@@ -567,6 +567,7 @@ class HiToDo(Gtk.Window):
         self.tasklist.clear()
         self.file_name = ""
         self.file_dirty = False
+        self.update_title()
     
     def open_file(self, widget=None):
         if not self.confirm_discard(): return
