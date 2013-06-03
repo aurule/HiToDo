@@ -35,7 +35,7 @@ class htd_filter(Gtk.FileFilter):
         self.add_pattern("*.htdl")
         self.set_name("HiToDo Files (*.htdl)")
         self.file_extension = ".htdl"
-        self.tasks = None
+        self.tasklist = None
     
     def read_to_store(self, data):
         '''Reads todo list data from xml file. Data is a dictionary of data holders to fill.'''
@@ -60,62 +60,62 @@ class htd_filter(Gtk.FileFilter):
         data['cols'].extend(cols_list.split(','))
         
         #get highest-level tasklist element
-        tasklist = document.find("tasklist")
-        self.tasks = data['task_store'] #store for use later
-        self.__read_tasks(tasklist, None)
+        tlist = document.find("tasklist")
+        self.tasklist = data['task_store'] #store for use later
+        self.__read_tasks(tlist, None)
         
         exp = document.find('expanded')
-        ret = []
+        expanded_paths = []
         for n in exp.findall('path'):
-            ret.append(n.text)
+            expanded_paths.append(n.text)
         seldata = document.find('selected')
         sel = seldata.text
         
-        return (ret, sel)
+        return (expanded_paths, sel)
     
-    def __read_tasks(self, tasklist, parent=None):
-        '''Internal function to recursively add tasks from an XML file to the treestore self.tasks.'''
-        for task in tasklist.iterfind('./task'):
+    def __read_tasks(self, tlist, parent=None):
+        '''Internal function to recursively add tasks from an XML file to the treestore self.tasklist.'''
+        for task in tlist.iterfind('./task'):
             #make a list from subelements and attributes to add to the treestore
-            tlist = []
-            tlist.append(int(task.get('priority')))
-            tlist.append(int(task.find('pct').text))
-            tlist.append(int(task.find('est').text))
-            tlist.append(int(task.find('spent').text))
-            tlist.append(None) #est begin
-            tlist.append(None) #est complete
-            tlist.append(None) #act begin
+            tasks = []
+            tasks.append(int(task.get('priority')))
+            tasks.append(int(task.find('pct').text))
+            tasks.append(int(task.find('est').text))
+            tasks.append(int(task.find('spent').text))
+            tasks.append(None) #est begin
+            tasks.append(None) #est complete
+            tasks.append(None) #act begin
             completed_raw = task.find('completed').text
             if completed_raw is None:
-                tlist.append(None)
+                tasks.append(None)
             else:
-                tlist.append(dateparse(completed_raw))
+                tasks.append(dateparse(completed_raw))
             due_raw = task.find('due').text
             if due_raw is None:
-                tlist.append(None)
+                tasks.append(None)
             else:
-                tlist.append(dateparse(due_raw))
+                tasks.append(dateparse(due_raw))
             assigner_raw = task.find('assigner').text
             if assigner_raw is None: assigner_raw = ''
-            tlist.append(assigner_raw)
+            tasks.append(assigner_raw)
             assignee_raw = task.find('assignee').text
             if assignee_raw is None: assignee_raw = ''
-            tlist.append(assignee_raw)
+            tasks.append(assignee_raw)
             status_raw = task.find('status').text
             if status_raw is None: status_raw = ''
-            tlist.append(status_raw)
+            tasks.append(status_raw)
             done = task.get('done') == "True"
-            tlist.append(done)
-            tlist.append(task.find('title').text)
+            tasks.append(done)
+            tasks.append(task.find('title').text)
             notes_raw = task.find('notes').text
             if notes_raw is None: notes_raw = ''
-            tlist.append(notes_raw)
-            tlist.append(task.find('due').get('useTime') == "True")
-            tlist.append(not done) #inverse done
-            tlist.append(False) #time track flag
+            tasks.append(notes_raw)
+            tasks.append(task.find('due').get('useTime') == "True")
+            tasks.append(not done) #inverse done
+            tasks.append(False) #time track flag
             
             #append to store
-            treeiter = self.tasks.append(parent, tlist)
+            treeiter = self.tasklist.append(parent, tasks)
             self.__read_tasks(task.find('tasklist'), treeiter)
     
     def write(self, data):
@@ -165,42 +165,42 @@ class htd_filter(Gtk.FileFilter):
         row = SubElement(xml, 'path')
         row.text = str(path)
     
-    def store_tasks(self, tasks, taskelem):
-        self.tasks = tasks
-        treeiter = self.tasks.get_iter_first()
+    def store_tasks(self, treestore, taskelem):
+        self.tasklist = treestore
+        treeiter = self.tasklist.get_iter_first()
         self.__store_peers(treeiter, taskelem)
-        self.tasks = None
+        self.tasklist = None
     
     def __store_peers(self, treeiter, taskelem):
         while treeiter is not None:
             task = SubElement(taskelem, 'task')
-            task.set('done', str(self.tasks[treeiter][12]))
-            task.set('priority', str(self.tasks[treeiter][0]))
+            task.set('done', str(self.tasklist[treeiter][12]))
+            task.set('priority', str(self.tasklist[treeiter][0]))
             e = SubElement(task, 'pct') #pct complete
-            e.text = str(self.tasks[treeiter][1])
+            e.text = str(self.tasklist[treeiter][1])
             e = SubElement(task, 'est') #est time
-            e.text = str(self.tasks[treeiter][2])
+            e.text = str(self.tasklist[treeiter][2])
             e = SubElement(task, 'spent') #time spent
-            e.text = str(self.tasks[treeiter][3])
+            e.text = str(self.tasklist[treeiter][3])
             
             #due
-            if self.tasks[treeiter][8] is not None:
-                val = self.tasks[treeiter][8]
-                duetime = self.tasks[treeiter][15]
+            if self.tasklist[treeiter][8] is not None:
+                val = self.tasklist[treeiter][8]
+                duetime = self.tasklist[treeiter][15]
                 fmt = "%x %X" if duetime else "%x"
                 out = "" if val is None else val.strftime(fmt)
                 
                 due = SubElement(task, 'due')
                 due.text = out
-                due.set('useTime', str(self.tasks[treeiter][15]))
+                due.set('useTime', str(self.tasklist[treeiter][15]))
             else:
                 due = SubElement(task, 'due')
-                due.set('useTime', str(self.tasks[treeiter][15]))
+                due.set('useTime', str(self.tasklist[treeiter][15]))
             
             #completed
-            if self.tasks[treeiter][7] is not None:
-                val = self.tasks[treeiter][7]
-                duetime = self.tasks[treeiter][15]
+            if self.tasklist[treeiter][7] is not None:
+                val = self.tasklist[treeiter][7]
+                duetime = self.tasklist[treeiter][15]
                 fmt = "%x %X" if duetime else "%x"
                 out = "" if val is None else val.strftime(fmt)
                 
@@ -210,17 +210,17 @@ class htd_filter(Gtk.FileFilter):
                 SubElement(task, 'completed')
             
             e = SubElement(task, 'assigner')
-            e.text = self.tasks[treeiter][9]
+            e.text = self.tasklist[treeiter][9]
             e = SubElement(task, 'assignee')
-            e.text = self.tasks[treeiter][10]
+            e.text = self.tasklist[treeiter][10]
             e = SubElement(task, 'status')
-            e.text = self.tasks[treeiter][11]
+            e.text = self.tasklist[treeiter][11]
             e = SubElement(task, 'title')
-            e.text = self.tasks[treeiter][13]
+            e.text = self.tasklist[treeiter][13]
             e = SubElement(task, 'notes')
-            e.text = self.tasks[treeiter][14]
+            e.text = self.tasklist[treeiter][14]
             tlist = SubElement(task, 'tasklist')
-            if self.tasks.iter_has_child(treeiter):
-                childiter = self.tasks.iter_children(treeiter)
+            if self.tasklist.iter_has_child(treeiter):
+                childiter = self.tasklist.iter_children(treeiter)
                 self.__store_peers(childiter, tlist)
-            treeiter = self.tasks.iter_next(treeiter)
+            treeiter = self.tasklist.iter_next(treeiter)

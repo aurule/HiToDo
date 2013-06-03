@@ -99,181 +99,11 @@ UI_XML = """
 
 # Define the gui and its actions.
 class HiToDo(Gtk.Window):
-    def __init__(self):
-        Gtk.Window.__init__(self)
-        self.set_default_size(1100, 700)
-        self.title = "Untitled List - HiToDo"
-        self.set_title(self.title)
-        
-        #create core tree store
-        self.tasklist = Gtk.TreeStore(
-            int,    #priority
-            int,    #pct complete
-            int,    #est time taken in seconds
-            int,    #act time taken in seconds
-            object, #est begin
-            object, #est complete
-            object, #act begin
-            object, #act complete
-            object, #due
-            str,    #from
-            str,    #to
-            str,    #status
-            bool,   #done
-            str,    #title
-            str,    #notes
-            bool,   #use due time
-            bool,   #inverted done flag
-            bool    #whether this row's spent time is currently tracked
-        )
-        self.tasklist.set_sort_func(7, self.datecompare, None)
-        self.tasklist.set_sort_func(8, self.datecompare, None)
-        self.tasklist.connect("row-changed", self.make_dirty)
-        self.tasklist.connect("row-deleted", self.make_dirty)
-        
-        self.defaults = [
-            5,      #default priority
-            0,      #pct complete
-            0,      #est time taken
-            0,      #act time taken
-            None,   #est begin
-            None,   #est complete
-            None,   #act begin
-            None,   #act complete
-            None,   #due
-            "",     #from
-            "",     #to
-            "",     #status
-            False,  #done
-            "",     #title
-            "",     #notes
-            False,  #use due time
-            True,   #inverted done
-            False   #spent tracked
-        ]
-        
-        self.assignees = Gtk.ListStore(str)
-        self.assignees_list = []
-        self.assigners = Gtk.ListStore(str)
-        self.assigners_list = []
-        self.statii = Gtk.ListStore(str)
-        self.statii_list = []
-        self.priority_adj = Gtk.Adjustment(5, 0, 26, 1, 5, 5)
-        self.seliter = None
-        self.sellist = None
-        self.selcount = 0
-        self.title_editor = None
-        self.notes_ctl_mask = False
-        self.notes_shift_mask = False
-        self.parent = None
-        self.title_key_press_catcher = None
-        self.title_buff = None
-        self.file_name = ""
-        self.file_filter = None
-        self.file_dirty = False
-        self.tracking = None
-        self.timer_start = None
-        self.last_save = datetime.now()
-        self.focus = None
-        self.copied_rows = []
-        self.cols_available = {}
-        self.cols_visible = ['priority', 'pct complete', 'time est', 'time spent', 'tracked', 'due date', 'complete date', 'from', 'to', 'status', 'done', 'title']
-        
-        #create action groups
-        top_actions = Gtk.ActionGroup("top_actions")
-        self.create_top_actions(top_actions)
-        task_actions = Gtk.ActionGroup("task_actions")
-        self.create_task_actions(task_actions)
-        
-        #set up menu and toolbar
-        uimanager = self.create_ui_manager()
-        uimanager.insert_action_group(top_actions)
-        uimanager.insert_action_group(task_actions)
-        menubar = uimanager.get_widget("/MenuBar")
-        toolbar = uimanager.get_widget("/ToolBar")
-        toolbar.get_style_context().add_class(Gtk.STYLE_CLASS_PRIMARY_TOOLBAR)
-        
-        #start with a simple stacked layout
-        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        
-        #add the menu and tool bars on top
-        main_box.pack_start(menubar, False, False, 0)
-        main_box.pack_start(toolbar, False, False, 0)
-        
-        #now we create a horizontal pane
-        task_pane = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
-        task_pane.set_position(900)
-        
-        #add task list area
-        task_scroll_win = Gtk.ScrolledWindow()
-        task_scroll_win.set_hexpand(True)
-        task_scroll_win.set_vexpand(True)
-        self.task_view = Gtk.TreeView(self.tasklist)
-        
-        #set up columns
-        self.create_columns()
-        self.display_columns()
-        
-        #set up selection handling and add the completed table widget
-        self.selection = self.task_view.get_selection()
-        self.selection.set_mode(Gtk.SelectionMode.MULTIPLE)
-        self.sel_changed_handler = self.selection.connect("changed", self.task_selected)
-        self.task_view.set_properties(expander_column=self.col_title, enable_tree_lines=True, reorderable=True, enable_search=True, search_column=13, rules_hint=True)
-        self.task_view.connect('key-press-event', self.tasks_keys_dn)
-        self.task_view.connect('focus-in-event', self.track_focus)
-        task_scroll_win.add(self.task_view)
-        task_pane.pack1(task_scroll_win, True, True)
-        
-        #add notes area
-        notes_scroll_win = Gtk.ScrolledWindow()
-        notes_scroll_win.set_hexpand(True)
-        notes_scroll_win.set_vexpand(True)
-        self.notes_buff = undobuffer.UndoableTextBuffer()
-        self.notes_view = Gtk.TextView()
-        self.notes_view.set_buffer(self.notes_buff)
-        self.notes_view.connect('focus-in-event', self.track_focus)
-        self.notes_view.connect('focus-out-event', self.commit_notes)
-        self.notes_view.connect('key-press-event', self.notes_keys_dn)
-        self.notes_view.connect('key-release-event', self.notes_keys_up)
-        self.notes_view.set_wrap_mode(Gtk.WrapMode.WORD)
-        notes_scroll_win.add(self.notes_view)
-        task_pane.pack2(notes_scroll_win, True, True)
-        
-        #commit the task editing pane
-        main_box.pack_start(task_pane, True, True, 0)
-        
-        #commit the ui
-        self.add(main_box)
-        
-        # create a clipboard for easy copying
-        self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)       
-        self.connect("delete-event", Gtk.main_quit)
-        self.show_all()
-        
-        self.open_dlg = dialogs.htd_open(self)
-        self.save_dlg = dialogs.htd_save(self)
-        self.about_dlg = dialogs.htd_about(self)
-        self.prefs_dlg = dialogs.htd_prefs(self)
-    
     def skip(self, widget=None):
         pass
     
     def track_focus(self, widget, event=None):
         self.focus = widget
-    
-    def datecompare(self, model, row1, row2, data=None):
-        sort_column, _ = model.get_sort_column_id()
-        value1 = model.get_value(row1, sort_column)
-        if value1 is None: value1 = datetime.min
-        value2 = model.get_value(row2, sort_column)
-        if value2 is None: value2 = datetime.min
-        
-        if value1 < value2:
-            return -1
-        elif value1 == value2:
-            return 0
-        else:
-            return 1
     
     def add_task(self, widget=None, parent_iter=None):
         self.commit_all()
@@ -457,6 +287,21 @@ class HiToDo(Gtk.Window):
         #recalculate our parent's pct complete, if we have one
         self.recalc_parent_pct(path)
     
+    def force_children_done(self, path):
+        treeiter = self.tasklist.get_iter(path)
+        childiter = self.tasklist.iter_children(treeiter)
+        self.__force_peers_done(childiter)
+    
+    def __force_peers_done(self, treeiter):
+        while treeiter != None:
+            self.tasklist[treeiter][1] = 100
+            self.tasklist[treeiter][12] = True
+            self.tasklist[treeiter][16] = False
+            if self.tasklist.iter_has_child(treeiter):
+                child_iter = self.tasklist.iter_children(treeiter)
+                self.__force_peers_done(child_iter)
+            treeiter = self.tasklist.iter_next(treeiter)
+    
     def recalc_parent_pct(self, path):
         parts = path.rpartition(':')
         parent_path = parts[0]
@@ -495,21 +340,6 @@ class HiToDo(Gtk.Window):
             return int(floor(total_pct / n_children))
         else:
             return 0
-    
-    def force_children_done(self, path):
-        treeiter = self.tasklist.get_iter(path)
-        childiter = self.tasklist.iter_children(treeiter)
-        self.__force_peers_done(childiter)
-    
-    def __force_peers_done(self, treeiter):
-        while treeiter != None:
-            self.tasklist[treeiter][1] = 100
-            self.tasklist[treeiter][12] = True
-            self.tasklist[treeiter][16] = False
-            if self.tasklist.iter_has_child(treeiter):
-                child_iter = self.tasklist.iter_children(treeiter)
-                self.__force_peers_done(child_iter)
-            treeiter = self.tasklist.iter_next(treeiter)
     
     def commit_priority(self, widget=None, path=None, new_priority=None):
         if path is None: return
@@ -665,35 +495,6 @@ class HiToDo(Gtk.Window):
         self.tasklist.remove(treeiter)
         self.recalc_parent_pct(str(path))
     
-    def notes_keys_dn(self, widget=None, event=None):
-        kvn = Gdk.keyval_name(event.keyval)
-        if kvn == "Control_L" or kvn == "Control_R":
-            self.notes_ctl_mask = True
-        if kvn == "Return" and self.notes_ctl_mask:
-            self.commit_notes()
-            self.notes_ctl_mask = False
-            return True
-    
-    def notes_keys_up(self, widget=None, event=None):
-        kvn = Gdk.keyval_name(event.keyval)
-        if kvn == "Control_L" or kvn == "Control_R":
-            self.notes_ctl_mask = False
-    
-    def tasks_keys_dn(self, widget=None, event=None):
-        kvn = Gdk.keyval_name(event.keyval)
-        if kvn == "Delete":
-            self.del_current_task()
-            return True
-        if kvn == "F2":
-            path = self.tasklist.get_path(self.seliter)
-            self.task_view.set_cursor_on_cell(path, self.col_title, self.title_cell, True)
-            return True
-    
-    def title_keys_dn(self, widget=None, event=None):
-        kvn = Gdk.keyval_name(event.keyval)
-        if kvn == "Escape":
-            self.commit_title(path=self.title_edit_path, new_title='', write=False)
-    
     def task_selected(self, widget):
         self.selcount = widget.count_selected_rows()
         self.sellist = widget.get_selected_rows()[1]
@@ -712,14 +513,6 @@ class HiToDo(Gtk.Window):
         
         self.notes_buff.clear_undo()
     
-    def select_none(self, widget=None):
-        if self.focus == self.task_view:
-            self.selection.unselect_all()
-        elif self.focus == self.notes_view:
-            self.focus.emit('select-all', False)
-        else:
-            self.focus.select_region(0,0)
-    
     def select_all(self, widget=None):
         if self.focus == self.task_view:
             self.selection.select_all()
@@ -727,6 +520,14 @@ class HiToDo(Gtk.Window):
             self.focus.emit('select-all', True)
         else:
             self.focus.select_region(0, -1)
+    
+    def select_none(self, widget=None):
+        if self.focus == self.task_view:
+            self.selection.unselect_all()
+        elif self.focus == self.notes_view:
+            self.focus.emit('select-all', False)
+        else:
+            self.focus.select_region(0,0)
     
     def select_inv(self, widget=None):
         if self.selcount == 0:
@@ -761,14 +562,11 @@ class HiToDo(Gtk.Window):
     def collapse_all(self, widget=None):
         self.task_view.collapse_all()
     
-    def open_recent(self, widget):
-        if not self.confirm_discard(): return
-        
-        uri = widget.get_current_uri()
-        fpath = urlparse(uri).path
-        self.file_name = unquote(fpath)
-        self.file_filter = file_parsers.pick_filter(fpath)
-        self.__do_open()
+    def new_file(self, widget=None):
+        self.confirm_discard()
+        self.tasklist.clear()
+        self.file_name = ""
+        self.file_dirty = False
     
     def open_file(self, widget=None):
         if not self.confirm_discard(): return
@@ -779,6 +577,15 @@ class HiToDo(Gtk.Window):
         
         self.file_name = self.open_dlg.get_filename()
         self.file_filter = self.save_dlg.get_filter()
+        self.__do_open()
+    
+    def open_recent(self, widget):
+        if not self.confirm_discard(): return
+        
+        uri = widget.get_current_uri()
+        fpath = urlparse(uri).path
+        self.file_name = unquote(fpath)
+        self.file_filter = file_parsers.pick_filter(fpath)
         self.__do_open()
 
     def __do_open(self):
@@ -826,44 +633,6 @@ class HiToDo(Gtk.Window):
         self.update_title()
         self.last_save = datetime.now()
     
-    def confirm_discard(self):
-        if not self.file_dirty: return True
-        
-        diff = datetime.now() - self.last_save
-        sec = diff.total_seconds()
-        if sec > 86400:
-            diff_num = int(sec / 86400)
-            diff_unit = "day"
-        elif sec > 3600:
-            diff_num = int(sec / 3600)
-            diff_unit = "hour"
-        elif sec > 60:
-            diff_num = int(sec / 60)
-            diff_unit = "minute"
-        else:
-            diff_num = int(sec)
-            diff_unit = "second"
-        
-        diff_text = "%s %s" % (diff_num, diff_unit)
-        if diff_num > 1: diff_text += "s"
-        
-        fname = "Untitled List" if self.file_name == ""  else self.file_name
-        
-        dlg = dialogs.htd_warn_discard(self, fname, diff_text)
-        retval = dlg.run()
-        dlg.destroy()
-        
-        if retval == -3:
-            #save
-            self.save_file()
-            return not self.file_dirty
-        elif retval == -7:
-            #discard
-            return True
-        else:
-            #cancel or any other code (like from esc key)
-            return False
-    
     def save_file(self, widget=None):
         if self.file_name == "":
             self.save_file_as()
@@ -906,6 +675,48 @@ class HiToDo(Gtk.Window):
             self.file_name += self.file_filter.file_extension
         self.save_file()
     
+    def confirm_discard(self):
+        if not self.file_dirty: return True
+        
+        diff = datetime.now() - self.last_save
+        sec = diff.total_seconds()
+        if sec > 86400:
+            diff_num = int(sec / 86400)
+            diff_unit = "day"
+        elif sec > 3600:
+            diff_num = int(sec / 3600)
+            diff_unit = "hour"
+        elif sec > 60:
+            diff_num = int(sec / 60)
+            diff_unit = "minute"
+        else:
+            diff_num = int(sec)
+            diff_unit = "second"
+        
+        diff_text = "%s %s" % (diff_num, diff_unit)
+        if diff_num > 1: diff_text += "s"
+        
+        fname = "Untitled List" if self.file_name == ""  else self.file_name
+        
+        dlg = dialogs.htd_warn_discard(self, fname, diff_text)
+        retval = dlg.run()
+        dlg.destroy()
+        
+        if retval == -3:
+            #save
+            self.save_file()
+            return not self.file_dirty
+        elif retval == -7:
+            #discard
+            return True
+        else:
+            #cancel or any other code (like from esc key)
+            return False
+    
+    def make_dirty(self, path=None, it=None, data=None):
+        self.file_dirty = True
+        self.update_title()
+    
     def update_title(self):
         if self.file_name != "":
             ttl = "%s (%s) - HiToDo" % (basename(self.file_name), dirname(self.file_name))
@@ -915,16 +726,6 @@ class HiToDo(Gtk.Window):
         self.title = "*"+ttl if self.file_dirty else ttl
         
         self.set_title(self.title)
-    
-    def make_dirty(self, path=None, it=None, data=None):
-        self.file_dirty = True
-        self.update_title()
-    
-    def new_file(self, widget=None):
-        self.confirm_discard()
-        self.tasklist.clear()
-        self.file_name = ""
-        self.file_dirty = False
     
     def show_about(self, widget=None):
         self.about_dlg.run()
@@ -1000,6 +801,198 @@ class HiToDo(Gtk.Window):
         if self.focus == self.notes_view:
             self.notes_buff.redo()
     
+    def display_columns(self):
+        for col in self.task_view.get_columns():
+            self.task_view.remove_column(col)
+        
+        for col in self.cols_visible:
+            self.task_view.append_column(self.cols_available[col])
+    
+    def notes_keys_dn(self, widget=None, event=None):
+        kvn = Gdk.keyval_name(event.keyval)
+        if kvn == "Control_L" or kvn == "Control_R":
+            self.notes_ctl_mask = True
+        if kvn == "Return" and self.notes_ctl_mask:
+            self.commit_notes()
+            self.notes_ctl_mask = False
+            return True
+    
+    def notes_keys_up(self, widget=None, event=None):
+        kvn = Gdk.keyval_name(event.keyval)
+        if kvn == "Control_L" or kvn == "Control_R":
+            self.notes_ctl_mask = False
+    
+    def tasks_keys_dn(self, widget=None, event=None):
+        kvn = Gdk.keyval_name(event.keyval)
+        if kvn == "Delete":
+            self.del_current_task()
+            return True
+        if kvn == "F2":
+            path = self.tasklist.get_path(self.seliter)
+            self.task_view.set_cursor_on_cell(path, self.col_title, self.title_cell, True)
+            return True
+    
+    def title_keys_dn(self, widget=None, event=None):
+        kvn = Gdk.keyval_name(event.keyval)
+        if kvn == "Escape":
+            self.commit_title(path=self.title_edit_path, new_title='', write=False)
+    
+    def __init__(self):
+        Gtk.Window.__init__(self)
+        self.set_default_size(1100, 700)
+        self.title = "Untitled List - HiToDo"
+        self.set_title(self.title)
+        
+        #create core tree store
+        self.tasklist = Gtk.TreeStore(
+            int,    #priority
+            int,    #pct complete
+            int,    #est time taken in seconds
+            int,    #act time taken in seconds
+            object, #est begin
+            object, #est complete
+            object, #act begin
+            object, #act complete
+            object, #due
+            str,    #from
+            str,    #to
+            str,    #status
+            bool,   #done
+            str,    #title
+            str,    #notes
+            bool,   #use due time
+            bool,   #inverted done flag
+            bool    #whether this row's spent time is currently tracked
+        )
+        self.tasklist.set_sort_func(7, self.datecompare, None)
+        self.tasklist.set_sort_func(8, self.datecompare, None)
+        self.tasklist.connect("row-changed", self.make_dirty)
+        self.tasklist.connect("row-deleted", self.make_dirty)
+        
+        self.defaults = [
+            5,      #default priority
+            0,      #pct complete
+            0,      #est time taken
+            0,      #act time taken
+            None,   #est begin
+            None,   #est complete
+            None,   #act begin
+            None,   #act complete
+            None,   #due
+            "",     #from
+            "",     #to
+            "",     #status
+            False,  #done
+            "",     #title
+            "",     #notes
+            False,  #use due time
+            True,   #inverted done
+            False   #spent tracked
+        ]
+        
+        self.assignees = Gtk.ListStore(str)
+        self.assignees_list = []
+        self.assigners = Gtk.ListStore(str)
+        self.assigners_list = []
+        self.statii = Gtk.ListStore(str)
+        self.statii_list = []
+        self.priority_adj = Gtk.Adjustment(5, 0, 26, 1, 5, 5)
+        self.seliter = None
+        self.sellist = None
+        self.selcount = 0
+        self.title_editor = None
+        self.notes_ctl_mask = False
+        self.notes_shift_mask = False
+        self.parent = None
+        self.title_key_press_catcher = None
+        self.title_buff = None
+        self.file_name = ""
+        self.file_filter = None
+        self.file_dirty = False
+        self.tracking = None
+        self.timer_start = None
+        self.last_save = datetime.now()
+        self.focus = None
+        self.copied_rows = []
+        self.cols_available = {}
+        self.cols_visible = ['priority', 'pct complete', 'time est', 'time spent', 'tracked', 'due date', 'complete date', 'from', 'to', 'status', 'done', 'title']
+        
+        #create action groups
+        top_actions = Gtk.ActionGroup("top_actions")
+        self.create_top_actions(top_actions)
+        task_actions = Gtk.ActionGroup("task_actions")
+        self.create_task_actions(task_actions)
+        
+        #set up menu and toolbar
+        uimanager = self.create_ui_manager()
+        uimanager.insert_action_group(top_actions)
+        uimanager.insert_action_group(task_actions)
+        menubar = uimanager.get_widget("/MenuBar")
+        toolbar = uimanager.get_widget("/ToolBar")
+        toolbar.get_style_context().add_class(Gtk.STYLE_CLASS_PRIMARY_TOOLBAR)
+        
+        #start with a simple stacked layout
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        
+        #add the menu and tool bars on top
+        main_box.pack_start(menubar, False, False, 0)
+        main_box.pack_start(toolbar, False, False, 0)
+        
+        #now we create a horizontal pane
+        task_pane = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        task_pane.set_position(900)
+        
+        #add task list area
+        task_scroll_win = Gtk.ScrolledWindow()
+        task_scroll_win.set_hexpand(True)
+        task_scroll_win.set_vexpand(True)
+        self.task_view = Gtk.TreeView(self.tasklist)
+        
+        #set up columns
+        self.create_columns()
+        self.display_columns()
+        
+        #set up selection handling and add the completed table widget
+        self.selection = self.task_view.get_selection()
+        self.selection.set_mode(Gtk.SelectionMode.MULTIPLE)
+        self.sel_changed_handler = self.selection.connect("changed", self.task_selected)
+        self.task_view.set_properties(expander_column=self.col_title, enable_tree_lines=True, reorderable=True, enable_search=True, search_column=13, rules_hint=True)
+        self.task_view.connect('key-press-event', self.tasks_keys_dn)
+        self.task_view.connect('focus-in-event', self.track_focus)
+        task_scroll_win.add(self.task_view)
+        task_pane.pack1(task_scroll_win, True, True)
+        
+        #add notes area
+        notes_scroll_win = Gtk.ScrolledWindow()
+        notes_scroll_win.set_hexpand(True)
+        notes_scroll_win.set_vexpand(True)
+        self.notes_buff = undobuffer.UndoableTextBuffer()
+        self.notes_view = Gtk.TextView()
+        self.notes_view.set_buffer(self.notes_buff)
+        self.notes_view.connect('focus-in-event', self.track_focus)
+        self.notes_view.connect('focus-out-event', self.commit_notes)
+        self.notes_view.connect('key-press-event', self.notes_keys_dn)
+        self.notes_view.connect('key-release-event', self.notes_keys_up)
+        self.notes_view.set_wrap_mode(Gtk.WrapMode.WORD)
+        notes_scroll_win.add(self.notes_view)
+        task_pane.pack2(notes_scroll_win, True, True)
+        
+        #commit the task editing pane
+        main_box.pack_start(task_pane, True, True, 0)
+        
+        #commit the ui
+        self.add(main_box)
+        
+        # create a clipboard for easy copying
+        self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)       
+        self.connect("delete-event", Gtk.main_quit)
+        self.show_all()
+        
+        self.open_dlg = dialogs.htd_open(self)
+        self.save_dlg = dialogs.htd_save(self)
+        self.about_dlg = dialogs.htd_about(self)
+        self.prefs_dlg = dialogs.htd_prefs(self)
+    
     def due_render(self, col, cell, model, tree_iter, data):
         val = model[tree_iter][8]
         duetime = model[tree_iter][15]
@@ -1015,6 +1008,20 @@ class HiToDo(Gtk.Window):
         fmt = "%x %X" if duetime else "%x"
         out = "" if val is None else val.strftime(fmt)
         cell.set_property("text", str(out))
+    
+    def datecompare(self, model, row1, row2, data=None):
+        sort_column, _ = model.get_sort_column_id()
+        value1 = model.get_value(row1, sort_column)
+        if value1 is None: value1 = datetime.min
+        value2 = model.get_value(row2, sort_column)
+        if value2 is None: value2 = datetime.min
+        
+        if value1 < value2:
+            return -1
+        elif value1 == value2:
+            return 0
+        else:
+            return 1
     
     def note_render(self, col, cell, model, tree_iter, data):
         val = model[tree_iter][14]
@@ -1122,13 +1129,6 @@ class HiToDo(Gtk.Window):
         self.col_title.add_attribute(note, "strikethrough", 12)
         self.col_title.set_sort_column_id(13)
         self.cols_available['title'] = self.col_title
-    
-    def display_columns(self):
-        for col in self.task_view.get_columns():
-            self.task_view.remove_column(col)
-        
-        for col in self.cols_visible:
-            self.task_view.append_column(self.cols_available[col])
     
     def create_top_actions(self, action_group):
         action_group.add_actions([
