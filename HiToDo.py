@@ -135,10 +135,16 @@ class HiToDo(Gtk.Window):
             self.defaults[16],      #inverted done
             self.defaults[17]       #spent tracked
         ])
-        #select new row and immediately edit title field
-        self.recalc_parent_pct(str(self.tasklist.get_path(new_row_iter)))
-        self.selection.select_iter(new_row_iter)
+        
         path = self.tasklist.get_path(new_row_iter)
+        spath = str(path)
+        
+        #ensure parent is not Done and recalc its pct complete)
+        self.force_parent_not_done(spath)
+        self.recalc_parent_pct(spath)
+        
+        #select new row and immediately edit title field
+        self.selection.select_iter(new_row_iter)
         if parent_iter is not None:
             self.task_view.expand_to_path(path)
         self.task_view.set_cursor_on_cell(path, self.col_title, self.title_cell, True)
@@ -278,6 +284,8 @@ class HiToDo(Gtk.Window):
                 self.track_action.set_active(False)
         else:
             #we're transitioning from done to not-done
+            self.force_parent_not_done(path)
+            self.recalc_parent_pct(path)
             pct = self.calc_pct_from_children(path)
         
         self.tasklist[path][12] = not done
@@ -302,6 +310,16 @@ class HiToDo(Gtk.Window):
                 self.__force_peers_done(child_iter)
             treeiter = self.tasklist.iter_next(treeiter)
     
+    def force_parent_not_done(self, path):
+        parts = path.rpartition(':')
+        parent_path = parts[0]
+        if parent_path == '': return
+        
+        parent_iter = self.tasklist.get_iter(parent_path)
+        self.tasklist[parent_iter][12] = False
+        self.tasklist[parent_iter][16] = True
+        self.force_parent_not_done(parent_path)
+    
     def recalc_parent_pct(self, path):
         parts = path.rpartition(':')
         parent_path = parts[0]
@@ -309,7 +327,7 @@ class HiToDo(Gtk.Window):
         
         parent_iter = self.tasklist.get_iter(parent_path)
         if self.tasklist[parent_iter][12]: return #skip calculation if parent is marked "done"
-        
+
         n_children = self.tasklist.iter_n_children(parent_iter)
         if n_children == 0:
             final_pct = 0
