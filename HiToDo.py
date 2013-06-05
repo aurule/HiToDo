@@ -648,6 +648,7 @@ class HiToDo(Gtk.Window):
         if selme != '' and selme is not None:
             self.selection.select_iter(self.tasklist.get_iter(selme))
         self.task_view.thaw_child_notify()
+        self.task_view.grab_focus()
         
         self.update_title()
         self.last_save = datetime.now()
@@ -754,34 +755,45 @@ class HiToDo(Gtk.Window):
         self.prefs_dlg.show()
     
     def do_cut(self, widget=None):
-        if self.focus != self.task_view:
+        if self.focus == self.notes_view or self.focus == self.title_editor:
             self.focus.emit('cut-clipboard')
-        else:
+        elif self.focus == self.task_view:
             if self.sellist is None: return
             row_texts = []
-            self.copied_rows = []
+            del self.copied_rows[:]
             for path in self.sellist:
                 row_texts.append(self.tasklist[path][13])
-                self.copied_rows.append(self.tasklist[path][:])
+                self.copied_rows.append([0] + self.tasklist[path][:])
+                treeiter = self.tasklist.get_iter(path)
+                self.__copy_children(treeiter, len(self.copied_rows))
             self.clipboard.set_text("\n".join(row_texts), -1)
             self.del_current_task()
     
     def do_copy(self, widget=None):
-        if self.focus != self.task_view:
+        if self.focus == self.notes_view or (self.title_editor is not None and self.focus == self.title_editor):
             self.focus.emit('copy-clipboard')
-        else:
+        elif self.focus == self.task_view:
             if self.sellist is None: return
             row_texts = []
-            self.copied_rows = []
+            del self.copied_rows[:]
             for path in self.sellist:
                 row_texts.append(self.tasklist[path][13])
-                self.copied_rows.append(self.tasklist[path][:])
+                self.copied_rows.append([0] + self.tasklist[path][:])
+                treeiter = self.tasklist.get_iter(path)
+                self.__copy_children(treeiter, len(self.copied_rows))
             self.clipboard.set_text("\n".join(row_texts), -1)
     
+    def __copy_children(self, treeiter, parent_index):
+        childiter = self.tasklist.iter_children(treeiter)
+        while childiter != None:
+            self.copied_rows.append([parent_index] + self.tasklist[childiter][:])
+            self.__copy_children(childiter, len(self.copied_rows))
+            childiter = self.tasklist.iter_next(childiter)
+    
     def do_paste(self, widget=None):
-        if self.focus != self.task_view:
+        if self.focus == self.notes_view or self.focus == self.title_editor:
             self.focus.emit('paste-clipboard')
-        else:
+        elif self.focus == self.task_view:
             if self.seliter is None:
                 parent_iter = None
             else:
@@ -793,24 +805,32 @@ class HiToDo(Gtk.Window):
                 else:
                     parent_iter = None
             
+            parents = [parent_iter]
             for row in self.copied_rows:
-                new_row = self.defaults
+                new_row = self.defaults[:]
                 inherit = [0,2,4,5,8,9,10,11,13,14] #columns to preserve from original row
                 for i in inherit:
-                    new_row[i] = row[i]
-                self.tasklist.append(parent_iter, new_row)
+                    new_row[i] = row[i+1]
+                treeiter = self.tasklist.append(parents[row[0]], new_row)
+                parents.append(treeiter)
+            
+            self.make_dirty()
     
     def do_paste_into(self, widget=None):
         if self.focus != self.task_view: return
         if self.seliter is None: return
         
+        parents = [self.seliter]
         for row in self.copied_rows:
-            new_row = self.defaults
+            new_row = self.defaults[:]
             inherit = [0,2,4,5,8,9,10,11,13,14] #columns to preserve from original row
             for i in inherit:
-                new_row[i] = row[i]
-            treeiter = self.tasklist.append(self.seliter, new_row)
-            self.task_view.expand_to_path(self.tasklist.get_path(treeiter))            
+                new_row[i] = row[i+1]
+            treeiter = self.tasklist.append(parents[row[0]], new_row)
+            self.task_view.expand_to_path(self.tasklist.get_path(treeiter))
+            parents.append(treeiter)
+        
+        self.make_dirty()       
     
     def do_undo(self, widget=None):
         if self.focus == self.notes_view:
