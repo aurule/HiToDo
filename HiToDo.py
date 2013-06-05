@@ -1026,7 +1026,7 @@ class HiToDo(Gtk.Window):
         
         # create a clipboard for easy copying
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)       
-        self.connect("delete-event", Gtk.main_quit)
+        self.connect("delete-event", self.destroy)
         self.show_all()
         
         self.open_dlg = dialogs.htd_open(self)
@@ -1229,8 +1229,8 @@ class HiToDo(Gtk.Window):
         self.add_accel_group(accelgroup)
         return uimanager
     
-    def destroy(self, widget):
-        if not self.confirm_discard(): return
+    def destroy(self, widget=None, data=None):
+        if not self.confirm_discard(): return True
         Gtk.main_quit()
 
 def main():
