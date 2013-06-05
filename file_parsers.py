@@ -157,8 +157,7 @@ class htd_filter(Gtk.FileFilter):
         
         #write to file
         ofile = open(data['filename'], 'w')
-        ofile.write('<?xml version="1.0" encoding="ISO-8859-1"?>')
-        ofile.write(ElementTree.tostring(htd))
+        ofile.write(ElementTree.tostring(htd, "UTF-8"))
         ofile.close()
     
     def map_expanded(self, treeview, path, xml):
