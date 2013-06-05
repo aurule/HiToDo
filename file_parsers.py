@@ -125,17 +125,17 @@ class htd_filter(Gtk.FileFilter):
         assigners = SubElement(htd, 'assigners')
         for f in data['from_list']:
             e = SubElement(assigners, 'name')
-            e.text = f
+            e.text = unicode(f, 'utf-8')
         
         assignees = SubElement(htd, 'assignees')
         for f in data['to_list']:
             e = SubElement(assignees, 'name')
-            e.text = f
+            e.text = unicode(f, 'utf-8')
         
         statii = SubElement(htd, 'statii')
         for f in data['status_list']:
             e = SubElement(statii, 'name')
-            e.text = f
+            e.text = unicode(f, 'utf-8')
         
         #store list of expanded rows
         exp = SubElement(htd, 'expanded')
@@ -157,7 +157,7 @@ class htd_filter(Gtk.FileFilter):
         
         #write to file
         ofile = open(data['filename'], 'w')
-        ofile.write(ElementTree.tostring(htd, "UTF-8"))
+        ofile.write(ElementTree.tostring(htd, encoding="UTF-8"))
         ofile.close()
     
     def map_expanded(self, treeview, path, xml):
@@ -209,15 +209,15 @@ class htd_filter(Gtk.FileFilter):
                 SubElement(task, 'completed')
             
             e = SubElement(task, 'assigner')
-            e.text = self.tasklist[treeiter][9]
+            e.text = unicode(self.tasklist[treeiter][9], 'utf-8')
             e = SubElement(task, 'assignee')
-            e.text = self.tasklist[treeiter][10]
+            e.text = unicode(self.tasklist[treeiter][10], 'utf-8')
             e = SubElement(task, 'status')
-            e.text = self.tasklist[treeiter][11]
+            e.text = unicode(self.tasklist[treeiter][11], 'utf-8')
             e = SubElement(task, 'title')
-            e.text = self.tasklist[treeiter][13]
+            e.text = unicode(self.tasklist[treeiter][13], 'utf-8')
             e = SubElement(task, 'notes')
-            e.text = self.tasklist[treeiter][14]
+            e.text = unicode(self.tasklist[treeiter][14], 'utf-8')
             tlist = SubElement(task, 'tasklist')
             if self.tasklist.iter_has_child(treeiter):
                 childiter = self.tasklist.iter_children(treeiter)
