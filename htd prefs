@@ -1,0 +1,14 @@
+open last file(s) on start
+default cols for a new list
+    add/remove/change order
+    only applies to new files
+default from, to, statii
+    add/edit/remove
+    only applies to new files
+current file's from, to, statii
+    add new
+    remove existing if not assigned
+    edit existing
+current file's cols
+    add/remove/change order
+    cannot remove "done" and "title"
