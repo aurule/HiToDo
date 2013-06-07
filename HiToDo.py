@@ -536,7 +536,7 @@ class HiToDo(Gtk.Window):
             self.selection.select_all()
         elif self.focus == self.notes_view:
             self.focus.emit('select-all', True)
-        else:
+        elif self.title_editor is not None and self.focus == self.title_editor:
             self.focus.select_region(0, -1)
     
     def select_none(self, widget=None):
@@ -544,10 +544,12 @@ class HiToDo(Gtk.Window):
             self.selection.unselect_all()
         elif self.focus == self.notes_view:
             self.focus.emit('select-all', False)
-        else:
+        elif self.title_editor is not None and self.focus == self.title_editor:
             self.focus.select_region(0,0)
     
     def select_inv(self, widget=None):
+        if self.focus != self.task_view: return
+        
         if self.selcount == 0:
             self.select_all()
         elif self.selcount == len(self.tasklist):
@@ -618,7 +620,7 @@ class HiToDo(Gtk.Window):
         self.tasklist.clear()
         
         #add rows to self.tasklist
-        self.cols_visible[:] = []
+        del self.cols_visible[:]
         data = {
             'filename': self.file_name,
             'from_list': self.assigners_list,
@@ -755,7 +757,7 @@ class HiToDo(Gtk.Window):
         self.prefs_dlg.show()
     
     def do_cut(self, widget=None):
-        if self.focus == self.notes_view or self.focus == self.title_editor:
+        if self.focus == self.notes_view or (self.title_editor is not None and self.focus == self.title_editor):
             self.focus.emit('cut-clipboard')
         elif self.focus == self.task_view:
             if self.sellist is None: return
@@ -791,9 +793,11 @@ class HiToDo(Gtk.Window):
             childiter = self.tasklist.iter_next(childiter)
     
     def do_paste(self, widget=None):
-        if self.focus == self.notes_view or self.focus == self.title_editor:
+        if self.focus == self.notes_view or (self.title_editor is not None and self.focus == self.title_editor):
             self.focus.emit('paste-clipboard')
         elif self.focus == self.task_view:
+            if not self.copied_rows: return
+            
             if self.seliter is None:
                 parent_iter = None
             else:
