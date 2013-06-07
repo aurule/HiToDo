@@ -141,7 +141,7 @@ class HiToDo(Gtk.Window):
         
         #ensure parent is not Done and recalc its pct complete)
         self.force_parent_not_done(spath)
-        self.recalc_parent_pct(spath)
+        self.calc_parent_pct(spath)
         
         #select new row and immediately edit title field
         self.selection.select_iter(new_row_iter)
@@ -276,7 +276,7 @@ class HiToDo(Gtk.Window):
             #we're transitioning from not-done to done
             
             #we're now 100% complete
-            pct = 100
+            self.tasklist[path][1] = 100
             
             self.force_children_done(path)
             self.tasklist[path][7] = datetime.now()
@@ -285,20 +285,19 @@ class HiToDo(Gtk.Window):
         else:
             #we're transitioning from done to not-done
             self.force_parent_not_done(path)
-            self.recalc_parent_pct(path)
-            pct = self.calc_pct_from_children(path)
+            self.calc_parent_pct(path)
+            self.calc_pct(path)
         
         self.tasklist[path][12] = not done
         self.tasklist[path][16] = done
-        self.tasklist[path][1] = pct
         
         #recalculate our parent's pct complete, if we have one
-        self.recalc_parent_pct(path)
+        self.calc_parent_pct(path)
     
     def force_children_done(self, path):
         treeiter = self.tasklist.get_iter(path)
-        childiter = self.tasklist.iter_children(treeiter)
-        self.__force_peers_done(childiter)
+        child_iter = self.tasklist.iter_children(treeiter)
+        self.__force_peers_done(child_iter)
     
     def __force_peers_done(self, treeiter):
         while treeiter != None:
@@ -311,53 +310,47 @@ class HiToDo(Gtk.Window):
             treeiter = self.tasklist.iter_next(treeiter)
     
     def force_parent_not_done(self, path):
-        parts = path.rpartition(':')
+        parts = path.split(':')
+        oldpath = ''
+        for parent_path in parts:
+            newpath = oldpath + parent_path
+            parent_iter = self.tasklist.get_iter(newpath)
+            self.tasklist[parent_iter][12] = False
+            self.tasklist[parent_iter][16] = True
+            oldpath = newpath + ':'
+    
+    def calc_parent_pct(self, path):
+        parts = path.partition(':')
         parent_path = parts[0]
-        if parent_path == '': return
+        if parent_path == path: return
         
         parent_iter = self.tasklist.get_iter(parent_path)
-        self.tasklist[parent_iter][12] = False
-        self.tasklist[parent_iter][16] = True
-        self.force_parent_not_done(parent_path)
+        self.__do_pct(parent_iter)
     
-    def recalc_parent_pct(self, path):
-        parts = path.rpartition(':')
-        parent_path = parts[0]
-        if parent_path == '': return
-        
-        parent_iter = self.tasklist.get_iter(parent_path)
-        if self.tasklist[parent_iter][12]: return #skip calculation if parent is marked "done"
-
-        n_children = self.tasklist.iter_n_children(parent_iter)
-        if n_children == 0:
-            final_pct = 0
-        else:
-            childiter = self.tasklist.iter_children(parent_iter)
-            total_pct = 0
-            while childiter != None:
-                total_pct += self.tasklist[childiter][1]
-                childiter = self.tasklist.iter_next(childiter)
-            
-            final_pct = int(floor(total_pct / n_children))
-        
-        self.tasklist[parent_iter][1] = final_pct
-        self.recalc_parent_pct(parent_path)
-    
-    def calc_pct_from_children(self, path):
-        #Assumes the children are already calculated out and does not recurse.
-        #Just peeks at the top level children's pct completes.
+    def calc_pct(self, path):
         treeiter = self.tasklist.get_iter(path)
-        if self.tasklist.iter_has_child(treeiter):
-            n_children = self.tasklist.iter_n_children(treeiter)
-            child_iter = self.tasklist.iter_children(treeiter)
-            total_pct = 0
-            while child_iter is not None:
-                total_pct += self.tasklist[child_iter][1]
-                child_iter = self.tasklist.iter_next(child_iter)
-            
-            return int(floor(total_pct / n_children))
-        else:
-            return 0
+        if self.tasklist.iter_n_children(treeiter) == 0:
+            self.tasklist[treeiter][1] = 0
+            return
+        
+        self.__do_pct(treeiter)
+    
+    def __do_pct(self, treeiter):
+        n_children = 0 #This is not the liststore's child count. It omits children who have children of their own.
+        n_done = 0 #Also omits children who have children.
+        child_iter = self.tasklist.iter_children(treeiter)
+        while child_iter is not None:
+            if self.tasklist.iter_n_children(child_iter):
+                nc, nd = self.__do_pct(child_iter)
+                n_children += nc
+                n_done += nd
+            else:
+                n_children += 1
+                n_done += self.tasklist[child_iter][12]
+            child_iter = self.tasklist.iter_next(child_iter)
+        
+        self.tasklist[treeiter][1] = int((n_done / n_children) * 100)
+        return n_children, n_done
     
     def commit_priority(self, widget=None, path=None, new_priority=None):
         if path is None: return
@@ -499,7 +492,7 @@ class HiToDo(Gtk.Window):
             self.commit_est(path=str(path), new_est=0)
             
             self.tasklist.remove(ref)
-            self.recalc_parent_pct(str(path))
+            self.calc_parent_pct(str(path))
         
         self.seliter = None
     
@@ -511,7 +504,7 @@ class HiToDo(Gtk.Window):
         self.commit_spent(path=path, new_spent=0)
         self.commit_est(path=path, new_est=0)
         self.tasklist.remove(treeiter)
-        self.recalc_parent_pct(str(path))
+        self.calc_parent_pct(str(path))
     
     def task_selected(self, widget):
         self.selcount = widget.count_selected_rows()
@@ -572,8 +565,8 @@ class HiToDo(Gtk.Window):
                 self.selection.select_iter(treeiter)
             #probe children
             if self.tasklist.iter_has_child(treeiter):
-                childiter = self.tasklist.iter_children(treeiter)
-                self.__invert_tasklist_selection(childiter)
+                child_iter = self.tasklist.iter_children(treeiter)
+                self.__invert_tasklist_selection(child_iter)
             treeiter = self.tasklist.iter_next(treeiter)
     
     def expand_all(self, widget=None):
@@ -786,11 +779,11 @@ class HiToDo(Gtk.Window):
             self.clipboard.set_text("\n".join(row_texts), -1)
     
     def __copy_children(self, treeiter, parent_index):
-        childiter = self.tasklist.iter_children(treeiter)
-        while childiter != None:
-            self.copied_rows.append([parent_index] + self.tasklist[childiter][:])
-            self.__copy_children(childiter, len(self.copied_rows))
-            childiter = self.tasklist.iter_next(childiter)
+        child_iter = self.tasklist.iter_children(treeiter)
+        while child_iter != None:
+            self.copied_rows.append([parent_index] + self.tasklist[child_iter][:])
+            self.__copy_children(child_iter, len(self.copied_rows))
+            child_iter = self.tasklist.iter_next(child_iter)
     
     def do_paste(self, widget=None):
         if self.focus == self.notes_view or (self.title_editor is not None and self.focus == self.title_editor):
