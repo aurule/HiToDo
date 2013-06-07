@@ -1213,10 +1213,10 @@ class HiToDo(Gtk.Window):
             ("expand_all", None, "_Expand All", None, "Expand all tasks", self.expand_all),
             ("collapse_all", None, "_Collapse All", None, "Collapse all tasks", self.collapse_all)
         ])
-        self.track_action = Gtk.ToggleAction("track_spent", "Track spent time", "Track time worked toward this task", None)
+        self.track_action = Gtk.ToggleAction("track_spent", "_Track spent time", "Track time worked toward this task", None)
         self.track_action.set_properties(icon_name="appointment-soon")
         self.track_action.connect("activate", self.track_spent)
-        action_group.add_action(self.track_action)
+        action_group.add_action_with_accel(self.track_action, "<Primary>T")
     
     def create_ui_manager(self):
         uimanager = Gtk.UIManager()
