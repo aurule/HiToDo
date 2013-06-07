@@ -336,15 +336,18 @@ class HiToDo(Gtk.Window):
         self.__do_pct(treeiter)
     
     def __do_pct(self, treeiter):
+        '''Calculates pct complete from the number of done leaves. Branch children are ignored for the calculation.'''
         n_children = 0 #This is not the liststore's child count. It omits children who have children of their own.
         n_done = 0 #Also omits children who have children.
         child_iter = self.tasklist.iter_children(treeiter)
         while child_iter is not None:
             if self.tasklist.iter_n_children(child_iter):
+                #for branches, get their pct and grab child numbers for our own
                 nc, nd = self.__do_pct(child_iter)
                 n_children += nc
                 n_done += nd
             else:
+                #for leaves, inc counters as appropriate
                 n_children += 1
                 n_done += self.tasklist[child_iter][12]
             child_iter = self.tasklist.iter_next(child_iter)
@@ -362,11 +365,16 @@ class HiToDo(Gtk.Window):
     def commit_due(self, widget=None, path=None, new_due=None):
         if path is None: return
         
-        try:
-            dt = dateparse(new_due, fuzzy=True)
-            self.tasklist[path][8] = dt
-        except ValueError:
-            pass
+        if new_due.lower() == "tomorrow":
+            delta = timedelta(days=1)
+            dt = datetime.today() + delta
+        else:
+            try:
+                dt = dateparse(new_due, fuzzy=True)
+            except ValueError:
+                dt = None
+        
+        self.tasklist[path][8] = dt
     
     def commit_complete(self, widget=None, path=None, new_complete=None):
         if path is None: return
