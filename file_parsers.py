@@ -36,6 +36,7 @@ class htd_filter(Gtk.FileFilter):
         self.set_name("HiToDo Files (*.htdl)")
         self.file_extension = ".htdl"
         self.tasklist = None
+        self.file_version = "1.0"
     
     def read_to_store(self, data):
         '''Reads todo list data from xml file. Data is a dictionary of data holders to fill.'''
@@ -122,6 +123,8 @@ class htd_filter(Gtk.FileFilter):
         '''Writes todo list data to xml file. Data is a dictionary of data pieces to store.'''
 
         htd = Element('htd')
+        htd.set('version', self.file_version)
+        
         assigners = SubElement(htd, 'assigners')
         for f in data['from_list']:
             e = SubElement(assigners, 'name')
