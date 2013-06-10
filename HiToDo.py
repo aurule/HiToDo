@@ -115,7 +115,7 @@ class HiToDo(Gtk.Window):
         else:
             parent = self.defaults
         
-        new_row_iter = self.tasklist.append(parent_iter, [
+        row_data = [
             parent[0],              #default priority (inherit from parent)
             self.defaults[1],       #pct complete
             self.defaults[2],       #est time taken
@@ -134,7 +134,13 @@ class HiToDo(Gtk.Window):
             parent[15],             #use due time (inherit from parent)
             self.defaults[16],      #inverted done
             self.defaults[17]       #spent tracked
-        ])
+        ]
+        
+        
+        if self.seliter is not None and parent_iter is not self.seliter:
+            new_row_iter = self.tasklist.insert_after(None, self.seliter, row_data)
+        else:
+            new_row_iter = self.tasklist.append(parent_iter, row_data)
         
         path = self.tasklist.get_path(new_row_iter)
         spath = str(path)
