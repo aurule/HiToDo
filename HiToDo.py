@@ -664,8 +664,9 @@ class HiToDo(Gtk.Window):
         self.task_view.thaw_child_notify()
         self.task_view.grab_focus()
         
-        self.update_title()
         self.last_save = datetime.now()
+        self.file_dirty = False
+        self.update_title()
     
     def save_file(self, widget=None):
         if self.file_name == "":
@@ -676,6 +677,10 @@ class HiToDo(Gtk.Window):
             selpath = str(self.tasklist.get_path(self.seliter))
         else:
             selpath = ''
+        
+        del self.cols_visible[:]
+        for col in self.task_view.get_columns():
+            self.cols_visible.append(col.code)
         
         data = {
             'filename': self.file_name,
@@ -1107,75 +1112,98 @@ class HiToDo(Gtk.Window):
         priority.connect("edited", self.commit_priority)
         priority.connect("editing-started", self.priority_edit_start)
         col_priority = Gtk.TreeViewColumn("!", priority, text=0, foreground_set=12)
+        col_priority.set_reorderable(True)
         col_priority.set_sort_column_id(0)
+        col_priority.set_reorderable(True)
+        col_priority.code = "priority"
         self.cols_available['priority'] = col_priority
         
         pct = Gtk.CellRendererProgress()
         col_pct = Gtk.TreeViewColumn("%", pct, value=1, visible=16)
+        col_pct.set_reorderable(True)
         col_pct.set_sort_column_id(1)
+        col_pct.code = "pct complete"
         self.cols_available['pct complete'] = col_pct
         
         est = Gtk.CellRendererText(foreground="#999", editable=True)
         est.connect("edited", self.commit_est)
         est.connect("editing-started", self.est_edit_start)
         col_est = Gtk.TreeViewColumn("Est", est, foreground_set=12)
+        col_est.set_reorderable(True)
         col_est.set_sort_column_id(2)
         col_est.set_cell_data_func(est, self.est_render)
+        col_est.code = "time est"
         self.cols_available['time est'] = col_est
         
         spent = Gtk.CellRendererText(foreground="#999", editable=True)
         spent.connect("edited", self.commit_spent)
         spent.connect("editing-started", self.spent_edit_start)
         col_spent = Gtk.TreeViewColumn("Spent", spent, foreground_set=12)
+        col_spent.set_reorderable(True)
         col_spent.set_sort_column_id(3)
         col_spent.set_cell_data_func(spent, self.spent_render)
+        col_spent.code = "time spent"
         self.cols_available['time spent'] = col_spent
         
         tracking = Gtk.CellRendererText(foreground="#b00", text=u"\u231A")
         col_tracking = Gtk.TreeViewColumn(u"\u231A", tracking, visible=17)
+        col_tracking.set_reorderable(True)
+        col_tracking.code = "tracked"
         self.cols_available['tracked'] = col_tracking
         
         due = Gtk.CellRendererText(editable=True, foreground="#999")
         due.connect("edited", self.commit_due)
         due.connect("editing-started", self.due_edit_start)
         col_due = Gtk.TreeViewColumn("Due", due, foreground_set=12)
+        col_due.set_reorderable(True)
         col_due.set_sort_column_id(8)
         col_due.set_cell_data_func(due, self.due_render)
+        col_due.code = "due date"
         self.cols_available['due date'] = col_due
         
         completed = Gtk.CellRendererText(editable=True, foreground="#999")
         completed.connect("edited", self.commit_complete)
         completed.connect("editing-started", self.complete_edit_start)
         col_completed = Gtk.TreeViewColumn("Completed", completed, foreground_set=12, visible=12)
+        col_completed.set_reorderable(True)
         col_completed.set_sort_column_id(7)
         col_completed.set_cell_data_func(completed, self.completed_render)
+        col_completed.code = "complete date"
         self.cols_available['complete date'] = col_completed
         
         assigner = Gtk.CellRendererCombo(model=self.assigners, has_entry=True, editable=True, foreground="#999", text_column=0)
         assigner.connect("edited", self.commit_assigner)
         assigner.connect("editing-started", self.combo_edit_start)
         col_assigner = Gtk.TreeViewColumn("From", assigner, text=9, foreground_set=12)
+        col_assigner.set_reorderable(True)
         col_assigner.set_sort_column_id(9)
+        col_assigner.code = "from"
         self.cols_available['from'] = col_assigner
         
         assignee = Gtk.CellRendererCombo(model=self.assignees, has_entry=True, editable=True, foreground="#999", text_column=0)
         assignee.connect("edited", self.commit_assignee)
         assignee.connect("editing-started", self.combo_edit_start)
         col_assignee = Gtk.TreeViewColumn("To", assignee, text=10, foreground_set=12)
+        col_assignee.set_reorderable(True)
         col_assignee.set_sort_column_id(10)
+        col_assignee.code = "to"
         self.cols_available['to'] = col_assignee
         
         status = Gtk.CellRendererCombo(model=self.statii, has_entry=True, editable=True, foreground="#999", text_column=0)
         status.connect("edited", self.commit_status)
         status.connect("editing-started", self.combo_edit_start)
         col_status = Gtk.TreeViewColumn("Status", status, text=11, foreground_set=12)
+        col_status.set_reorderable(True)
         col_status.set_sort_column_id(11)
+        col_status.code = "status"
         self.cols_available['status'] = col_status
         
         done = Gtk.CellRendererToggle(activatable=True, radio=False)
         done.connect("toggled", self.commit_done)
         col_done = Gtk.TreeViewColumn(u"\u2713", done, active=12)
         col_done.set_sort_column_id(12)
+        col_done.set_reorderable(True)
+        col_done.code = "done"
         self.cols_available['done'] = col_done
         
         self.title_cell = Gtk.CellRendererText(editable=True, ellipsize=Pango.EllipsizeMode.NONE, foreground="#999")
@@ -1184,6 +1212,7 @@ class HiToDo(Gtk.Window):
         self.title_cell.connect("editing-canceled", self.commit_title, None, None, True)
         note = Gtk.CellRendererText(editable=False, ellipsize=Pango.EllipsizeMode.MIDDLE, foreground="#999")
         self.col_title = Gtk.TreeViewColumn("Title")
+        self.col_title.set_reorderable(True)
         self.col_title.pack_start(self.title_cell, True)
         self.col_title.pack_start(note, False)
         self.col_title.add_attribute(self.title_cell, "text", 13)
@@ -1192,6 +1221,7 @@ class HiToDo(Gtk.Window):
         self.col_title.set_cell_data_func(note, self.note_render)
         self.col_title.add_attribute(note, "strikethrough", 12)
         self.col_title.set_sort_column_id(13)
+        self.col_title.code = "title"
         self.cols_available['title'] = self.col_title
     
     def create_top_actions(self, action_group):
