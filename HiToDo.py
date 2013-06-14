@@ -65,18 +65,18 @@ UI_XML = """
             <separator />
             <menuitem action='prefs' />
         </menu>
+        <menu action="ViewMenu">
+            <menuitem action='show_toolbar' />
+            <separator />
+            <menuitem action='expand_all' />
+            <menuitem action='collapse_all' />
+        </menu>
         <menu action='TaskMenu'>
             <menuitem action='task_new' />
             <menuitem action='task_newsub' />
             <menuitem action='task_del' />
             <separator />
             <menuitem action='track_spent' />
-        </menu>
-        <menu action="ViewMenu">
-            <menuitem action='expand_all' />
-            <menuitem action='collapse_all' />
-            <separator />
-            <menuitem action='show_toolbar' />
         </menu>
         <menu action='HelpMenu'>
             <menuitem action='help_about' />
@@ -1232,7 +1232,7 @@ class HiToDo(Gtk.Window):
     def create_task_actions(self, action_group):
         action_group.add_actions([
             ("task_newsub", Gtk.STOCK_INDENT, "New S_ubtask", "<Primary><Shift>N", "Add a new subtask", self.add_subtask),
-            ("task_del", Gtk.STOCK_REMOVE, None, None, "Delete selected task(s)", self.del_current_task),
+            ("task_del", Gtk.STOCK_REMOVE, "Delete task", None, "Delete selected task(s)", self.del_current_task),
             ("task_cut", Gtk.STOCK_CUT, None, None, "Cut task(s)", self.do_cut),
             ("task_copy", Gtk.STOCK_COPY, None, None, "Copy task(s)", self.do_copy),
             ("task_paste", Gtk.STOCK_PASTE, None, None, "Paste task(s)", self.do_paste),
