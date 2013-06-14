@@ -621,6 +621,14 @@ class HiToDo(Gtk.Window):
         self.file_filter = file_parsers.pick_filter(fpath)
         self.__do_open()
 
+    def __open_last(self):
+        uris, num_uris = self.recent_files.get_uris()
+        uri = uris[0]
+        fpath = urlparse(uri).path
+        self.file_name = unquote(fpath)
+        self.file_filter = file_parsers.pick_filter(fpath)
+        self.__do_open()
+
     def __do_open(self):
         '''Internal function to open a file from self.file_name using the reader at self.file_filter.'''
         self.file_dirty = False
@@ -984,6 +992,7 @@ class HiToDo(Gtk.Window):
         self.copied_rows = []
         self.cols_available = {}
         self.cols_visible = ['priority', 'pct complete', 'time est', 'time spent', 'tracked', 'due date', 'complete date', 'from', 'to', 'status', 'done', 'title']
+        self.open_last_file = True
         
         #create action groups
         top_actions = Gtk.ActionGroup("top_actions")
@@ -1061,6 +1070,8 @@ class HiToDo(Gtk.Window):
         self.about_dlg = dialogs.htd_about(self)
         self.prefs_dlg = dialogs.htd_prefs(self)
         self.docprops_dlg = dialogs.htd_docprops(self)
+        
+        if self.open_last_file: self.__open_last()
     
     def due_render(self, col, cell, model, tree_iter, data):
         val = model[tree_iter][8]
@@ -1244,14 +1255,14 @@ class HiToDo(Gtk.Window):
             ("show_toolbar", None, "_Toolbar", None, "Show or hide the toolbar", self.toggle_toolbar, True)
         ])
         
-        recent_files = Gtk.RecentAction("recents", "_Recent Files", "Open a recently-used file", None)
-        recent_files.set_properties(icon_name="document-open-recent", local_only=True, sort_type=Gtk.RecentSortType.MRU, show_not_found=False, show_numbers=True)
+        self.recent_files = Gtk.RecentAction("recents", "_Recent Files", "Open a recently-used file", None)
+        self.recent_files.set_properties(icon_name="document-open-recent", local_only=True, sort_type=Gtk.RecentSortType.MRU, show_not_found=False, show_numbers=True)
         htdl_filter = Gtk.RecentFilter()
         htdl_filter.add_pattern("*.htdl")
         htdl_filter.set_name("HiToDo Files (*.htdl)")
-        recent_files.add_filter(htdl_filter)
-        recent_files.connect("item-activated", self.open_recent)
-        action_group.add_action(recent_files)
+        self.recent_files.add_filter(htdl_filter)
+        self.recent_files.connect("item-activated", self.open_recent)
+        action_group.add_action(self.recent_files)
         
         save_file = Gtk.Action("save_file", None, "Save task list", Gtk.STOCK_SAVE)
         save_file.connect("activate", self.save_file)
