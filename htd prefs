@@ -1,3 +1,5 @@
+universal preferences
+=====
 open last file(s) on start
 default cols for a new list
     add/remove/change order
@@ -5,6 +7,10 @@ default cols for a new list
 default from, to, statii
     add/edit/remove
     only applies to new files
+show/hide toolbar
+
+document properties
+=====
 current file's from, to, statii
     add new
     remove existing if not assigned
