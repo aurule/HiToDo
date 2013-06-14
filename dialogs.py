@@ -77,3 +77,15 @@ class htd_prefs(Gtk.Dialog):
     
     def disappear(self, widget=None):
         self.hide()
+
+class htd_docprops(Gtk.Dialog):
+    def __init__(self, parent):
+        flags = Gtk.DialogFlags.DESTROY_WITH_PARENT
+        Gtk.Dialog.__init__(self, "Document Properties", parent, flags)
+        close = self.add_button(Gtk.STOCK_CLOSE, Gtk.ResponseType.CLOSE)
+        close.connect("clicked", self.disappear)
+        actions = self.get_action_area()
+        #TODO add settings widgets to "actions"
+    
+    def disappear(self, widget=None):
+        self.hide()

@@ -43,8 +43,11 @@ UI_XML = """
             <menuitem action="save_file" />
             <menuitem action="saveas_file" />
             <separator />
+            <menuitem action="doc_props" />
+            <separator />
             <menuitem action="recents" />
             <separator />
+            <menuitem action='close' />
             <menuitem action='quit' />
         </menu>
         <menu action='EditMenu'>
@@ -72,6 +75,8 @@ UI_XML = """
         <menu action="ViewMenu">
             <menuitem action='expand_all' />
             <menuitem action='collapse_all' />
+            <separator />
+            <menuitem action='show_toolbar' />
         </menu>
         <menu action='HelpMenu'>
             <menuitem action='help_about' />
@@ -763,6 +768,9 @@ class HiToDo(Gtk.Window):
     def set_prefs(self, widget=None):
         self.prefs_dlg.show()
     
+    def set_docprops(self, widget=None):
+        self.docprops_dlg.show()
+    
     def do_cut(self, widget=None):
         if self.focus == self.notes_view or (self.title_editor is not None and self.focus == self.title_editor):
             self.focus.emit('cut-clipboard')
@@ -889,6 +897,9 @@ class HiToDo(Gtk.Window):
         if kvn == "Escape":
             self.commit_title(path=self.title_edit_path, new_title='', write=False)
     
+    def toggle_toolbar(self, widget=None, event=None):
+        self.toolbar.set_visible(widget.get_active())
+    
     def __init__(self):
         Gtk.Window.__init__(self)
         self.set_default_size(1100, 700)
@@ -980,15 +991,15 @@ class HiToDo(Gtk.Window):
         uimanager.insert_action_group(top_actions)
         uimanager.insert_action_group(task_actions)
         menubar = uimanager.get_widget("/MenuBar")
-        toolbar = uimanager.get_widget("/ToolBar")
-        toolbar.get_style_context().add_class(Gtk.STYLE_CLASS_PRIMARY_TOOLBAR)
+        self.toolbar = uimanager.get_widget("/ToolBar")
+        self.toolbar.get_style_context().add_class(Gtk.STYLE_CLASS_PRIMARY_TOOLBAR)
         
         #start with a simple stacked layout
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         
         #add the menu and tool bars on top
         main_box.pack_start(menubar, False, False, 0)
-        main_box.pack_start(toolbar, False, False, 0)
+        main_box.pack_start(self.toolbar, False, False, 0)
         
         #now we create a horizontal pane
         task_pane = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
@@ -1044,6 +1055,7 @@ class HiToDo(Gtk.Window):
         self.save_dlg = dialogs.htd_save(self)
         self.about_dlg = dialogs.htd_about(self)
         self.prefs_dlg = dialogs.htd_prefs(self)
+        self.docprops_dlg = dialogs.htd_docprops(self)
     
     def due_render(self, col, cell, model, tree_iter, data):
         val = model[tree_iter][8]
@@ -1186,17 +1198,22 @@ class HiToDo(Gtk.Window):
         action_group.add_actions([
             ("new_file", Gtk.STOCK_NEW, None, "", None, self.new_file),
             ("open_file", Gtk.STOCK_OPEN, None, None, "Open file", self.open_file),
-            ("save_file", Gtk.STOCK_SAVE, None, None, "Save file", self.save_file),
             ("saveas_file", Gtk.STOCK_SAVE_AS, None, None, None, self.save_file_as),
+            ("close", Gtk.STOCK_CLOSE, None, None, None, self.new_file),
             ("quit", Gtk.STOCK_QUIT, None, None, None, self.destroy),
             ("help_about", Gtk.STOCK_ABOUT, None, None, None, self.show_about),
             ("prefs", Gtk.STOCK_PREFERENCES, None, None, None, self.set_prefs),
+            ("doc_props", Gtk.STOCK_PROPERTIES, None, None, None, self.set_docprops),
             ("FileMenu", None, "_File"),
             ("EditMenu", None, "_Edit"),
             ("TaskMenu", None, "_Task"),
             ("ViewMenu", None, "_View"),
             ("HelpMenu", None, "_Help")
         ])
+        action_group.add_toggle_actions([
+            ("show_toolbar", None, "_Toolbar", None, "Show or hide the toolbar", self.toggle_toolbar, True)
+        ])
+        
         recent_files = Gtk.RecentAction("recents", "_Recent Files", "Open a recently-used file", None)
         recent_files.set_properties(icon_name="document-open-recent", local_only=True, sort_type=Gtk.RecentSortType.MRU, show_not_found=False, show_numbers=True)
         htdl_filter = Gtk.RecentFilter()
@@ -1206,17 +1223,20 @@ class HiToDo(Gtk.Window):
         recent_files.connect("item-activated", self.open_recent)
         action_group.add_action(recent_files)
         
+        save_file = Gtk.Action("save_file", None, "Save task list", Gtk.STOCK_SAVE)
+        save_file.connect("activate", self.save_file)
+        save_file.set_is_important(True)
+        action_group.add_action_with_accel(save_file, None)
+        
         
     def create_task_actions(self, action_group):
         action_group.add_actions([
-            ("task_new", Gtk.STOCK_ADD, "_New Task", "<Primary>N", "New task", self.add_task),
-            ("task_newsub", Gtk.STOCK_INDENT, "New S_ubtask", "<Primary><Shift>N", "New subtask", self.add_subtask),
-            ("task_del", Gtk.STOCK_REMOVE, None, None, "Delete task", self.del_current_task),
-            ("task_cut", Gtk.STOCK_CUT, None, None, "Cut task", self.do_cut),
-            ("task_copy", Gtk.STOCK_COPY, None, None, "Copy task", self.do_copy),
-            ("task_paste", Gtk.STOCK_PASTE, None, None, "Paste task", self.do_paste),
-            ("task_paste_into", None, "Paste as _Child", "<Primary><Shift>V", "Paste as child", self.do_paste_into),
-            ("undo", Gtk.STOCK_UNDO, None, "<Primary>Z", "Undo", self.do_undo),
+            ("task_newsub", Gtk.STOCK_INDENT, "New S_ubtask", "<Primary><Shift>N", "Add a new subtask", self.add_subtask),
+            ("task_del", Gtk.STOCK_REMOVE, None, None, "Delete selected task(s)", self.del_current_task),
+            ("task_cut", Gtk.STOCK_CUT, None, None, "Cut task(s)", self.do_cut),
+            ("task_copy", Gtk.STOCK_COPY, None, None, "Copy task(s)", self.do_copy),
+            ("task_paste", Gtk.STOCK_PASTE, None, None, "Paste task(s)", self.do_paste),
+            ("task_paste_into", None, "Paste as _Child", "<Primary><Shift>V", "Paste task(s) as child", self.do_paste_into),
             ("redo", Gtk.STOCK_REDO, None, "<Primary><Shift>Z", "Redo", self.do_redo),
             ("sel_all", Gtk.STOCK_SELECT_ALL, None, "<Primary>A", None, self.select_all),
             ("sel_inv", None, "_Invert Selection", None, None, self.select_inv),
@@ -1224,9 +1244,23 @@ class HiToDo(Gtk.Window):
             ("expand_all", None, "_Expand All", None, "Expand all tasks", self.expand_all),
             ("collapse_all", None, "_Collapse All", None, "Collapse all tasks", self.collapse_all)
         ])
+        
+        task_new = Gtk.Action("task_new", "_New Task", "Add a new task", Gtk.STOCK_ADD)
+        task_new.connect("activate", self.add_task)
+        task_new.set_is_important(True)
+        task_new.set_short_label("Add")
+        action_group.add_action_with_accel(task_new, "<Primary>N")
+        
+        undo = Gtk.Action("undo", None, "Undo", Gtk.STOCK_UNDO)
+        undo.connect("activate", self.do_undo)
+        undo.set_is_important(True)
+        action_group.add_action_with_accel(undo, "<Primary>Z")
+        
         self.track_action = Gtk.ToggleAction("track_spent", "_Track spent time", "Track time worked toward this task", None)
         self.track_action.set_properties(icon_name="appointment-soon")
         self.track_action.connect("activate", self.track_spent)
+        self.track_action.set_is_important(True)
+        self.track_action.set_short_label("Track")
         action_group.add_action_with_accel(self.track_action, "<Primary>T")
     
     def create_ui_manager(self):
