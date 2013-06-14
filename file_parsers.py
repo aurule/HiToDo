@@ -56,7 +56,7 @@ class htd_filter(Gtk.FileFilter):
             if n.text not in data['status_list']:
                 data['status_list'].append(n.text)
         
-        columns = document.find('cols')
+        columns = document.find('properties/cols')
         cols_list = columns.text
         data['cols'].extend(cols_list.split(','))
         
@@ -148,8 +148,10 @@ class htd_filter(Gtk.FileFilter):
         sel = SubElement(htd, 'selected')
         sel.text = data['selection']
         
+        #doc properties
+        props = SubElement(htd, 'properties')
         #store cols list
-        columns = SubElement(htd, 'cols')
+        columns = SubElement(props, 'cols')
         columns.text = ','.join(data['cols'])
         
         #create master tasklist element
