@@ -622,8 +622,9 @@ class HiToDo(Gtk.Window):
         self.__do_open()
 
     def __open_last(self):
-        uris, num_uris = self.recent_files.get_uris()
-        uri = uris[0]
+        retval = self.recent_files.get_uris()
+        if retval == []: return
+        uri = retval[0][0]
         fpath = urlparse(uri).path
         self.file_name = unquote(fpath)
         self.file_filter = file_parsers.pick_filter(fpath)
