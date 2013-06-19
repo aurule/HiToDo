@@ -19,15 +19,19 @@ Although it isn't completely finished, HiToDo is stable and usable day-to-day. H
 * Status field with dropdown list for convenience
 * Arbitrary-length plaintext notes for every task
 * Save/Open htdl format files - xml for easy portability
+* Cut, copy, paste, and paste-beneath operations for tasks
+* Cut, copy, and paste for title and notes fields
+* Undo/Redo for notes field
+* Task reordering via drag-and-drop
 
 **Coming Features:**
 
-* Unlimited per-session undo/redo
-* Task cut, copy, paste, and paste-beneath operations
-* Task reordering via drag-and-drop (may not be possible)
+* Unlimited per-session undo/redo for tasks and title field entry
 * [todo.txt](http://todotxt.com/) save/open
 * ToDoList save/open
-* Multiple lists at once via tabs
+* Option to open multiple lists at once via tabs instead of multiple windows
+* Option to open multiple lists at once using multiple windows (launched from within the program)
+* Global preferences stored with GSettings
 
 # Requirements
 
