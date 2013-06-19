@@ -693,7 +693,8 @@ class HiToDo(Gtk.Window):
             'to_list': self.assignees_list,
             'status_list': self.statii_list,
             'task_store': self.tasklist,
-            'cols': self.cols_visible
+            'cols': self.cols_visible,
+            'geometry': ()
         }
         rows_to_expand, selme = self.file_filter.read_to_store(data)
         
@@ -705,7 +706,18 @@ class HiToDo(Gtk.Window):
         for n in self.statii_list:
             self.statii.append([n])
         
+        #show requested columns
         self.display_columns()
+        
+        #set window geometry
+        self.task_pane.set_position(data['geometry'][3])
+        self.set_default_size(data['geometry'][1], data['geometry'][2])
+        if data['geometry'][0]:
+            self.maximize()
+            #TODO figure out why task_pane's position gets set very strangely in full screen
+        else:
+            self.unmaximize()
+            self.resize(data['geometry'][1], data['geometry'][2])
         
         #reconnect model to view
         self.task_view.set_model(self.tasklist)
@@ -736,6 +748,8 @@ class HiToDo(Gtk.Window):
         for col in self.task_view.get_columns():
             self.cols_visible.append(col.code)
         
+        width, height = self.get_size()
+        task_width = self.task_pane.get_position()
         data = {
             'filename': self.file_name,
             'from_list': sorted(self.assigners_list),
@@ -744,7 +758,8 @@ class HiToDo(Gtk.Window):
             'task_store': self.tasklist,
             'task_view': self.task_view,
             'selection': selpath,
-            'cols': self.cols_visible
+            'cols': self.cols_visible,
+            'geometry': (self.maximized, width, height, task_width)
         }
         self.file_filter.write(data)
         
@@ -971,6 +986,10 @@ class HiToDo(Gtk.Window):
     def toggle_toolbar(self, widget=None, event=None):
         self.toolbar.set_visible(widget.get_active())
     
+    def track_maximized(self, widget, event, data=None):
+        mask = Gdk.WindowState.MAXIMIZED
+        self.maximized = (widget.get_window().get_state() & mask) == mask
+    
     def __init__(self):
         Gtk.Window.__init__(self)
         self.set_default_size(1100, 700)
@@ -1054,6 +1073,7 @@ class HiToDo(Gtk.Window):
         self.open_last_file = True
         self.undobuffer = []
         self.redobuffer = []
+        self.maximized = False
         
         #create action groups
         top_actions = Gtk.ActionGroup("top_actions")
@@ -1077,8 +1097,8 @@ class HiToDo(Gtk.Window):
         main_box.pack_start(self.toolbar, False, False, 0)
         
         #now we create a horizontal pane
-        task_pane = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
-        task_pane.set_position(900)
+        self.task_pane = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        self.task_pane.set_position(900)
         
         #add task list area
         task_scroll_win = Gtk.ScrolledWindow()
@@ -1098,7 +1118,7 @@ class HiToDo(Gtk.Window):
         self.task_view.connect('key-press-event', self.tasks_keys_dn)
         self.task_view.connect('focus-in-event', self.track_focus)
         task_scroll_win.add(self.task_view)
-        task_pane.pack1(task_scroll_win, True, True)
+        self.task_pane.pack1(task_scroll_win, True, True)
         
         #add notes area
         notes_scroll_win = Gtk.ScrolledWindow()
@@ -1113,10 +1133,10 @@ class HiToDo(Gtk.Window):
         self.notes_view.connect('key-release-event', self.notes_keys_up)
         self.notes_view.set_wrap_mode(Gtk.WrapMode.WORD)
         notes_scroll_win.add(self.notes_view)
-        task_pane.pack2(notes_scroll_win, True, True)
+        self.task_pane.pack2(notes_scroll_win, False, False)
         
         #commit the task editing pane
-        main_box.pack_start(task_pane, True, True, 0)
+        main_box.pack_start(self.task_pane, True, True, 0)
         
         #commit the ui
         self.add(main_box)
@@ -1124,6 +1144,7 @@ class HiToDo(Gtk.Window):
         # create a clipboard for easy copying
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)       
         self.connect("delete-event", self.destroy)
+        self.connect("window-state-event", self.track_maximized)
         self.show_all()
         
         self.open_dlg = dialogs.htd_open(self)

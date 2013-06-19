@@ -47,18 +47,30 @@ class htd_filter(Gtk.FileFilter):
         for n in assigners.findall('name'):
             if n.text not in data['from_list']:
                 data['from_list'].append(n.text)
+        
         assignees = document.find("assignees")
         for n in assignees.findall('name'):
             if n.text not in data['to_list']:
                 data['to_list'].append(n.text)
+        
         statii = document.find("statii")
         for n in statii.findall('name'):
             if n.text not in data['status_list']:
                 data['status_list'].append(n.text)
         
-        columns = document.find('properties/cols')
+        #get visible column list
+        columns = document.find('columns')
         cols_list = columns.text
         data['cols'].extend(cols_list.split(','))
+        
+        #get window geometry
+        geo = document.find('geometry')
+        maxed = geo.find('maximized').text == "True"
+        height = int(geo.find('height').text)
+        width = int(geo.find('width').text)
+        task_width = int(geo.find('task-width').text)
+        
+        data['geometry'] = (maxed, height, width, task_width)
         
         #get highest-level tasklist element
         tlist = document.find("tasklist")
@@ -125,6 +137,7 @@ class htd_filter(Gtk.FileFilter):
         htd = Element('htd')
         htd.set('version', self.file_version)
         
+        #store assigners, assignees, and statii lists
         assigners = SubElement(htd, 'assigners')
         for f in data['from_list']:
             e = SubElement(assigners, 'name')
@@ -148,11 +161,20 @@ class htd_filter(Gtk.FileFilter):
         sel = SubElement(htd, 'selected')
         sel.text = data['selection']
         
-        #doc properties
-        props = SubElement(htd, 'properties')
         #store cols list
-        columns = SubElement(props, 'cols')
+        columns = SubElement(htd, 'columns')
         columns.text = ','.join(data['cols'])
+        
+        #store window geometry
+        geo = SubElement(htd, 'geometry')
+        maxed = SubElement(geo, 'maximized')
+        maxed.text = str(data['geometry'][0])
+        height = SubElement(geo, 'height')
+        height.text = str(data['geometry'][1])
+        width = SubElement(geo, 'width')
+        width.text = str(data['geometry'][2])
+        task_width = SubElement(geo, 'task-width')
+        task_width.text = str(data['geometry'][3])
         
         #create master tasklist element
         tasklist = SubElement(htd, 'tasklist')
