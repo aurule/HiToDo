@@ -8,6 +8,8 @@ default from, to, statii
     add/edit/remove
     only applies to new files
 show/hide toolbar
+open new files in same or different window
+use tabs or multiple windows for multiple documents
 
 document properties
 =====

@@ -1,4 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+Copyright 2013 Peter Andrews
+
+This file is part of HiToDo.
+
+HiToDo is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+HiToDo is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with HiToDo.  If not, see <http://www.gnu.org/licenses/>.
+-->
 <schemalist>
     <schema id="app.hitodo" path="/app/hitodo/">
         <key type="b" name="reopen">
@@ -8,8 +26,18 @@
         </key>
         <key type="b" name="show-toolbar">
             <default>true</default>
-            <summary>Show toolbar</summary>
+            <summary>Show or hide toolbar</summary>
             <description>Controls whether the toolbar should be visible to the user.</description>
+        </key>
+        <key type="b" name="use-tabs">
+            <default>true</default>
+            <summary>Use tabs for multiple files</summary>
+            <description>When true, multiple task lists can be opened within the same window using a set of tabs. When false, every task list is shown in its own window.</description>
+        </key>
+        <key type="b" name="open-in-new-window">
+            <default>true</default>
+            <summary>Open new files in their own window. Ignored when use-tabs is True.</summary>
+            <description>When true, opening a new file will create a new HiToDo instance for that task list. When false, opening a new file closes the current file and reuses its window.</description>
         </key>
         <key type="as" name="default-statii">
             <default>[]</default>
@@ -26,7 +54,7 @@
             <summary>Default list of assignees</summary>
             <description>These strings will automatically be available as task Assignee options for newly created task lists. Has no effect on saved lists.</description>
         </key>
-        <key type="as" name="default-cols">
+        <key type="as" name="col-order">
             <default>['priority', 'pct complete', 'time est', 'time spent', 'tracked', 'due date', 'complete date', 'from', 'to', 'status', 'done', 'title']</default>
             <summary>Default list of visible columns</summary>
             <description>The columns named here will be shown in HiToDo in the order listed. It's a terrible idea to leave out the "done" and "title" columns.</description>
