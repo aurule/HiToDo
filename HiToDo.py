@@ -150,9 +150,11 @@ class HiToDo(Gtk.Window):
         path = self.tasklist.get_path(new_row_iter)
         spath = str(path)
         
-        #ensure parent is not Done and recalc its pct complete)
+        #ensure parent is not Done and recalc its pct complete
         self.force_parent_not_done(spath)
         self.calc_parent_pct(spath)
+        
+        #TODO push action tuple to self.undobuffer; clear self.redobuffer
         
         #select new row and immediately edit title field
         self.selection.select_iter(new_row_iter)
@@ -508,7 +510,10 @@ class HiToDo(Gtk.Window):
             if self.tasklist[path][17]:
                 self.track_action.set_active(False)
             refs.append((self.tasklist.get_iter(path), path))
-        #only then can we remove them without invalidating paths
+        
+        #TODO push action tuple to self.undobuffer; clear self.redobuffer
+        
+        #now we can remove them without invalidating paths
         for ref, path in refs:
             self.commit_spent(path=str(path), new_spent=0)
             self.commit_est(path=str(path), new_est=0)
@@ -523,6 +528,7 @@ class HiToDo(Gtk.Window):
         if self.tasklist[path][17]:
             self.track_action.set_active(False)
         treeiter = self.tasklist.get_iter(path)
+        
         self.commit_spent(path=path, new_spent=0)
         self.commit_est(path=path, new_est=0)
         self.tasklist.remove(treeiter)
@@ -540,9 +546,27 @@ class HiToDo(Gtk.Window):
             self.seliter = self.tasklist.get_iter(self.sellist[0])
             self.parent = self.tasklist.iter_parent(self.seliter)
             self.notes_buff.set_text(self.tasklist[self.seliter][14])
+        
+            #enable controls which can act on a singleton
+            self.task_cut.set_sensitive(True)
+            self.task_copy.set_sensitive(True)
+            self.task_del.set_sensitive(True)
+            self.task_paste.set_sensitive(True)
+            self.task_paste_into.set_sensitive(True)
+            self.notes_view.set_sensitive(True)
         else:
             self.seliter = None
             self.notes_buff.set_text('')
+        
+            #enable controls which can act on a group
+            self.task_cut.set_sensitive(True)
+            self.task_copy.set_sensitive(True)
+            self.task_del.set_sensitive(True)
+            
+            #disable controls which require a single selection
+            self.task_paste.set_sensitive(False)
+            self.task_paste_into.set_sensitive(False)
+            self.notes_view.set_sensitive(False)
         
         self.notes_buff.clear_undo()
     
@@ -553,6 +577,16 @@ class HiToDo(Gtk.Window):
             self.focus.emit('select-all', True)
         elif self.title_editor is not None and self.focus == self.title_editor:
             self.focus.select_region(0, -1)
+        
+        #enable controls which can act on a group
+        self.task_cut.set_sensitive(True)
+        self.task_copy.set_sensitive(True)
+        self.task_del.set_sensitive(True)
+        
+        #disable controls which require a single selection
+        self.task_paste.set_sensitive(False)
+        self.task_paste_into.set_sensitive(False)
+        self.notes_view.set_sensitive(False)
     
     def select_none(self, widget=None):
         if self.focus == self.task_view:
@@ -561,6 +595,14 @@ class HiToDo(Gtk.Window):
             self.focus.emit('select-all', False)
         elif self.title_editor is not None and self.focus == self.title_editor:
             self.focus.select_region(0,0)
+        
+        #disable controls which require a selection
+        self.task_cut.set_sensitive(False)
+        self.task_copy.set_sensitive(False)
+        self.task_paste.set_sensitive(False)
+        self.task_paste_into.set_sensitive(False)
+        self.notes_view.set_sensitive(False)
+        self.task_del.set_sensitive(False)
     
     def select_inv(self, widget=None):
         if self.focus != self.task_view: return
@@ -871,10 +913,22 @@ class HiToDo(Gtk.Window):
     def do_undo(self, widget=None):
         if self.focus == self.notes_view:
             self.notes_buff.undo()
+        elif self.focus == self.task_view:
+            pass
+            #TODO
+            #pop action tuple from self.undobuffer
+            #execute its inverse
+            #push action tuple to self.redobuffer
     
     def do_redo(self, widget=None):
         if self.focus == self.notes_view:
             self.notes_buff.redo()
+        elif self.focus == self.task_view:
+            pass
+            #TODO
+            #pop action tuple from self.undobuffer
+            #execute its inverse
+            #push action tuple to self.redobuffer
     
     def display_columns(self):
         for col in self.task_view.get_columns():
@@ -947,6 +1001,7 @@ class HiToDo(Gtk.Window):
         self.tasklist.set_sort_func(7, self.datecompare, None)
         self.tasklist.set_sort_func(8, self.datecompare, None)
         self.tasklist.connect("row-changed", self.make_dirty)
+        #TODO self.tasklist.connect("row-changed", self.push_change_undo)
         self.tasklist.connect("row-deleted", self.make_dirty)
         
         self.defaults = [
@@ -997,6 +1052,8 @@ class HiToDo(Gtk.Window):
         self.cols_available = {}
         self.cols_visible = ['priority', 'pct complete', 'time est', 'time spent', 'tracked', 'due date', 'complete date', 'from', 'to', 'status', 'done', 'title']
         self.open_last_file = True
+        self.undobuffer = []
+        self.redobuffer = []
         
         #create action groups
         top_actions = Gtk.ActionGroup("top_actions")
@@ -1276,11 +1333,6 @@ class HiToDo(Gtk.Window):
     def create_task_actions(self, action_group):
         action_group.add_actions([
             ("task_newsub", Gtk.STOCK_INDENT, "New S_ubtask", "<Primary><Shift>N", "Add a new subtask", self.add_subtask),
-            ("task_del", Gtk.STOCK_REMOVE, "Delete task", None, "Delete selected task(s)", self.del_current_task),
-            ("task_cut", Gtk.STOCK_CUT, None, None, "Cut task(s)", self.do_cut),
-            ("task_copy", Gtk.STOCK_COPY, None, None, "Copy task(s)", self.do_copy),
-            ("task_paste", Gtk.STOCK_PASTE, None, None, "Paste task(s)", self.do_paste),
-            ("task_paste_into", None, "Paste as _Child", "<Primary><Shift>V", "Paste task(s) as child", self.do_paste_into),
             ("redo", Gtk.STOCK_REDO, None, "<Primary><Shift>Z", "Redo", self.do_redo),
             ("sel_all", Gtk.STOCK_SELECT_ALL, None, "<Primary>A", None, self.select_all),
             ("sel_inv", None, "_Invert Selection", None, None, self.select_inv),
@@ -1288,6 +1340,26 @@ class HiToDo(Gtk.Window):
             ("expand_all", None, "_Expand All", None, "Expand all tasks", self.expand_all),
             ("collapse_all", None, "_Collapse All", None, "Collapse all tasks", self.collapse_all)
         ])
+        
+        self.task_del = Gtk.Action("task_del", "Delete task", "Delete selected task(s)", Gtk.STOCK_REMOVE)
+        self.task_del.connect("activate", self.del_current_task)
+        action_group.add_action(self.task_del)
+        
+        self.task_cut = Gtk.Action("task_cut", None, "Cut", Gtk.STOCK_CUT)
+        self.task_cut.connect("activate", self.do_cut)
+        action_group.add_action_with_accel(self.task_cut, None)
+
+        self.task_copy = Gtk.Action("task_copy", None, "Copy", Gtk.STOCK_COPY)
+        self.task_copy.connect("activate", self.do_copy)
+        action_group.add_action_with_accel(self.task_copy, None)
+        
+        self.task_paste = Gtk.Action("task_paste", None, "Paste", Gtk.STOCK_PASTE)
+        self.task_paste.connect("activate", self.do_paste)
+        action_group.add_action_with_accel(self.task_paste, None)
+        
+        self.task_paste_into = Gtk.Action("task_paste_into", "Paste as _Child", "Paste task as child", None)
+        self.task_paste_into.connect("activate", self.do_paste_into)
+        action_group.add_action_with_accel(self.task_paste_into, "<Primary><Shift>V")
         
         task_new = Gtk.Action("task_new", "_New Task", "Add a new task", Gtk.STOCK_ADD)
         task_new.connect("activate", self.add_task)
