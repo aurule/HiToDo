@@ -18,7 +18,7 @@ current file's from, to, statii
 current file's cols
     add/remove/change order
     cannot remove "done" and "title"
-window geometry
+window geometry (save only, no dialog)
     width
     height
     task view width
