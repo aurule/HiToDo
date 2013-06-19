@@ -919,6 +919,10 @@ class HiToDo(Gtk.Window):
             #pop action tuple from self.undobuffer
             #execute its inverse
             #push action tuple to self.redobuffer
+        
+        #Note that we never set the undo or redo action's sensitivities. They
+        #must always be sensitive to allow for undo/redo within the notes_view
+        #widget, regardless of the task undo/redo buffers' statii.
     
     def do_redo(self, widget=None):
         if self.focus == self.notes_view:
@@ -926,9 +930,27 @@ class HiToDo(Gtk.Window):
         elif self.focus == self.task_view:
             pass
             #TODO
-            #pop action tuple from self.undobuffer
-            #execute its inverse
-            #push action tuple to self.redobuffer
+            #pop action tuple from self.redobuffer
+            #execute it
+            #push action tuple to self.undobuffer
+    
+    def push_undoable_change(self, treemodel, path, treeiter, data=None):
+        self.__push_undoable("change", path)
+    
+    def __push_undoable(self, action, data):
+        if self.tasklist.get_path(self.seliter) == data:
+            print "hi there!"
+        pass
+        #push tuple to self.undobuffer
+        
+        #("new", path)
+        #("del", (path, [deleted row]))
+        #("change", [old row])
+        #("done", path)
+        #("paste", (path of first element, [paste_data]))
+        
+        #clear self.redobuffer and disallow activation of Redo button
+        del self.redobuffer[:]
     
     def display_columns(self):
         for col in self.task_view.get_columns():
@@ -1001,7 +1023,7 @@ class HiToDo(Gtk.Window):
         self.tasklist.set_sort_func(7, self.datecompare, None)
         self.tasklist.set_sort_func(8, self.datecompare, None)
         self.tasklist.connect("row-changed", self.make_dirty)
-        #TODO self.tasklist.connect("row-changed", self.push_change_undo)
+        self.tasklist.connect("row-changed", self.push_undoable_change)
         self.tasklist.connect("row-deleted", self.make_dirty)
         
         self.defaults = [
@@ -1333,7 +1355,6 @@ class HiToDo(Gtk.Window):
     def create_task_actions(self, action_group):
         action_group.add_actions([
             ("task_newsub", Gtk.STOCK_INDENT, "New S_ubtask", "<Primary><Shift>N", "Add a new subtask", self.add_subtask),
-            ("redo", Gtk.STOCK_REDO, None, "<Primary><Shift>Z", "Redo", self.do_redo),
             ("sel_all", Gtk.STOCK_SELECT_ALL, None, "<Primary>A", None, self.select_all),
             ("sel_inv", None, "_Invert Selection", None, None, self.select_inv),
             ("sel_none", None, "Select _None", "<Primary><Shift>A", None, self.select_none),
@@ -1367,10 +1388,14 @@ class HiToDo(Gtk.Window):
         task_new.set_short_label("Add")
         action_group.add_action_with_accel(task_new, "<Primary>N")
         
-        undo = Gtk.Action("undo", None, "Undo", Gtk.STOCK_UNDO)
-        undo.connect("activate", self.do_undo)
-        undo.set_is_important(True)
-        action_group.add_action_with_accel(undo, "<Primary>Z")
+        self.undo_action = Gtk.Action("undo", None, "Undo", Gtk.STOCK_UNDO)
+        self.undo_action.connect("activate", self.do_undo)
+        self.undo_action.set_is_important(True)
+        action_group.add_action_with_accel(self.undo_action, "<Primary>Z")
+                
+        self.redo_action = Gtk.Action("redo", None, "Redo", Gtk.STOCK_REDO)
+        self.redo_action.connect("activate", self.do_redo)
+        action_group.add_action_with_accel(self.redo_action, "<Primary><Shift>Z")
         
         self.track_action = Gtk.ToggleAction("track_spent", "_Track spent time", "Track time worked toward this task", None)
         self.track_action.set_properties(icon_name="appointment-soon")
