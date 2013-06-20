@@ -32,6 +32,7 @@ Although it isn't completely finished, HiToDo is stable and usable day-to-day. H
 * Option to open multiple lists at once via tabs instead of multiple windows
 * Option to open multiple lists at once using multiple windows (launched from within the program)
 * Global preferences stored with GSettings
+* Open/Save of networked files
 
 # Requirements
 
