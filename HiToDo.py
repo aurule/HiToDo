@@ -840,10 +840,10 @@ class HiToDo(Gtk.Window):
         self.about_dlg.hide()
     
     def set_prefs(self, widget=None):
-        self.prefs_dlg.show()
+        self.prefs_dlg.show_all()
     
     def set_docprops(self, widget=None):
-        self.docprops_dlg.show()
+        self.docprops_dlg.show_all()
     
     def do_cut(self, widget=None):
         if self.focus == self.notes_view or (self.title_editor is not None and self.focus == self.title_editor):
