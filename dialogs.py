@@ -70,7 +70,7 @@ class htd_prefs(Gtk.Dialog):
     def __init__(self, parent):
         flags = Gtk.DialogFlags.DESTROY_WITH_PARENT
         Gtk.Dialog.__init__(self, "HiToDo Preferences", parent, flags)
-        close = self.add_button(Gtk.STOCK_CLOSE, Gtk.ResponseType.CLOSE)
+        close = self.add_button(Gtk.STOCK_OK, Gtk.ResponseType.CLOSE)
         close.connect("clicked", self.disappear)
         content = self.get_content_area()
         #TODO add settings widgets to "content"
@@ -82,10 +82,52 @@ class htd_docprops(Gtk.Dialog):
     def __init__(self, parent):
         flags = Gtk.DialogFlags.DESTROY_WITH_PARENT
         Gtk.Dialog.__init__(self, "Document Properties", parent, flags)
-        close = self.add_button(Gtk.STOCK_CLOSE, Gtk.ResponseType.CLOSE)
+        close = self.add_button(Gtk.STOCK_OK, Gtk.ResponseType.CLOSE)
         close.connect("clicked", self.disappear)
         content = self.get_content_area()
-        #TODO add settings widgets to "content"
+        nb = Gtk.Notebook()
+        
+        #Tags tab
+        taglbl = Gtk.Label("Tags")
+        tagbox = Gtk.Box()
+        tagbox.set_orientation(Gtk.Orientation.VERTICAL)
+        nb.append_page(tagbox, taglbl)
+        
+        #Columns tab
+        collbl = Gtk.Label("Columns")
+        colbox = Gtk.Box()
+        colbox.set_orientation(Gtk.Orientation.VERTICAL)
+        #explanation
+        expolbl = Gtk.Label("Choose which columns to show. To change their order, just drag the column headers in the main window.")
+        expolbl.set_property("wrap", True)
+        expolbl.set_max_width_chars(20)
+        colbox.pack_start(expolbl, False, False, 0)
+        #list widget
+        col_view_scroller = Gtk.ScrolledWindow()
+        col_view = Gtk.TreeView(parent.cols)
+        visible = Gtk.CellRendererToggle(activatable=True, radio=False)
+        visible.connect("toggled", parent.skip)
+        col_visible = Gtk.TreeViewColumn(u"\u2713", visible, active=2)
+        col_view.append_column(col_visible)
+        name = Gtk.CellRendererText(editable=False)
+        col_name = Gtk.TreeViewColumn("Column", name, text=1)
+        col_view.append_column(col_name)
+        col_view_scroller.add(col_view)
+        col_view_scroller.set_min_content_height(315)
+        col_view_scroller.set_min_content_width(230)
+        colbox.pack_start(col_view_scroller, True, True, 0)
+        
+        nb.append_page(colbox, collbl)
+        
+        #Stats tab
+        statlbl = Gtk.Label("Stats")
+        statbox = Gtk.Box()
+        statbox.set_orientation(Gtk.Orientation.VERTICAL)
+        nb.append_page(statbox, statlbl)
+        
+        #add the tabbed notebook
+        content.pack_start(nb, True, True, 0)
+        content.set_size_request(300, 400)
     
     def disappear(self, widget=None):
         self.hide()

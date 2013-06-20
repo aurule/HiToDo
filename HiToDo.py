@@ -699,6 +699,9 @@ class HiToDo(Gtk.Window):
         rows_to_expand, selme = self.file_filter.read_to_store(data)
         
         #iterate assigners, assignees, and statii to put names into respective liststores
+        self.assigners.clear()
+        self.assignees.clear()
+        self.statii.clear()
         for n in self.assigners_list:
             self.assigners.append([n])
         for n in self.assignees_list:
@@ -952,6 +955,9 @@ class HiToDo(Gtk.Window):
         for col in self.cols_visible:
             self.task_view.append_column(self.cols_available[col])
         
+        for row in self.cols:
+            row[2] = row[0] in self.cols_visible
+        
         self.task_view.set_properties(expander_column=self.col_title)
     
     def notes_keys_dn(self, widget=None, event=None):
@@ -1070,6 +1076,7 @@ class HiToDo(Gtk.Window):
         self.copied_rows = []
         self.cols_available = {}
         self.cols_visible = ['priority', 'pct complete', 'time est', 'time spent', 'tracked', 'due date', 'complete date', 'from', 'to', 'status', 'done', 'title']
+        self.cols = Gtk.ListStore(str, str, bool)
         self.open_last_file = True
         self.undobuffer = []
         self.redobuffer = []
@@ -1209,6 +1216,7 @@ class HiToDo(Gtk.Window):
         #col_priority.set_reorderable(True)
         col_priority.code = "priority"
         self.cols_available['priority'] = col_priority
+        self.cols.append(['priority', 'Priority (!)', False])
         
         pct = Gtk.CellRendererProgress()
         col_pct = Gtk.TreeViewColumn("%", pct, value=1, visible=16)
@@ -1216,6 +1224,7 @@ class HiToDo(Gtk.Window):
         col_pct.set_sort_column_id(1)
         col_pct.code = "pct complete"
         self.cols_available['pct complete'] = col_pct
+        self.cols.append(['pct complete', 'Percent Complete (%)', False])
         
         est = Gtk.CellRendererText(foreground="#999", editable=True)
         est.connect("edited", self.commit_est)
@@ -1226,6 +1235,7 @@ class HiToDo(Gtk.Window):
         col_est.set_cell_data_func(est, self.est_render)
         col_est.code = "time est"
         self.cols_available['time est'] = col_est
+        self.cols.append(['time est', 'Est', False])
         
         spent = Gtk.CellRendererText(foreground="#999", editable=True)
         spent.connect("edited", self.commit_spent)
@@ -1236,12 +1246,14 @@ class HiToDo(Gtk.Window):
         col_spent.set_cell_data_func(spent, self.spent_render)
         col_spent.code = "time spent"
         self.cols_available['time spent'] = col_spent
+        self.cols.append(['time spent', 'Spent', False])
         
         tracking = Gtk.CellRendererText(foreground="#b00", text=u"\u231A")
         col_tracking = Gtk.TreeViewColumn(u"\u231A", tracking, visible=17)
         #col_tracking.set_reorderable(True)
         col_tracking.code = "tracked"
         self.cols_available['tracked'] = col_tracking
+        self.cols.append(['tracked', u'Tracking (\u231A)', False])
         
         due = Gtk.CellRendererText(editable=True, foreground="#999")
         due.connect("edited", self.commit_due)
@@ -1252,6 +1264,7 @@ class HiToDo(Gtk.Window):
         col_due.set_cell_data_func(due, self.due_render)
         col_due.code = "due date"
         self.cols_available['due date'] = col_due
+        self.cols.append(['due date', 'Due', False])
         
         completed = Gtk.CellRendererText(editable=True, foreground="#999")
         completed.connect("edited", self.commit_complete)
@@ -1262,6 +1275,7 @@ class HiToDo(Gtk.Window):
         col_completed.set_cell_data_func(completed, self.completed_render)
         col_completed.code = "complete date"
         self.cols_available['complete date'] = col_completed
+        self.cols.append(['complete date', 'Completed', False])
         
         assigner = Gtk.CellRendererCombo(model=self.assigners, has_entry=True, editable=True, foreground="#999", text_column=0)
         assigner.connect("edited", self.commit_assigner)
@@ -1271,6 +1285,7 @@ class HiToDo(Gtk.Window):
         col_assigner.set_sort_column_id(9)
         col_assigner.code = "from"
         self.cols_available['from'] = col_assigner
+        self.cols.append(['from', 'From', False])
         
         assignee = Gtk.CellRendererCombo(model=self.assignees, has_entry=True, editable=True, foreground="#999", text_column=0)
         assignee.connect("edited", self.commit_assignee)
@@ -1280,6 +1295,7 @@ class HiToDo(Gtk.Window):
         col_assignee.set_sort_column_id(10)
         col_assignee.code = "to"
         self.cols_available['to'] = col_assignee
+        self.cols.append(['to', 'To', False])
         
         status = Gtk.CellRendererCombo(model=self.statii, has_entry=True, editable=True, foreground="#999", text_column=0)
         status.connect("edited", self.commit_status)
@@ -1289,6 +1305,7 @@ class HiToDo(Gtk.Window):
         col_status.set_sort_column_id(11)
         col_status.code = "status"
         self.cols_available['status'] = col_status
+        self.cols.append(['status', 'Status', False])
         
         done = Gtk.CellRendererToggle(activatable=True, radio=False)
         done.connect("toggled", self.commit_done)
@@ -1297,6 +1314,7 @@ class HiToDo(Gtk.Window):
         #col_done.set_reorderable(True)
         col_done.code = "done"
         self.cols_available['done'] = col_done
+        self.cols.append(['done', u'Done (\u2713)', True])
         
         self.title_cell = Gtk.CellRendererText(editable=True, ellipsize=Pango.EllipsizeMode.NONE, foreground="#999")
         self.title_cell.connect("edited", self.commit_title)
@@ -1315,6 +1333,7 @@ class HiToDo(Gtk.Window):
         self.col_title.set_sort_column_id(13)
         self.col_title.code = "title"
         self.cols_available['title'] = self.col_title
+        self.cols.append(['title', 'Title', True])
     
     def create_top_actions(self, action_group):
         action_group.add_actions([
