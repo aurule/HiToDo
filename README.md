@@ -1,8 +1,8 @@
 # HiToDo
 
-HiToDo is a heirarchical task list manager inspired by [ToDoList](http://www.abstractspoon.com/tdl_resources.html). It's designed to reproduce those features which I found most useful and needed in day-to-day use. There's a lot more that ToDoList can do, so check it out if you run windows!
+HiToDo is a heirarchical task list manager inspired by [ToDoList](http://www.abstractspoon.com/tdl_resources.html). It's designed to reproduce those features which I found most useful and needed in day-to-day use. There's a lot more that ToDoList can do, so check it out if you run Windows!
 
-Although it isn't completely finished, HiToDo is stable and usable day-to-day. However, I wouldn't recommend it for production use without a lot of backups (just in case) and the patience to recreate lists if/when the format changes.
+Although it isn't completely finished, HiToDo is stable and fairly usable for non-critical task management. However, I wouldn't recommend it for production use without a lot of backups and the patience to recreate lists as the format changes.
 
 ## Features
 
@@ -12,7 +12,7 @@ Although it isn't completely finished, HiToDo is stable and usable day-to-day. H
 * Arbitrary numeric priority levels
 * Completion percent tracking/display
 * Time estimate field
-* Time taken field with live tracking (push a button and it starts accruing time; push again and it adds that time to the task's spent total)
+* Time taken field with live tracking (click a button and it starts to accrue time; click again and it adds that time to the task's spent total)
 * Due date field
 * Completed date field
 * Assigner and Assignee fields with dropdown lists for convenience
@@ -24,15 +24,17 @@ Although it isn't completely finished, HiToDo is stable and usable day-to-day. H
 * Undo/Redo for notes field
 * Task reordering via drag-and-drop
 
-**Coming Features:**
+**Planned Features:**
 
 * Unlimited per-session undo/redo for tasks and title field entry
+* Global preferences stored with GSettings
+* Option to open multiple lists at once using multiple windows (launched from within the program)
+* Option to open multiple lists at once via tabs instead of multiple windows
+* Open/Save of networked files
+* Built-in PGP signing and encryption/decryption?
+* Compressed save files?
 * [todo.txt](http://todotxt.com/) save/open
 * ToDoList save/open
-* Option to open multiple lists at once via tabs instead of multiple windows
-* Option to open multiple lists at once using multiple windows (launched from within the program)
-* Global preferences stored with GSettings
-* Open/Save of networked files
 
 # Requirements
 
