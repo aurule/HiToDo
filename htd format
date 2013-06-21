@@ -14,9 +14,16 @@
         ...
     </expanded>
     <selected>0</selected>
-    <prefs>
-        <cols_visible>string of col names, in display order</cols_visible>
-    </prefs>
+    <columns>
+        <col visible="True|False">column name</col>
+        ...
+    </columns>
+    <geometry>
+        <maximized>False|True</maximized>
+        <height>height in pixels, ignorant of window decorations</height>
+        <width>width in pixels, ignorant of window decorations</width>
+        <offset>width of the task view panel</offset>
+    </geometry>
     <tasklist>
         <task done="False" priority="5">
             <pct>0</pct>
