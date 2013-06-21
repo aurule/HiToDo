@@ -748,10 +748,6 @@ class HiToDo(Gtk.Window):
         else:
             selpath = ''
         
-        del self.cols_visible[:]
-        for col in self.task_view.get_columns():
-            self.cols_visible.append(col.code)
-        
         width, height = self.get_size()
         task_width = self.task_pane.get_position()
         data = {
@@ -952,12 +948,15 @@ class HiToDo(Gtk.Window):
     def display_columns(self):
         for col in self.task_view.get_columns():
             self.task_view.remove_column(col)
+        cols_vis = []
         
-        for col in self.cols_visible:
-            self.task_view.append_column(self.cols_available[col])
+        for col, vis in self.cols_visible:
+            if vis:
+                self.task_view.append_column(self.cols_available[col])
+                cols_vis.append(col)
         
         for row in self.cols:
-            row[2] = row[0] in self.cols_visible
+            row[2] = row[0] in cols_vis
         
         self.task_view.set_properties(expander_column=self.col_title)
     
@@ -996,6 +995,43 @@ class HiToDo(Gtk.Window):
     def track_maximized(self, widget, event, data=None):
         mask = Gdk.WindowState.MAXIMIZED
         self.maximized = (widget.get_window().get_state() & mask) == mask
+        
+    def toggle_col_visible(self, widget, path, data=None):
+        code = self.cols[path][0]
+        visible_now = self.cols[path][2]
+        idex = self.cols_visible.index((code, visible_now))
+        
+        if visible_now:
+            self.task_view.remove_column(self.cols_available[code])
+        else:
+            self.task_view.insert_column(self.cols_available[code], idex)
+        
+        self.cols_visible[idex] = (code, not visible_now)
+        self.cols[path][2] = not visible_now
+        self.make_dirty()
+    
+    def move_col(self, widget, sel, offset):
+        colstore, orig = sel.get_selected()
+        if offset == "up":
+            target = colstore.iter_previous(orig)
+        else:
+            target = colstore.iter_next(orig)
+        
+        col1 = (colstore[orig][0], colstore[orig][2])
+        col2 = (colstore[target][0], colstore[target][2])
+        id1 = self.cols_visible.index(col1)
+        id2 = self.cols_visible.index(col2)
+        
+        small = min(id1, id2)
+        big = max(id1, id2)
+        #move small in front of big
+        s = self.cols_available[self.cols_visible[small][0]]
+        b = self.cols_available[self.cols_visible[big][0]]
+        self.task_view.move_column_after(s, b)
+        
+        self.cols_visible[id2], self.cols_visible[id1] = self.cols_visible[id1], self.cols_visible[id2]
+        colstore.swap(target, orig)
+        self.make_dirty()
     
     def __init__(self):
         Gtk.Window.__init__(self)
@@ -1076,8 +1112,8 @@ class HiToDo(Gtk.Window):
         self.focus = None
         self.copied_rows = []
         self.cols_available = {}
-        self.cols_visible = ['priority', 'pct complete', 'time est', 'time spent', 'tracked', 'due date', 'complete date', 'from', 'to', 'status', 'done', 'title']
-        self.cols = Gtk.ListStore(str, str, bool)
+        self.cols_visible = [('priority', True), ('pct complete', True), ('time est', True), ('time spent', True), ('tracked', True), ('due date', True), ('complete date', True), ('from', True), ('to', True), ('status', True), ('done', True), ('title', True)]
+        self.cols = Gtk.ListStore(str, str, bool, bool) #code, label for settings screen, visible flag, can hide flag
         self.open_last_file = True
         self.undobuffer = []
         self.redobuffer = []
@@ -1217,7 +1253,7 @@ class HiToDo(Gtk.Window):
         #col_priority.set_reorderable(True)
         col_priority.code = "priority"
         self.cols_available['priority'] = col_priority
-        self.cols.append(['priority', 'Priority (!)', False])
+        self.cols.append(['priority', 'Priority (!)', True, True])
         
         pct = Gtk.CellRendererProgress()
         col_pct = Gtk.TreeViewColumn("%", pct, value=1, visible=16)
@@ -1225,7 +1261,7 @@ class HiToDo(Gtk.Window):
         col_pct.set_sort_column_id(1)
         col_pct.code = "pct complete"
         self.cols_available['pct complete'] = col_pct
-        self.cols.append(['pct complete', 'Percent Complete (%)', False])
+        self.cols.append(['pct complete', 'Percent Complete (%)', True, True])
         
         est = Gtk.CellRendererText(foreground="#999", editable=True)
         est.connect("edited", self.commit_est)
@@ -1236,7 +1272,7 @@ class HiToDo(Gtk.Window):
         col_est.set_cell_data_func(est, self.est_render)
         col_est.code = "time est"
         self.cols_available['time est'] = col_est
-        self.cols.append(['time est', 'Est', False])
+        self.cols.append(['time est', 'Est', True, True])
         
         spent = Gtk.CellRendererText(foreground="#999", editable=True)
         spent.connect("edited", self.commit_spent)
@@ -1247,14 +1283,14 @@ class HiToDo(Gtk.Window):
         col_spent.set_cell_data_func(spent, self.spent_render)
         col_spent.code = "time spent"
         self.cols_available['time spent'] = col_spent
-        self.cols.append(['time spent', 'Spent', False])
+        self.cols.append(['time spent', 'Spent', True, True])
         
         tracking = Gtk.CellRendererText(foreground="#b00", text=u"\u231A")
         col_tracking = Gtk.TreeViewColumn(u"\u231A", tracking, visible=17)
         #col_tracking.set_reorderable(True)
         col_tracking.code = "tracked"
         self.cols_available['tracked'] = col_tracking
-        self.cols.append(['tracked', u'Tracking (\u231A)', False])
+        self.cols.append(['tracked', u'Tracking (\u231A)', True, True])
         
         due = Gtk.CellRendererText(editable=True, foreground="#999")
         due.connect("edited", self.commit_due)
@@ -1265,7 +1301,7 @@ class HiToDo(Gtk.Window):
         col_due.set_cell_data_func(due, self.due_render)
         col_due.code = "due date"
         self.cols_available['due date'] = col_due
-        self.cols.append(['due date', 'Due', False])
+        self.cols.append(['due date', 'Due', True, True])
         
         completed = Gtk.CellRendererText(editable=True, foreground="#999")
         completed.connect("edited", self.commit_complete)
@@ -1276,7 +1312,7 @@ class HiToDo(Gtk.Window):
         col_completed.set_cell_data_func(completed, self.completed_render)
         col_completed.code = "complete date"
         self.cols_available['complete date'] = col_completed
-        self.cols.append(['complete date', 'Completed', False])
+        self.cols.append(['complete date', 'Completed', True, True])
         
         assigner = Gtk.CellRendererCombo(model=self.assigners, has_entry=True, editable=True, foreground="#999", text_column=0)
         assigner.connect("edited", self.commit_assigner)
@@ -1286,7 +1322,7 @@ class HiToDo(Gtk.Window):
         col_assigner.set_sort_column_id(9)
         col_assigner.code = "from"
         self.cols_available['from'] = col_assigner
-        self.cols.append(['from', 'From', False])
+        self.cols.append(['from', 'From', True, True])
         
         assignee = Gtk.CellRendererCombo(model=self.assignees, has_entry=True, editable=True, foreground="#999", text_column=0)
         assignee.connect("edited", self.commit_assignee)
@@ -1296,7 +1332,7 @@ class HiToDo(Gtk.Window):
         col_assignee.set_sort_column_id(10)
         col_assignee.code = "to"
         self.cols_available['to'] = col_assignee
-        self.cols.append(['to', 'To', False])
+        self.cols.append(['to', 'To', True, True])
         
         status = Gtk.CellRendererCombo(model=self.statii, has_entry=True, editable=True, foreground="#999", text_column=0)
         status.connect("edited", self.commit_status)
@@ -1306,7 +1342,7 @@ class HiToDo(Gtk.Window):
         col_status.set_sort_column_id(11)
         col_status.code = "status"
         self.cols_available['status'] = col_status
-        self.cols.append(['status', 'Status', False])
+        self.cols.append(['status', 'Status', True, True])
         
         done = Gtk.CellRendererToggle(activatable=True, radio=False)
         done.connect("toggled", self.commit_done)
@@ -1315,7 +1351,7 @@ class HiToDo(Gtk.Window):
         #col_done.set_reorderable(True)
         col_done.code = "done"
         self.cols_available['done'] = col_done
-        self.cols.append(['done', u'Done (\u2713)', True])
+        self.cols.append(['done', u'Done (\u2713)', True, False])
         
         self.title_cell = Gtk.CellRendererText(editable=True, ellipsize=Pango.EllipsizeMode.NONE, foreground="#999")
         self.title_cell.connect("edited", self.commit_title)
@@ -1334,7 +1370,7 @@ class HiToDo(Gtk.Window):
         self.col_title.set_sort_column_id(13)
         self.col_title.code = "title"
         self.cols_available['title'] = self.col_title
-        self.cols.append(['title', 'Title', True])
+        self.cols.append(['title', 'Title', True, False])
     
     def create_top_actions(self, action_group):
         action_group.add_actions([

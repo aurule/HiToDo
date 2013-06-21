@@ -60,8 +60,13 @@ class htd_filter(Gtk.FileFilter):
         
         #get visible column list
         columns = document.find('columns')
-        cols_list = columns.text
-        data['cols'].extend(cols_list.split(','))
+        for c in columns.findall('col'):
+            data['cols'].append((c.text, bool(c.attrib['visible'])))
+        #cols_list = columns.text
+        #cols_list = cols_list.split(',')
+        #for col in cols_list:
+        #    data['cols'].append((col, True))
+        #data['cols'].extend(cols_list.split(','))
         
         #get window geometry
         geo = document.find('geometry')
@@ -163,7 +168,10 @@ class htd_filter(Gtk.FileFilter):
         
         #store cols list
         columns = SubElement(htd, 'columns')
-        columns.text = ','.join(data['cols'])
+        for col, vis in data['cols']:
+            c = SubElement(columns, 'col')
+            c.set("visible", str(vis))
+            c.text = col
         
         #store window geometry
         geo = SubElement(htd, 'geometry')
