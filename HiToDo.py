@@ -806,7 +806,7 @@ class HiToDo(Gtk.Window):
         
         fname = "Untitled List" if self.file_name == ""  else self.file_name
         
-        dlg = dialogs.htd_warn_discard(self, fname, diff_text)
+        dlg = dialogs.misc.htd_warn_discard(self, fname, diff_text)
         retval = dlg.run()
         dlg.destroy()
         
