@@ -1191,11 +1191,11 @@ class HiToDo(Gtk.Window):
         self.connect("window-state-event", self.track_maximized)
         self.show_all()
         
-        self.open_dlg = dialogs.htd_open(self)
-        self.save_dlg = dialogs.htd_save(self)
-        self.about_dlg = dialogs.htd_about(self)
-        self.prefs_dlg = dialogs.htd_prefs(self)
-        self.docprops_dlg = dialogs.htd_docprops(self)
+        self.open_dlg = dialogs.misc.htd_open(self)
+        self.save_dlg = dialogs.misc.htd_save(self)
+        self.about_dlg = dialogs.misc.htd_about(self)
+        self.prefs_dlg = dialogs.prefs.main(self)
+        self.docprops_dlg = dialogs.docprops.main(self)
         
         if self.open_last_file: self.__open_last()
     
