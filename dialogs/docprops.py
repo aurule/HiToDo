@@ -28,6 +28,7 @@ class main(Gtk.Dialog):
         self.parent = parent
         
         nb = Gtk.Notebook()
+        nb.set_border_width(5)
         
         #Tags tab
         taglbl = Gtk.Label("Tags")
@@ -45,7 +46,7 @@ class main(Gtk.Dialog):
         nb.append_page(stattab, statlbl)
         
         #add the tabbed notebook
-        content.pack_start(nb, True, True, 5)
+        content.pack_start(nb, True, True, 0)
         content.set_size_request(300, 400)
     
     def disappear(self, widget=None):
@@ -124,22 +125,29 @@ class main(Gtk.Dialog):
         tasksframe.set_shadow_type(Gtk.ShadowType.NONE)
         taskstats = Gtk.Grid()
         taskstats.set_column_spacing(20)
+        taskstats.set_border_width(5)
         
-        ret = self.parent.count_tasks()
         tlabel = Gtk.Label("Total")
-        tstat = Gtk.Label(ret[0])
+        self.tstat = Gtk.Label("0")
         taskstats.attach(tlabel, 0, 0, 1, 1)
-        taskstats.attach(tstat, 1, 0, 1, 1)
+        taskstats.attach(self.tstat, 1, 0, 1, 1)
         olabel = Gtk.Label("Done")
-        ostat = Gtk.Label(ret[1])
+        self.ostat = Gtk.Label("0")
         taskstats.attach(olabel, 0, 1, 1, 1)
-        taskstats.attach(ostat, 1, 1, 1, 1)
+        taskstats.attach(self.ostat, 1, 1, 1, 1)
         dlabel = Gtk.Label("Open")
-        dstat = Gtk.Label(ret[2])
+        self.dstat = Gtk.Label("0")
         taskstats.attach(dlabel, 0, 2, 1, 1)
-        taskstats.attach(dstat, 1, 2, 1, 1)
+        taskstats.attach(self.dstat, 1, 2, 1, 1)
         
         tasksframe.add(taskstats)
         main_box.add(tasksframe)
         
         return main_box
+    
+    def show(self):
+        stats = self.parent.make_stats()
+        self.tstat.set_text(stats['total'])
+        self.ostat.set_text(stats['open'])
+        self.dstat.set_text(stats['done'])
+        Gtk.Dialog.show()

@@ -1033,7 +1033,7 @@ class HiToDo(Gtk.Window):
         colstore.swap(target, orig)
         self.make_dirty()
     
-    def count_tasks(self, treeiter = None):
+    def make_stats(self, treeiter = None):
         if treeiter is None:
             treeiter = self.tasklist.get_iter_first()
         
@@ -1044,10 +1044,10 @@ class HiToDo(Gtk.Window):
         while treeiter is not None:
             if self.tasklist.iter_has_children(treeiter):
                 childiter = self.tasklist.iter_children(treeiter)
-                ret = self.count_tasks(childiter)
-                total += ret[0]
-                total_open += ret[1]
-                total_done += ret[2]
+                ret = self.make_stats(childiter)
+                total += ret['total']
+                total_open += ret['open']
+                total_done += ret['done']
             total += 1
             if self.tasklist[treeiter][12]:
                 total_done += 1
@@ -1055,7 +1055,7 @@ class HiToDo(Gtk.Window):
                 total_open += 1
             treeiter = self.tasklist.iter_next(treeiter)
         
-        return [total, total_open, total_done]
+        return {'total': total, 'open': total_open, 'done': total_done}
     
     def __init__(self):
         Gtk.Window.__init__(self)
