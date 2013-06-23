@@ -1033,6 +1033,30 @@ class HiToDo(Gtk.Window):
         colstore.swap(target, orig)
         self.make_dirty()
     
+    def count_tasks(self, treeiter = None):
+        if treeiter is None:
+            treeiter = self.tasklist.get_iter_first()
+        
+        total = 0
+        total_open = 0
+        total_done = 0
+        
+        while treeiter is not None:
+            if self.tasklist.iter_has_children(treeiter):
+                childiter = self.tasklist.iter_children(treeiter)
+                ret = self.count_tasks(childiter)
+                total += ret[0]
+                total_open += ret[1]
+                total_done += ret[2]
+            total += 1
+            if self.tasklist[treeiter][12]:
+                total_done += 1
+            else:
+                total_open += 1
+            treeiter = self.tasklist.iter_next(treeiter)
+        
+        return [total, total_open, total_done]
+    
     def __init__(self):
         Gtk.Window.__init__(self)
         self.set_default_size(1100, 700)

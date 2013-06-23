@@ -45,7 +45,7 @@ class main(Gtk.Dialog):
         nb.append_page(stattab, statlbl)
         
         #add the tabbed notebook
-        content.pack_start(nb, True, True, 0)
+        content.pack_start(nb, True, True, 5)
         content.set_size_request(300, 400)
     
     def disappear(self, widget=None):
@@ -115,4 +115,31 @@ class main(Gtk.Dialog):
     def create_stats_tab(self):
         main_box = Gtk.Box()
         main_box.set_orientation(Gtk.Orientation.VERTICAL)
+        
+        #first up are stats directly related to tasks
+        tasksframe = Gtk.Frame()
+        tasksframe_lbl = Gtk.Label()
+        tasksframe_lbl.set_markup("<b>Tasks</b>")
+        tasksframe.set_label_widget(tasksframe_lbl)
+        tasksframe.set_shadow_type(Gtk.ShadowType.NONE)
+        taskstats = Gtk.Grid()
+        taskstats.set_column_spacing(20)
+        
+        ret = self.parent.count_tasks()
+        tlabel = Gtk.Label("Total")
+        tstat = Gtk.Label(ret[0])
+        taskstats.attach(tlabel, 0, 0, 1, 1)
+        taskstats.attach(tstat, 1, 0, 1, 1)
+        olabel = Gtk.Label("Done")
+        ostat = Gtk.Label(ret[1])
+        taskstats.attach(olabel, 0, 1, 1, 1)
+        taskstats.attach(ostat, 1, 1, 1, 1)
+        dlabel = Gtk.Label("Open")
+        dstat = Gtk.Label(ret[2])
+        taskstats.attach(dlabel, 0, 2, 1, 1)
+        taskstats.attach(dstat, 1, 2, 1, 1)
+        
+        tasksframe.add(taskstats)
+        main_box.add(tasksframe)
+        
         return main_box
