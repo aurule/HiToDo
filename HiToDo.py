@@ -640,7 +640,8 @@ class HiToDo(Gtk.Window):
         self.task_view.collapse_all()
     
     def new_file(self, widget=None):
-        self.confirm_discard()
+        if not self.confirm_discard(): return
+        
         self.tasklist.clear()
         self.file_name = ""
         self.file_dirty = False
