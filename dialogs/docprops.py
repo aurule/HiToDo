@@ -123,8 +123,9 @@ class main(Gtk.Dialog):
         tasksframe_lbl.set_markup("<b>Tasks</b>")
         tasksframe.set_label_widget(tasksframe_lbl)
         tasksframe.set_shadow_type(Gtk.ShadowType.NONE)
+        tasksframe.set_border_width(5)
         taskstats = Gtk.Grid()
-        taskstats.set_column_spacing(20)
+        taskstats.set_column_spacing(30)
         taskstats.set_border_width(5)
         
         tlabel = Gtk.Label("Total")
@@ -145,9 +146,9 @@ class main(Gtk.Dialog):
         
         return main_box
     
-    def show(self):
+    def show_all(self):
         stats = self.parent.make_stats()
-        self.tstat.set_text(stats['total'])
-        self.ostat.set_text(stats['open'])
-        self.dstat.set_text(stats['done'])
-        Gtk.Dialog.show()
+        self.tstat.set_text(str(stats['total']))
+        self.ostat.set_text(str(stats['open']))
+        self.dstat.set_text(str(stats['done']))
+        Gtk.Dialog.show_all(self)

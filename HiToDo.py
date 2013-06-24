@@ -1042,7 +1042,7 @@ class HiToDo(Gtk.Window):
         total_done = 0
         
         while treeiter is not None:
-            if self.tasklist.iter_has_children(treeiter):
+            if self.tasklist.iter_n_children(treeiter):
                 childiter = self.tasklist.iter_children(treeiter)
                 ret = self.make_stats(childiter)
                 total += ret['total']
