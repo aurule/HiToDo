@@ -27,6 +27,7 @@ from urllib import unquote
 from dateutil.parser import parse as dateparse
 from math import floor
 import xml.etree.ElementTree as et
+import operator
 
 import testing
 import dialogs
@@ -1112,13 +1113,16 @@ class HiToDo(Gtk.Window):
             False   #spent tracked
         ]
         
-        self.assignees = Gtk.ListStore(str)
-        self.assignees_list = []
         self.assigners = Gtk.ListStore(str)
+        self.assigners.set_sort_column_id(0, Gtk.SortType.ASCENDING)
         self.assigners_list = []
+        self.assignees = Gtk.ListStore(str)
+        self.assignees.set_sort_column_id(0, Gtk.SortType.ASCENDING)
+        self.assignees_list = []
         self.statii = Gtk.ListStore(str)
+        self.statii.set_sort_column_id(0, Gtk.SortType.ASCENDING)
         self.statii_list = []
-        self.priority_adj = Gtk.Adjustment(5, 0, 26, 1, 5, 5)
+        #self.priority_adj = Gtk.Adjustment(5, 0, 26, 1, 5, 5)
         self.seliter = None
         self.sellist = None
         self.selcount = 0
