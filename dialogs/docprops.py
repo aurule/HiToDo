@@ -56,7 +56,77 @@ class main(Gtk.Dialog):
         main_box = Gtk.Box()
         main_box.set_orientation(Gtk.Orientation.VERTICAL)
         
+        #Assigners
+        from_frame = Gtk.Frame()
+        from_frame_lbl = Gtk.Label()
+        from_frame_lbl.set_markup("<b>Assigners (From)</b>")
+        from_frame.set_label_widget(from_frame_lbl)
+        from_frame.set_shadow_type(Gtk.ShadowType.NONE)
+        from_frame.set_border_width(5)
+        from_align = Gtk.Alignment()
+        from_align.set_property("left-padding", 5)
+        from_box = Gtk.Box()
+        from_box.set_orientation(Gtk.Orientation.HORIZONTAL)
         
+        self.from_list = Gtk.Label()
+        self.from_list.set_property("wrap", True)
+        from_box.pack_start(self.from_list, True, True, 5)
+        from_edit = Gtk.Button(Gtk.STOCK_EDIT)
+        from_edit.set_use_stock(True)
+        from_edit.connect("clicked", self.edit_labels, "assigners")
+        from_box.pack_start(from_edit, False, False, 0)
+        
+        from_align.add(from_box)
+        from_frame.add(from_align)
+        main_box.pack_start(from_frame, False, False, 0)
+        
+        #Assignees
+        to_frame = Gtk.Frame()
+        to_frame_lbl = Gtk.Label()
+        to_frame_lbl.set_markup("<b>Assignees (To)</b>")
+        to_frame.set_label_widget(to_frame_lbl)
+        to_frame.set_shadow_type(Gtk.ShadowType.NONE)
+        to_frame.set_border_width(5)
+        to_align = Gtk.Alignment()
+        to_align.set_property("left-padding", 5)
+        to_box = Gtk.Box()
+        to_box.set_orientation(Gtk.Orientation.HORIZONTAL)
+        
+        self.to_list = Gtk.Label()
+        self.to_list.set_property("wrap", True)
+        to_box.pack_start(self.to_list, True, True, 5)
+        to_edit = Gtk.Button(Gtk.STOCK_EDIT)
+        to_edit.set_use_stock(True)
+        to_edit.connect("clicked", self.edit_labels, "assignees")
+        to_box.pack_start(to_edit, False, False, 0)
+        
+        to_align.add(to_box)
+        to_frame.add(to_align)
+        main_box.pack_start(to_frame, False, False, 0)
+        
+        #Status
+        status_frame = Gtk.Frame()
+        status_frame_lbl = Gtk.Label()
+        status_frame_lbl.set_markup("<b>Status</b>")
+        status_frame.set_label_widget(status_frame_lbl)
+        status_frame.set_shadow_type(Gtk.ShadowType.NONE)
+        status_frame.set_border_width(5)
+        status_align = Gtk.Alignment()
+        status_align.set_property("left-padding", 5)
+        status_box = Gtk.Box()
+        status_box.set_orientation(Gtk.Orientation.HORIZONTAL)
+        
+        self.status_list = Gtk.Label()
+        self.status_list.set_property("wrap", True)
+        status_box.pack_start(self.status_list, True, True, 5)
+        status_edit = Gtk.Button(Gtk.STOCK_EDIT)
+        status_edit.set_use_stock(True)
+        status_edit.connect("clicked", self.edit_labels, "statii")
+        status_box.pack_start(status_edit, False, False, 0)
+        
+        status_align.add(status_box)
+        status_frame.add(status_align)
+        main_box.pack_start(status_frame, False, False, 0)
         
         return main_box
     
@@ -69,7 +139,7 @@ class main(Gtk.Dialog):
         #first a scrolling window to put it in
         col_view_scroller = Gtk.ScrolledWindow()
         col_view_scroller.set_min_content_height(315)
-        col_view_scroller.set_min_content_width(230)
+        col_view_scroller.set_min_content_width(450)
         
         col_view = Gtk.TreeView(self.parent.cols)
         col_sel = col_view.get_selection() #store selection for later
@@ -157,4 +227,15 @@ class main(Gtk.Dialog):
         self.tstat.set_text(str(stats['total']))
         self.ostat.set_text(str(stats['open']))
         self.dstat.set_text(str(stats['done']))
+        self.from_list.set_text(', '.join(sorted(self.parent.assigners_list)))
+        self.to_list.set_text(', '.join(sorted(self.parent.assignees_list)))
+        self.status_list.set_text(', '.join(sorted(self.parent.statii_list)))
         Gtk.Dialog.show_all(self)
+        
+    def edit_labels(self, widget, data):
+        if data == "assigners":
+            pass
+        if data == "assignees":
+            pass
+        if data == "statii":
+            pass
