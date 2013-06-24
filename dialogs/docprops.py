@@ -30,6 +30,11 @@ class main(Gtk.Dialog):
         nb = Gtk.Notebook()
         nb.set_border_width(5)
         
+        #Stats tab
+        statlbl = Gtk.Label("Stats")
+        stattab = self.create_stats_tab()
+        nb.append_page(stattab, statlbl)
+        
         #Tags tab
         taglbl = Gtk.Label("Tags")
         tagtab = self.create_tags_tab()
@@ -39,11 +44,6 @@ class main(Gtk.Dialog):
         collbl = Gtk.Label("Columns")
         coltab = self.create_cols_tab()
         nb.append_page(coltab, collbl)
-        
-        #Stats tab
-        statlbl = Gtk.Label("Stats")
-        stattab = self.create_stats_tab()
-        nb.append_page(stattab, statlbl)
         
         #add the tabbed notebook
         content.pack_start(nb, True, True, 0)
@@ -124,8 +124,10 @@ class main(Gtk.Dialog):
         tasksframe.set_label_widget(tasksframe_lbl)
         tasksframe.set_shadow_type(Gtk.ShadowType.NONE)
         tasksframe.set_border_width(5)
+        taskstats_align = Gtk.Alignment()
+        taskstats_align.set_property("left-padding", 10)
         taskstats = Gtk.Grid()
-        taskstats.set_column_spacing(30)
+        taskstats.set_column_spacing(50)
         taskstats.set_border_width(5)
         
         tlabel = Gtk.Label("Total")
@@ -141,7 +143,8 @@ class main(Gtk.Dialog):
         taskstats.attach(dlabel, 0, 2, 1, 1)
         taskstats.attach(self.dstat, 1, 2, 1, 1)
         
-        tasksframe.add(taskstats)
+        taskstats_align.add(taskstats)
+        tasksframe.add(taskstats_align)
         main_box.add(tasksframe)
         
         return main_box
