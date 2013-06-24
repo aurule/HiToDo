@@ -64,6 +64,11 @@ UI_XML = """
             <menuitem action='sel_none' />
             <menuitem action='sel_inv' />
             <separator />
+            <menu action='LabelMenu'>
+                <menuitem action='edit_assigners' />
+                <menuitem action='edit_assignees' />
+                <menuitem action='edit_statii' />
+            </menu>
             <menuitem action='prefs' />
         </menu>
         <menu action="ViewMenu">
@@ -1059,6 +1064,17 @@ class HiToDo(Gtk.Window):
         
         return {'total': total, 'open': total_open, 'done': total_done}
     
+    def edit_assigners(self, widget, data=None):
+        pass
+    
+    def edit_assignees(self, widget, data=None):
+        pass
+    
+    def edit_statii(self, widget, data=None):
+        self.label_edit_dlg.set_title("Manage Status Labels")
+        self.label_edit_dlg.set_store(self.statii)
+        self.label_edit_dlg.show_all()
+    
     def __init__(self):
         Gtk.Window.__init__(self)
         self.set_default_size(1100, 700)
@@ -1224,6 +1240,7 @@ class HiToDo(Gtk.Window):
         self.about_dlg = dialogs.misc.htd_about(self)
         self.prefs_dlg = dialogs.prefs.main(self)
         self.docprops_dlg = dialogs.docprops.main(self)
+        self.label_edit_dlg = dialogs.labeledit.main(self)
         
         if self.open_last_file: self.__open_last()
     
@@ -1410,11 +1427,15 @@ class HiToDo(Gtk.Window):
             ("help_about", Gtk.STOCK_ABOUT, None, None, None, self.show_about),
             ("prefs", Gtk.STOCK_PREFERENCES, None, None, None, self.set_prefs),
             ("doc_props", Gtk.STOCK_PROPERTIES, None, None, None, self.set_docprops),
+            ("edit_assigners", None, "Assigne_rs (From)", None, "Manage this list's assigners", self.edit_assigners),
+            ("edit_assignees", None, "Assigne_es (To)", None, "Manage this list's assignees", self.edit_assignees),
+            ("edit_statii", None, "_Status", None, "Manage this list's status labels", self.edit_statii),
             ("FileMenu", None, "_File"),
             ("EditMenu", None, "_Edit"),
             ("TaskMenu", None, "_Task"),
             ("ViewMenu", None, "_View"),
-            ("HelpMenu", None, "_Help")
+            ("HelpMenu", None, "_Help"),
+            ("LabelMenu", None, "_Manage Labels")
         ])
         action_group.add_toggle_actions([
             ("show_toolbar", None, "_Toolbar", None, "Show or hide the toolbar", self.toggle_toolbar, True)

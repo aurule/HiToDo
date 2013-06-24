@@ -34,11 +34,12 @@ class main(Gtk.Dialog):
         statlbl = Gtk.Label("Stats")
         stattab = self.create_stats_tab()
         nb.append_page(stattab, statlbl)
+        #content.pack_start(stattab, True, True, 0)
         
         #Tags tab
-        labellbl = Gtk.Label("Labels")
-        labeltab = self.create_label_tab()
-        nb.append_page(labeltab, labellbl)
+        #labellbl = Gtk.Label("Labels")
+        #labeltab = self.create_label_tab()
+        #nb.append_page(labeltab, labellbl)
         
         #Columns tab
         collbl = Gtk.Label("Columns")
@@ -47,7 +48,7 @@ class main(Gtk.Dialog):
         
         #add the tabbed notebook
         content.pack_start(nb, True, True, 0)
-        content.set_size_request(300, 400)
+        #content.set_size_request(300, 200)
     
     def disappear(self, widget=None):
         self.hide()
@@ -139,7 +140,7 @@ class main(Gtk.Dialog):
         #first a scrolling window to put it in
         col_view_scroller = Gtk.ScrolledWindow()
         col_view_scroller.set_min_content_height(315)
-        col_view_scroller.set_min_content_width(450)
+        col_view_scroller.set_min_content_width(230)
         
         col_view = Gtk.TreeView(self.parent.cols)
         col_sel = col_view.get_selection() #store selection for later
@@ -227,9 +228,9 @@ class main(Gtk.Dialog):
         self.tstat.set_text(str(stats['total']))
         self.ostat.set_text(str(stats['open']))
         self.dstat.set_text(str(stats['done']))
-        self.from_list.set_text(', '.join(sorted(self.parent.assigners_list)))
-        self.to_list.set_text(', '.join(sorted(self.parent.assignees_list)))
-        self.status_list.set_text(', '.join(sorted(self.parent.statii_list)))
+        #self.from_list.set_text(', '.join(sorted(self.parent.assigners_list)))
+        #self.to_list.set_text(', '.join(sorted(self.parent.assignees_list)))
+        #self.status_list.set_text(', '.join(sorted(self.parent.statii_list)))
         Gtk.Dialog.show_all(self)
         
     def edit_labels(self, widget, data):
