@@ -1122,7 +1122,6 @@ class HiToDo(Gtk.Window):
         self.statii = Gtk.ListStore(str)
         self.statii.set_sort_column_id(0, Gtk.SortType.ASCENDING)
         self.statii_list = []
-        #self.priority_adj = Gtk.Adjustment(5, 0, 26, 1, 5, 5)
         self.seliter = None
         self.sellist = None
         self.selcount = 0
