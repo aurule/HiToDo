@@ -36,9 +36,9 @@ class main(Gtk.Dialog):
         nb.append_page(stattab, statlbl)
         
         #Tags tab
-        taglbl = Gtk.Label("Tags")
-        tagtab = self.create_tags_tab()
-        nb.append_page(tagtab, taglbl)
+        labellbl = Gtk.Label("Labels")
+        labeltab = self.create_label_tab()
+        nb.append_page(labeltab, labellbl)
         
         #Columns tab
         collbl = Gtk.Label("Columns")
@@ -52,9 +52,12 @@ class main(Gtk.Dialog):
     def disappear(self, widget=None):
         self.hide()
     
-    def create_tags_tab(self):
+    def create_label_tab(self):
         main_box = Gtk.Box()
         main_box.set_orientation(Gtk.Orientation.VERTICAL)
+        
+        
+        
         return main_box
     
     def create_cols_tab(self):
@@ -125,20 +128,20 @@ class main(Gtk.Dialog):
         tasksframe.set_shadow_type(Gtk.ShadowType.NONE)
         tasksframe.set_border_width(5)
         taskstats_align = Gtk.Alignment()
-        taskstats_align.set_property("left-padding", 10)
+        taskstats_align.set_property("left-padding", 5)
         taskstats = Gtk.Grid()
         taskstats.set_column_spacing(50)
-        taskstats.set_border_width(5)
+        taskstats.set_border_width(10)
         
         tlabel = Gtk.Label("Total")
         self.tstat = Gtk.Label("0")
         taskstats.attach(tlabel, 0, 0, 1, 1)
         taskstats.attach(self.tstat, 1, 0, 1, 1)
-        olabel = Gtk.Label("Done")
+        olabel = Gtk.Label("Open")
         self.ostat = Gtk.Label("0")
         taskstats.attach(olabel, 0, 1, 1, 1)
         taskstats.attach(self.ostat, 1, 1, 1, 1)
-        dlabel = Gtk.Label("Open")
+        dlabel = Gtk.Label("Done")
         self.dstat = Gtk.Label("0")
         taskstats.attach(dlabel, 0, 2, 1, 1)
         taskstats.attach(self.dstat, 1, 2, 1, 1)
