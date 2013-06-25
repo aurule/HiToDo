@@ -1065,14 +1065,21 @@ class HiToDo(Gtk.Window):
         return {'total': total, 'open': total_open, 'done': total_done}
     
     def edit_assigners(self, widget, data=None):
-        pass
+        self.label_edit_dlg.set_title("Manage Assigners (From)")
+        self.label_edit_dlg.set_store(self.assigners)
+        self.label_edit_dlg.set_list(self.assigners_list)
+        self.label_edit_dlg.show_all()
     
     def edit_assignees(self, widget, data=None):
-        pass
+        self.label_edit_dlg.set_title("Manage Assignees (To)")
+        self.label_edit_dlg.set_store(self.assignees)
+        self.label_edit_dlg.set_list(self.assignees_list)
+        self.label_edit_dlg.show_all()
     
     def edit_statii(self, widget, data=None):
         self.label_edit_dlg.set_title("Manage Status Labels")
         self.label_edit_dlg.set_store(self.statii)
+        self.label_edit_dlg.set_list(self.statii_list)
         self.label_edit_dlg.show_all()
     
     def __init__(self):
