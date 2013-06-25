@@ -775,6 +775,18 @@ class HiToDo(Gtk.Window):
         }
         rows_to_expand, selme = self.file_filter.read_to_store(data)
         
+        if len(self.cols_visible) <= len(self.cols):
+            codes = []
+            for code, flag in self.cols_visible:
+                codes.append(code)
+            former = 0
+            for col in self.cols:
+                try:
+                    i = codes.index(col[0])
+                except ValueError:
+                    self.cols_visible.insert(former, (col[0], False))
+                former += 1
+        
         #iterate assigners, assignees, and statii to put names into respective liststores
         self.assigners.clear()
         self.assignees.clear()
