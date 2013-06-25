@@ -1087,14 +1087,17 @@ class HiToDo(Gtk.Window):
     def toggle_col_visible(self, widget, path, data=None):
         code = self.cols[path][0]
         visible_now = self.cols[path][2]
-        idex = self.cols_visible.index((code, visible_now))
+        real_idex = self.cols_visible.index((code, visible_now))
+        idex = real_idex
+        for col in self.cols_visible[:real_idex]:
+            if not col[1]: idex -= 1
         
         if visible_now:
             self.task_view.remove_column(self.cols_available[code])
         else:
             self.task_view.insert_column(self.cols_available[code], idex)
         
-        self.cols_visible[idex] = (code, not visible_now)
+        self.cols_visible[real_idex] = (code, not visible_now)
         self.cols[path][2] = not visible_now
         self.make_dirty()
     
