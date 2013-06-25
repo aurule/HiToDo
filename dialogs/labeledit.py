@@ -136,6 +136,7 @@ class main(Gtk.Dialog):
         if write is True:
             self.treestore[path][0] = new_name
             self.label_list.append(new_name)
+            self.parent.make_dirty()
     
     def name_edit_start(self, renderer, editor, path):
         self.name_edit_path = str(path)
