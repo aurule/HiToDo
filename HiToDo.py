@@ -803,10 +803,10 @@ class HiToDo(Gtk.Window):
         
         #set window geometry
         self.task_pane.set_position(data['geometry'][3])
+        self.task_pane.set_property("position-set", True)
         self.set_default_size(data['geometry'][1], data['geometry'][2])
         if data['geometry'][0]:
             self.maximize()
-            #TODO figure out why task_pane's position gets set very strangely in full screen
         else:
             self.unmaximize()
             self.resize(data['geometry'][1], data['geometry'][2])
