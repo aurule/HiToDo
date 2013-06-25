@@ -398,6 +398,20 @@ class HiToDo(Gtk.Window):
         
         self.tasklist[path][8] = dt
     
+    def commit_est_begin(self, widget=None, path=None, new_due=None):
+        if path is None: return
+        
+        if new_due.lower() == "tomorrow":
+            delta = timedelta(days=1)
+            dt = datetime.today() + delta
+        else:
+            try:
+                dt = dateparse(new_due, fuzzy=True)
+            except ValueError:
+                dt = None
+        
+        self.tasklist[path][4] = dt
+    
     def commit_complete(self, widget=None, path=None, new_complete=None):
         if path is None: return
         
@@ -496,6 +510,15 @@ class HiToDo(Gtk.Window):
     
     def due_pick(self, entry, pos, event, data=None):
         #TODO add calendar picker popup
+        pass
+    
+    def est_begin_edit_start(self, renderer, editor, path):
+        self.track_focus(widget = editor)
+        editor.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "appointment-new")
+        editor.connect("icon-press", self.est_begin_pick)
+    
+    def est_begin_pick(self, entry, pos, event, data=None):
+        #TODO add calendar/time picker popup
         pass
     
     def complete_edit_start(self, renderer, editor, path):
@@ -1251,16 +1274,8 @@ class HiToDo(Gtk.Window):
         
         if self.open_last_file: self.__open_last()
     
-    def due_render(self, col, cell, model, tree_iter, data):
-        val = model[tree_iter][8]
-        duetime = model[tree_iter][15]
-        
-        fmt = "%x %X" if duetime else "%x"
-        out = "" if val is None else val.strftime(fmt)
-        cell.set_property("text", str(out))
-    
-    def completed_render(self, col, cell, model, tree_iter, data):
-        val = model[tree_iter][7]
+    def date_render(self, col, cell, model, tree_iter, data):
+        val = model[tree_iter][data]
         duetime = model[tree_iter][15]
         
         fmt = "%x %X" if duetime else "%x"
@@ -1286,13 +1301,8 @@ class HiToDo(Gtk.Window):
         out = '' if val == '' else "[%s]" % val.replace(linesep, ' ')
         cell.set_property("text", out)
     
-    def est_render(self, col, cell, model, tree_iter, data):
-        val = model[tree_iter][2]
-        out = '' if val == 0 else '%1.2fH' % (val/3600)
-        cell.set_property("text", out)
-    
-    def spent_render(self, col, cell, model, tree_iter, data):
-        val = model[tree_iter][3]
+    def duration_render(self, col, cell, model, tree_iter, data):
+        val = model[tree_iter][data]
         out = '' if val == 0 else '%1.2fH' % (val/3600)
         cell.set_property("text", out)
     
@@ -1321,7 +1331,7 @@ class HiToDo(Gtk.Window):
         col_est = Gtk.TreeViewColumn("Est", est, foreground_set=12)
         #col_est.set_reorderable(True)
         col_est.set_sort_column_id(2)
-        col_est.set_cell_data_func(est, self.est_render)
+        col_est.set_cell_data_func(est, self.duration_render, 2)
         col_est.code = "time est"
         self.cols_available['time est'] = col_est
         self.cols.append(['time est', 'Est', True, True])
@@ -1332,7 +1342,7 @@ class HiToDo(Gtk.Window):
         col_spent = Gtk.TreeViewColumn("Spent", spent, foreground_set=12)
         #col_spent.set_reorderable(True)
         col_spent.set_sort_column_id(3)
-        col_spent.set_cell_data_func(spent, self.spent_render)
+        col_spent.set_cell_data_func(spent, self.duration_render, 3)
         col_spent.code = "time spent"
         self.cols_available['time spent'] = col_spent
         self.cols.append(['time spent', 'Spent', True, True])
@@ -1343,6 +1353,21 @@ class HiToDo(Gtk.Window):
         col_tracking.code = "tracked"
         self.cols_available['tracked'] = col_tracking
         self.cols.append(['tracked', u'Tracking (\u231A)', True, True])
+        """
+        est_begin = Gtk.CellRendererText(editable=True, foreground="#999")
+        est_begin.connect("edited", self.commit_est_begin)
+        est_begin.connect("editing-started", self.est_begin_edit_start)
+        col_est_begin = Gtk.TreeViewColumn("Est Begin", est_begin, foreground_set=12)
+        #col_est_begin.set_reorderable(True)
+        col_est_begin.set_sort_column_id(4)
+        col_est_begin.set_cell_data_func(est_begin, self.date_render, 4)
+        col_est_begin.code = "est begin"
+        self.cols_available['est_begin'] = col_est_begin
+        self.cols.append(['est_begin', 'Est Begin', True, True])
+        """
+        #    self.defaults[5],       #est complete
+        #    self.defaults[6],       #act begin TODO if not set explicitly, this can be calculated from the earliest child act begin
+        #    self.defaults[7],       #act complete
         
         due = Gtk.CellRendererText(editable=True, foreground="#999")
         due.connect("edited", self.commit_due)
@@ -1350,7 +1375,7 @@ class HiToDo(Gtk.Window):
         col_due = Gtk.TreeViewColumn("Due", due, foreground_set=12)
         #col_due.set_reorderable(True)
         col_due.set_sort_column_id(8)
-        col_due.set_cell_data_func(due, self.due_render)
+        col_due.set_cell_data_func(due, self.date_render, 8)
         col_due.code = "due date"
         self.cols_available['due date'] = col_due
         self.cols.append(['due date', 'Due', True, True])
@@ -1361,7 +1386,7 @@ class HiToDo(Gtk.Window):
         col_completed = Gtk.TreeViewColumn("Completed", completed, foreground_set=12, visible=12)
         #col_completed.set_reorderable(True)
         col_completed.set_sort_column_id(7)
-        col_completed.set_cell_data_func(completed, self.completed_render)
+        col_completed.set_cell_data_func(completed, self.date_render, 7)
         col_completed.code = "complete date"
         self.cols_available['complete date'] = col_completed
         self.cols.append(['complete date', 'Completed', True, True])
