@@ -31,12 +31,14 @@ class main(Gtk.Dialog):
         nb.set_border_width(5)
         
         #Stats tab
-        statlbl = Gtk.Label("Stats")
+        statlbl = Gtk.Label("_Stats")
+        statlbl.set_use_underline(True)
         stattab = self.create_stats_tab()
         nb.append_page(stattab, statlbl)
         
         #Columns tab
-        collbl = Gtk.Label("Columns")
+        collbl = Gtk.Label("_Columns")
+        collbl.set_use_underline(True)
         coltab = self.create_cols_tab()
         nb.append_page(coltab, collbl)
         
@@ -55,7 +57,7 @@ class main(Gtk.Dialog):
         #first a scrolling window to put it in
         col_view_scroller = Gtk.ScrolledWindow()
         col_view_scroller.set_min_content_height(315)
-        col_view_scroller.set_min_content_width(230)
+        col_view_scroller.set_min_content_width(300)
         
         col_view = Gtk.TreeView(self.parent.cols)
         col_sel = col_view.get_selection() #store selection for later
@@ -97,7 +99,7 @@ class main(Gtk.Dialog):
         #explanation text
         expolbl = Gtk.Label("Choose which columns to show. To change their order, use the up and down buttons.")
         expolbl.set_property("wrap", True)
-        expolbl.set_max_width_chars(20)
+        expolbl.set_max_width_chars(24)
         main_box.pack_start(expolbl, False, False, 0)
         
         return main_box

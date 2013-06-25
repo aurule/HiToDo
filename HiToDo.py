@@ -1103,6 +1103,7 @@ class HiToDo(Gtk.Window):
     
     def move_col(self, widget, sel, offset):
         colstore, orig = sel.get_selected()
+        if orig is None: return
         if offset == "up":
             target = colstore.iter_previous(orig)
         else:
@@ -1536,7 +1537,7 @@ class HiToDo(Gtk.Window):
             ("close", Gtk.STOCK_CLOSE, None, None, None, self.new_file),
             ("quit", Gtk.STOCK_QUIT, None, None, None, self.destroy),
             ("help_about", Gtk.STOCK_ABOUT, None, None, None, self.show_about),
-            ("prefs", Gtk.STOCK_PREFERENCES, None, None, None, self.set_prefs),
+            ("prefs", Gtk.STOCK_PREFERENCES, "Pr_eferences", None, None, self.set_prefs),
             ("doc_props", Gtk.STOCK_PROPERTIES, None, None, None, self.set_docprops),
             ("edit_assigners", None, "Assigne_rs (From)", None, "Manage this list's assigners", self.edit_assigners),
             ("edit_assignees", None, "Assigne_es (To)", None, "Manage this list's assignees", self.edit_assignees),
