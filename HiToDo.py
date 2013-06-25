@@ -412,6 +412,34 @@ class HiToDo(Gtk.Window):
         
         self.tasklist[path][4] = dt
     
+    def commit_act_begin(self, widget=None, path=None, new_due=None):
+        if path is None: return
+        
+        if new_due.lower() == "tomorrow":
+            delta = timedelta(days=1)
+            dt = datetime.today() + delta
+        else:
+            try:
+                dt = dateparse(new_due, fuzzy=True)
+            except ValueError:
+                dt = None
+        
+        self.tasklist[path][6] = dt
+    
+    def commit_est_complete(self, widget=None, path=None, new_due=None):
+        if path is None: return
+        
+        if new_due.lower() == "tomorrow":
+            delta = timedelta(days=1)
+            dt = datetime.today() + delta
+        else:
+            try:
+                dt = dateparse(new_due, fuzzy=True)
+            except ValueError:
+                dt = None
+        
+        self.tasklist[path][5] = dt
+    
     def commit_complete(self, widget=None, path=None, new_complete=None):
         if path is None: return
         
@@ -518,6 +546,24 @@ class HiToDo(Gtk.Window):
         editor.connect("icon-press", self.est_begin_pick)
     
     def est_begin_pick(self, entry, pos, event, data=None):
+        #TODO add calendar/time picker popup
+        pass
+    
+    def act_begin_edit_start(self, renderer, editor, path):
+        self.track_focus(widget = editor)
+        editor.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "appointment-new")
+        editor.connect("icon-press", self.act_begin_pick)
+    
+    def act_begin_pick(self, entry, pos, event, data=None):
+        #TODO add calendar/time picker popup
+        pass
+    
+    def est_complete_edit_start(self, renderer, editor, path):
+        self.track_focus(widget = editor)
+        editor.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "appointment-new")
+        editor.connect("icon-press", self.est_complete_pick)
+    
+    def est_complete_pick(self, entry, pos, event, data=None):
         #TODO add calendar/time picker popup
         pass
     
@@ -1186,7 +1232,7 @@ class HiToDo(Gtk.Window):
         self.focus = None
         self.copied_rows = []
         self.cols_available = {}
-        self.cols_visible = [('priority', True), ('pct complete', True), ('time est', True), ('time spent', True), ('tracked', True), ('due date', True), ('complete date', True), ('from', True), ('to', True), ('status', True), ('done', True), ('title', True)]
+        self.cols_visible = [('priority', True), ('pct complete', True), ('time est', True), ('time spent', True), ('tracked', True), ('est begin', False), ('est complete', False), ('due date', True), ('act begin', False), ('complete date', True), ('from', True), ('to', True), ('status', True), ('done', True), ('title', True)]
         self.cols = Gtk.ListStore(str, str, bool, bool) #code, label for settings screen, visible flag, can hide flag
         self.open_last_file = True
         self.undobuffer = []
@@ -1353,21 +1399,28 @@ class HiToDo(Gtk.Window):
         col_tracking.code = "tracked"
         self.cols_available['tracked'] = col_tracking
         self.cols.append(['tracked', u'Tracking (\u231A)', True, True])
-        """
+        
         est_begin = Gtk.CellRendererText(editable=True, foreground="#999")
         est_begin.connect("edited", self.commit_est_begin)
-        est_begin.connect("editing-started", self.est_begin_edit_start)
+        est_begin.connect("editing-started", self.est_begin_edit_start, 4)
         col_est_begin = Gtk.TreeViewColumn("Est Begin", est_begin, foreground_set=12)
         #col_est_begin.set_reorderable(True)
         col_est_begin.set_sort_column_id(4)
         col_est_begin.set_cell_data_func(est_begin, self.date_render, 4)
         col_est_begin.code = "est begin"
-        self.cols_available['est_begin'] = col_est_begin
-        self.cols.append(['est_begin', 'Est Begin', True, True])
-        """
-        #    self.defaults[5],       #est complete
-        #    self.defaults[6],       #act begin TODO if not set explicitly, this can be calculated from the earliest child act begin
-        #    self.defaults[7],       #act complete
+        self.cols_available['est begin'] = col_est_begin
+        self.cols.append(['est begin', 'Est Begin', False, True])
+        
+        est_complete = Gtk.CellRendererText(editable=True, foreground="#999")
+        est_complete.connect("edited", self.commit_est_complete)
+        est_complete.connect("editing-started", self.est_complete_edit_start)
+        col_est_complete = Gtk.TreeViewColumn("Est Complete", est_complete, foreground_set=12)
+        #col_est_complete.set_reorderable(True)
+        col_est_complete.set_sort_column_id(4)
+        col_est_complete.set_cell_data_func(est_complete, self.date_render, 4)
+        col_est_complete.code = "est begin"
+        self.cols_available['est complete'] = col_est_complete
+        self.cols.append(['est complete', 'Est Complete', False, True])
         
         due = Gtk.CellRendererText(editable=True, foreground="#999")
         due.connect("edited", self.commit_due)
@@ -1379,6 +1432,17 @@ class HiToDo(Gtk.Window):
         col_due.code = "due date"
         self.cols_available['due date'] = col_due
         self.cols.append(['due date', 'Due', True, True])
+        
+        act_begin = Gtk.CellRendererText(editable=True, foreground="#999")
+        act_begin.connect("edited", self.commit_act_begin)
+        act_begin.connect("editing-started", self.act_begin_edit_start, 4)
+        col_act_begin = Gtk.TreeViewColumn("Begin", act_begin, foreground_set=12)
+        #col_act_begin.set_reorderable(True)
+        col_act_begin.set_sort_column_id(4)
+        col_act_begin.set_cell_data_func(act_begin, self.date_render, 4)
+        col_act_begin.code = "act begin"
+        self.cols_available['act begin'] = col_act_begin
+        self.cols.append(['act begin', 'Begin', False, True])
         
         completed = Gtk.CellRendererText(editable=True, foreground="#999")
         completed.connect("edited", self.commit_complete)
