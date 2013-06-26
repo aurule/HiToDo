@@ -648,20 +648,20 @@ class HiToDo(Gtk.Window):
     def select_all(self, widget=None):
         if self.focus == self.task_view:
             self.selection.select_all()
+        
+            #enable controls which can act on a group
+            self.task_cut.set_sensitive(True)
+            self.task_copy.set_sensitive(True)
+            self.task_del.set_sensitive(True)
+            
+            #disable controls which require a single selection
+            self.task_paste.set_sensitive(False)
+            self.task_paste_into.set_sensitive(False)
+            self.notes_view.set_sensitive(False)
         elif self.focus == self.notes_view:
             self.focus.emit('select-all', True)
         elif self.title_editor is not None and self.focus == self.title_editor:
             self.focus.select_region(0, -1)
-        
-        #enable controls which can act on a group
-        self.task_cut.set_sensitive(True)
-        self.task_copy.set_sensitive(True)
-        self.task_del.set_sensitive(True)
-        
-        #disable controls which require a single selection
-        self.task_paste.set_sensitive(False)
-        self.task_paste_into.set_sensitive(False)
-        self.notes_view.set_sensitive(False)
     
     def select_none(self, widget=None):
         if self.focus == self.task_view:
@@ -802,14 +802,13 @@ class HiToDo(Gtk.Window):
         self.display_columns()
         
         #set window geometry
-        self.task_pane.set_position(data['geometry'][3])
-        self.task_pane.set_property("position-set", True)
         self.set_default_size(data['geometry'][1], data['geometry'][2])
         if data['geometry'][0]:
             self.maximize()
         else:
             self.unmaximize()
             self.resize(data['geometry'][1], data['geometry'][2])
+        self.notes_view.set_size_request(data['geometry'][3], -1)
         
         #reconnect model to view
         self.task_view.set_model(self.tasklist)
@@ -837,7 +836,7 @@ class HiToDo(Gtk.Window):
             selpath = ''
         
         width, height = self.get_size()
-        task_width = self.task_pane.get_position()
+        task_width = width - self.task_pane.get_position()
         data = {
             'filename': self.file_name,
             'from_list': sorted(self.assigners_list),
@@ -1301,6 +1300,15 @@ class HiToDo(Gtk.Window):
         self.task_pane.pack1(task_scroll_win, True, True)
         
         #add notes area
+        notes_box = Gtk.Frame()
+        #notes_box.set_orientation(Gtk.Orientation.VERTICAL)
+        notes_box.set_shadow_type(Gtk.ShadowType.NONE)
+        notes_lbl = Gtk.Label()
+        notes_lbl.set_markup("<b>_Comments</b>")
+        notes_lbl.set_property("use-underline", True)
+        notes_box.set_label_widget(notes_lbl)
+        #notes_box.pack_start(notes_lbl, False, False, 3)
+        
         notes_scroll_win = Gtk.ScrolledWindow()
         notes_scroll_win.set_hexpand(True)
         notes_scroll_win.set_vexpand(True)
@@ -1313,7 +1321,12 @@ class HiToDo(Gtk.Window):
         self.notes_view.connect('key-release-event', self.notes_keys_up)
         self.notes_view.set_wrap_mode(Gtk.WrapMode.WORD)
         notes_scroll_win.add(self.notes_view)
-        self.task_pane.pack2(notes_scroll_win, False, False)
+        
+        notes_lbl.set_mnemonic_widget(self.notes_view)
+        
+        #notes_box.pack_start(notes_scroll_win, True, True, 0)
+        notes_box.add(notes_scroll_win)
+        self.task_pane.pack2(notes_box, True, True)
         
         #commit the task editing pane
         main_box.pack_start(self.task_pane, True, True, 0)
