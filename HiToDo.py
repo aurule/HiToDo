@@ -483,6 +483,9 @@ class HiToDo(Gtk.Window):
         if new_status != '' and new_status not in self.statii_list:
             self.statii.append([new_status])
             self.statii_list.append(new_status)
+        old_status = self.tasklist[path][11]
+        self.__push_undoable("status", (path, old_status, new_status))
+        
         self.tasklist[path][11] = new_status
         self.track_focus(widget = self.task_view)
     
@@ -492,6 +495,9 @@ class HiToDo(Gtk.Window):
         if new_assigner != '' and new_assigner not in self.assigners_list:
             self.assigners.append([new_assigner])
             self.assigners_list.append(new_assigner)
+        old_assigner = self.tasklist[path][9]
+        self.__push_undoable("assigner", (path, old_assigner, new_assigner))
+        
         self.tasklist[path][9] = new_assigner
         self.track_focus(widget = self.task_view)
     
@@ -501,6 +507,9 @@ class HiToDo(Gtk.Window):
         if new_assignee != '' and new_assignee not in self.assignees_list:
             self.assignees.append([new_assignee])
             self.assignees_list.append(new_assignee)
+        old_assignee = self.tasklist[path][10]
+        self.__push_undoable("assignee", (path, old_assignee, new_assignee))
+        
         self.tasklist[path][10] = new_assignee
         self.track_focus(widget = self.task_view)
     
@@ -1075,6 +1084,21 @@ class HiToDo(Gtk.Window):
                 oldtext = action[1][1]
                 self.tasklist[path][13] = oldtext
                 self.redobuffer.append(action)
+            elif action[0] == "status":
+                path = action[1][0]
+                oldtext = action[1][1]
+                self.tasklist[path][11] = oldtext
+                self.redobuffer.append(action)
+            elif action[0] == "assigner":
+                path = action[1][0]
+                oldtext = action[1][1]
+                self.tasklist[path][9] = oldtext
+                self.redobuffer.append(action)
+            elif action[0] == "assignee":
+                path = action[1][0]
+                oldtext = action[1][1]
+                self.tasklist[path][10] = oldtext
+                self.redobuffer.append(action)
         
         #Note that we never set the undo or redo action's sensitivities. They
         #must always be sensitive to allow for undo/redo within the notes_view
@@ -1111,6 +1135,21 @@ class HiToDo(Gtk.Window):
                 path = action[1][0]
                 newtext = action[1][2]
                 self.tasklist[path][13] = newtext
+                self.undobuffer.append(action)
+            elif action[0] == "status":
+                path = action[1][0]
+                newtext = action[1][2]
+                self.tasklist[path][11] = newtext
+                self.undobuffer.append(action)
+            elif action[0] == "assigner":
+                path = action[1][0]
+                newtext = action[1][2]
+                self.tasklist[path][9] = newtext
+                self.undobuffer.append(action)
+            elif action[0] == "assignee":
+                path = action[1][0]
+                newtext = action[1][2]
+                self.tasklist[path][10] = newtext
                 self.undobuffer.append(action)
     
     def __push_undoable(self, action, data):
