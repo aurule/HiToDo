@@ -213,6 +213,10 @@ class HiToDo(Gtk.Window):
             parent_est = self.tasklist[parent_path][2]
             pest = (parent_est + out - old_est)/3600
             self.commit_est(path=parent_path, new_est=pest)
+
+        #push undoable only on user click
+        if widget is not None:
+            self.__push_undoable("est", (path, old_est, int(out)))
     
     def commit_est_iter(self, treeiter=None, new_est=0):
         if treeiter is None: return
@@ -236,9 +240,13 @@ class HiToDo(Gtk.Window):
             n_children = self.tasklist.iter_n_children(treeiter)
             child_iter = self.tasklist.iter_children(treeiter)
             while child_iter is not None:
-                total_est += self.tasklist[child_iter][3]
+                total_est += self.tasklist[child_iter][2]
                 child_iter = self.tasklist.iter_next(child_iter)
-        self.tasklist[path][3] = total_est
+        old_est = self.tasklist[path][2]
+        self.tasklist[path][2] = total_est
+        
+        #push undoable
+        self.__push_undoable("est", (path, old_est, total_est))
     
     def commit_spent(self, widget=None, path=None, new_spent=None):
         if path is None or path == "": return
@@ -255,6 +263,10 @@ class HiToDo(Gtk.Window):
             parent_spent = self.tasklist[parent_path][3]
             pspent = (parent_spent + out - old_spent)/3600
             self.commit_spent(path=parent_path, new_spent=pspent)
+
+        #push undoable only on user click
+        if widget is not None:
+            self.__push_undoable("spent", (path, old_spent, int(out)))
     
     def commit_spent_iter(self, treeiter=None, new_spent=0):
         if treeiter is None: return
@@ -280,7 +292,11 @@ class HiToDo(Gtk.Window):
             while child_iter is not None:
                 total_spent += self.tasklist[child_iter][3]
                 child_iter = self.tasklist.iter_next(child_iter)
+        old_spent = self.tasklist[path][3]
         self.tasklist[path][3] = total_spent
+        
+        #push undoable
+        self.__push_undoable("spent", (path, old_spent, total_spent))
     
     def track_spent(self, action=None, data=None):
         on = action.get_active()
@@ -334,6 +350,9 @@ class HiToDo(Gtk.Window):
         
         self.tasklist[path][12] = not done
         self.tasklist[path][16] = done
+        
+        #TODO add undo action
+        #self.__push_undoable("done", (path, done, not done))
         
         #recalculate our parent's pct complete, if we have one
         self.calc_parent_pct(path)
@@ -405,9 +424,13 @@ class HiToDo(Gtk.Window):
     def commit_priority(self, widget=None, path=None, new_priority=None):
         if path is None: return
         
+        old_val = self.tasklist[path][0]
+        
         #priorities have to be integers
         if new_priority.isdigit():
             self.tasklist[path][0] = int(new_priority)
+        
+        self.__push_undoable("change", (path, 0, old_val, int(new_priority)))
     
     def commit_due(self, widget=None, path=None, new_due=None):
         if path is None: return
@@ -1107,6 +1130,16 @@ class HiToDo(Gtk.Window):
                 oldval = params[2]
                 self.tasklist[path][field] = oldval
                 self.redobuffer.append(action)
+            elif action[0] == "spent":
+                path = action[1][0]
+                oldval = action[1][1]
+                self.commit_spent(path=path, new_spent = oldval/3600)
+                self.redobuffer.append(action)
+            elif action[0] == "est":
+                path = action[1][0]
+                oldval = action[1][1]
+                self.commit_est(path=path, new_est = oldval/3600)
+                self.redobuffer.append(action)
         
         #Note that we never set the undo or redo action's sensitivities. They
         #must always be sensitive to allow for undo/redo within the notes_view
@@ -1147,6 +1180,16 @@ class HiToDo(Gtk.Window):
                 field = params[1]
                 newval = params[3]
                 self.tasklist[path][field] = newval
+                self.undobuffer.append(action)
+            elif action[0] == "spent":
+                path = action[1][0]
+                newval = action[1][2]
+                self.commit_spent(path=path, new_spent = newval/3600)
+                self.undobuffer.append(action)
+            elif action[0] == "est":
+                path = action[1][0]
+                newval = action[1][2]
+                self.commit_est(path=path, new_est = newval/3600)
                 self.undobuffer.append(action)
     
     def __push_undoable(self, action, data):
