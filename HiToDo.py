@@ -548,7 +548,9 @@ class HiToDo(Gtk.Window):
                 return
         
         #finally, set the new title if allowed
-        if write is True: self.tasklist[path][13] = new_title
+        if write is True:
+            self.tasklist[path][13] = new_title
+            self.__push_undoable("title", (path, old_title, new_title))
     
     def title_edit_start(self, renderer, editor, path):
         self.title_edit_path = str(path)
@@ -620,7 +622,8 @@ class HiToDo(Gtk.Window):
         
         refs.sort(key=operator.itemgetter(2))
         
-        #TODO push action tuple to self.undobuffer; clear self.redobuffer
+        #push action tuple to undo buffer
+        #TODO The problem here is that we could be deleting multiple tasks, including child tasks both implicitly (by deleting parent) and explicitly (by inclusion in sellist). Gotta work out how that functions.
         
         #now we can remove them without invalidating paths
         for ref, path, pathlen in refs:
@@ -1063,10 +1066,14 @@ class HiToDo(Gtk.Window):
             elif action[0] == "notes":
                 path = action[1][0]
                 oldtext = action[1][1]
-                newtext = action[1][2]
                 self.tasklist[path][14] = oldtext
                 if self.sellist[0] == path:
                     self.notes_buff.set_text(oldtext)
+                self.redobuffer.append(action)
+            elif action[0] == "title":
+                path = action[1][0]
+                oldtext = action[1][1]
+                self.tasklist[path][13] = oldtext
                 self.redobuffer.append(action)
         
         #Note that we never set the undo or redo action's sensitivities. They
@@ -1095,11 +1102,15 @@ class HiToDo(Gtk.Window):
                 self.undobuffer.append((action[0], (newpath, paths[1], paths[2])))
             elif action[0] == "notes":
                 path = action[1][0]
-                oldtext = action[1][1]
                 newtext = action[1][2]
                 self.tasklist[path][14] = newtext
                 if self.sellist[0] == path:
                     self.notes_buff.set_text(newtext)
+                self.undobuffer.append(action)
+            elif action[0] == "title":
+                path = action[1][0]
+                newtext = action[1][2]
+                self.tasklist[path][13] = newtext
                 self.undobuffer.append(action)
     
     def __push_undoable(self, action, data):
