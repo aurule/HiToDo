@@ -31,8 +31,10 @@ Although it isn't completely finished, HiToDo is stable and fairly usable for no
 * Option to open multiple lists at once using multiple windows (launched from within the program)
 * Option to open multiple lists at once via tabs instead of multiple windows
 * Open/Save of networked files
-* Built-in PGP signing and encryption/decryption?
-* Compressed save files?
+* Built-in PGP encryption?
+* Compressed save files? It would open up a lot of possibilities with bundled files.
+    * File signing/integrity checksums
+    * Embedding linked files
 * [todo.txt](http://todotxt.com/) save/open
 * ToDoList save/open
 

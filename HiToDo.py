@@ -105,6 +105,18 @@ UI_XML = """
         <separator />
         <toolitem action='track_spent' />
     </toolbar>
+    <popup name="TaskPopup">
+        <menuitem action="task_new" />
+        <menuitem action="task_newsub" />
+        <menuitem action='task_del' />
+        <separator />
+        <menuitem action='task_cut' />
+        <menuitem action='task_copy' />
+        <menuitem action='task_paste' />
+        <menuitem action='task_paste_into' />
+        <separator />
+        <menuitem action='track_spent' />
+    </popup>
 </ui>
 """
 
@@ -198,7 +210,12 @@ class HiToDo(Gtk.Window):
             parent_est = self.tasklist[parent_path][2]
             pest = (parent_est + out - old_est)/3600
             self.commit_est(path=parent_path, new_est=pest)
-        
+    
+    def commit_est_iter(self, treeiter=None, new_est=0):
+        if treeiter is None: return
+        path = str(self.tasklist.get_path(treeiter))
+        self.commit_est(path=path, new_spent=new_spent)
+    
     def est_edit_start(self, renderer, editor, path):
         val = self.tasklist[path][2]
         self.track_focus(widget = editor)
@@ -235,6 +252,11 @@ class HiToDo(Gtk.Window):
             parent_spent = self.tasklist[parent_path][3]
             pspent = (parent_spent + out - old_spent)/3600
             self.commit_spent(path=parent_path, new_spent=pspent)
+    
+    def commit_spent_iter(self, treeiter=None, new_spent=0):
+        if treeiter is None: return
+        path = str(self.tasklist.get_path(treeiter))
+        self.commit_spent(path=path, new_spent=new_spent)
         
     def spent_edit_start(self, renderer, editor, path):
         val = self.tasklist[path][3]
@@ -584,17 +606,19 @@ class HiToDo(Gtk.Window):
             #stop tracking if needed
             if self.tasklist[path][17]:
                 self.track_action.set_active(False)
-            refs.append((self.tasklist.get_iter(path), path))
+            refs.append((self.tasklist.get_iter(path), path, len(str(path))))
+        
+        refs.sort(key=operator.itemgetter(2))
         
         #TODO push action tuple to self.undobuffer; clear self.redobuffer
         
         #now we can remove them without invalidating paths
-        for ref, path in refs:
-            self.commit_spent(path=str(path), new_spent=0)
-            self.commit_est(path=str(path), new_est=0)
+        for ref, path, pathlen in refs:
+            self.commit_spent_iter(ref, new_spent=0)
+            self.commit_est(ref, new_est=0)
             
-            self.tasklist.remove(ref)
             self.calc_parent_pct(str(path))
+            self.tasklist.remove(ref)
         
         self.seliter = None
     
@@ -1076,6 +1100,16 @@ class HiToDo(Gtk.Window):
         if kvn == "Escape":
             self.commit_title(path=self.title_edit_path, new_title='', write=False)
     
+    def tasks_mouse_click(self, widget=None, event=None):
+        if event.button == 3 and event.type == Gdk.EventType.BUTTON_PRESS:
+            self.task_popup.show_all()
+            self.task_popup.popup(None, None, 
+                lambda menu, data: (
+                    event.get_root_coords()[0],
+                    event.get_root_coords()[1], True),
+                None, event.button, event.time)
+            return True
+    
     def toggle_toolbar(self, widget=None, event=None):
         self.toolbar.set_visible(widget.get_active())
     
@@ -1267,6 +1301,7 @@ class HiToDo(Gtk.Window):
         menubar = uimanager.get_widget("/MenuBar")
         self.toolbar = uimanager.get_widget("/ToolBar")
         self.toolbar.get_style_context().add_class(Gtk.STYLE_CLASS_PRIMARY_TOOLBAR)
+        self.task_popup = uimanager.get_widget("/TaskPopup")
         
         #start with a simple stacked layout
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -1296,6 +1331,7 @@ class HiToDo(Gtk.Window):
         self.task_view.set_properties(enable_tree_lines=True, reorderable=True, enable_search=True, search_column=13, rules_hint=True)
         self.task_view.connect('key-press-event', self.tasks_keys_dn)
         self.task_view.connect('focus-in-event', self.track_focus)
+        self.task_view.connect('button-press-event', self.tasks_mouse_click)
         task_scroll_win.add(self.task_view)
         self.task_pane.pack1(task_scroll_win, True, True)
         
