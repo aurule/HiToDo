@@ -95,17 +95,29 @@ class htd_filter(Gtk.FileFilter):
             tasks.append(int(task.find('pct').text))
             tasks.append(int(task.find('est').text))
             tasks.append(int(task.find('spent').text))
-            tasks.append(None) #est begin
-            tasks.append(None) #est complete
-            tasks.append(None) #act begin
+            est_begin_raw = task.find('est-begin').text
+            if est_begin_raw is None:
+                tasks.append("")
+            else:
+                tasks.append(dateparse(est_begin_raw))
+            est_complete_raw = task.find('est-complete').text
+            if est_complete_raw is None:
+                tasks.append("")
+            else:
+                tasks.append(dateparse(est_complete_raw))
+            act_begin_raw = task.find('act-begin').text
+            if act_begin_raw is None:
+                tasks.append("")
+            else:
+                tasks.append(dateparse(act_begin_raw))
             completed_raw = task.find('completed').text
             if completed_raw is None:
-                tasks.append(None)
+                tasks.append("")
             else:
                 tasks.append(dateparse(completed_raw))
             due_raw = task.find('due').text
             if due_raw is None:
-                tasks.append(None)
+                tasks.append("")
             else:
                 tasks.append(dateparse(due_raw))
             assigner_raw = task.find('assigner').text
@@ -217,9 +229,9 @@ class htd_filter(Gtk.FileFilter):
             fmt = "%Y-%m-%d %H:%M" if duetime else "%Y-%m-%d" #uses ISO 8601 format
             
             #due
-            if self.tasklist[treeiter][8] is not None:
+            if self.tasklist[treeiter][8] is not '':
                 val = self.tasklist[treeiter][8]
-                out = "" if val is None else val.strftime(fmt)
+                out = "" if val is '' else val.strftime(fmt)
                 
                 due = SubElement(task, 'due')
                 due.text = out
@@ -229,15 +241,44 @@ class htd_filter(Gtk.FileFilter):
                 due.set('useTime', str(self.tasklist[treeiter][15]))
             
             #completed
-            if self.tasklist[treeiter][7] is not None:
+            if self.tasklist[treeiter][7] is not '':
                 val = self.tasklist[treeiter][7]
-                out = "" if val is None else val.strftime(fmt)
+                out = "" if val is '' else val.strftime(fmt)
                 
                 e = SubElement(task, 'completed')
                 e.text = out
             else:
                 SubElement(task, 'completed')
             
+            #est begin
+            if self.tasklist[treeiter][4] is not '':
+                val = self.tasklist[treeiter][4]
+                out = "" if val is '' else val.strftime(fmt)
+                
+                e = SubElement(task, 'est-begin')
+                e.text = out
+            else:
+                SubElement(task, 'est-begin')
+            
+            #est complete
+            if self.tasklist[treeiter][5] is not '':
+                val = self.tasklist[treeiter][5]
+                out = "" if val is '' else val.strftime(fmt)
+                
+                e = SubElement(task, 'est-complete')
+                e.text = out
+            else:
+                SubElement(task, 'est-complete')
+            
+            #act begin
+            if self.tasklist[treeiter][6] is not "":
+                val = self.tasklist[treeiter][6]
+                out = "" if val is '' else val.strftime(fmt)
+                
+                e = SubElement(task, 'act-begin')
+                e.text = out
+            else:
+                SubElement(task, 'act-begin')
             e = SubElement(task, 'assigner')
             e.text = unicode(self.tasklist[treeiter][9], 'utf-8')
             e = SubElement(task, 'assignee')

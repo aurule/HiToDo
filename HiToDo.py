@@ -412,19 +412,26 @@ class HiToDo(Gtk.Window):
     def commit_due(self, widget=None, path=None, new_due=None):
         if path is None: return
         
+        old_val = self.tasklist[path][8]
+        
         if new_due.lower() == "tomorrow":
             delta = timedelta(days=1)
             dt = datetime.today() + delta
+        elif new_due == "":
+            dt = ""
         else:
             try:
                 dt = dateparse(new_due, fuzzy=True)
             except ValueError:
-                dt = None
+                dt = ""
         
         self.tasklist[path][8] = dt
+        self.__push_undoable("change", (path, 8, old_val, dt))
     
     def commit_est_begin(self, widget=None, path=None, new_due=None):
         if path is None: return
+        
+        old_val = self.tasklist[path][4]
         
         if new_due.lower() == "tomorrow":
             delta = timedelta(days=1)
@@ -436,9 +443,12 @@ class HiToDo(Gtk.Window):
                 dt = None
         
         self.tasklist[path][4] = dt
+        self.__push_undoable("change", (path, 4, old_val, dt))
     
     def commit_act_begin(self, widget=None, path=None, new_due=None):
         if path is None: return
+        
+        old_val = self.tasklist[path][6]
         
         if new_due.lower() == "tomorrow":
             delta = timedelta(days=1)
@@ -450,9 +460,12 @@ class HiToDo(Gtk.Window):
                 dt = None
         
         self.tasklist[path][6] = dt
+        self.__push_undoable("change", (path, 6, old_val, dt))
     
     def commit_est_complete(self, widget=None, path=None, new_due=None):
         if path is None: return
+        
+        old_val = self.tasklist[path][5]
         
         if new_due.lower() == "tomorrow":
             delta = timedelta(days=1)
@@ -464,9 +477,12 @@ class HiToDo(Gtk.Window):
                 dt = None
         
         self.tasklist[path][5] = dt
+        self.__push_undoable("change", (path, 5, old_val, dt))
     
     def commit_complete(self, widget=None, path=None, new_complete=None):
         if path is None: return
+        
+        old_complete = self.tasklist[path][7]
         
         if new_complete == '':
             self.tasklist[path][7] = None
@@ -476,6 +492,9 @@ class HiToDo(Gtk.Window):
                 self.tasklist[path][7] = dt
             except ValueError:
                 pass
+        
+        new_complete = self.tasklist[path[7]]
+        self.__push_undoable("change", (path, 7, old_complete, new_complete))
     
     def commit_status(self, widget=None, path=None, new_status=None):
         if path is None: return
@@ -484,7 +503,7 @@ class HiToDo(Gtk.Window):
             self.statii.append([new_status])
             self.statii_list.append(new_status)
         old_status = self.tasklist[path][11]
-        self.__push_undoable("status", (path, old_status, new_status))
+        self.__push_undoable("change", (path, 11, old_status, new_status))
         
         self.tasklist[path][11] = new_status
         self.track_focus(widget = self.task_view)
@@ -496,7 +515,7 @@ class HiToDo(Gtk.Window):
             self.assigners.append([new_assigner])
             self.assigners_list.append(new_assigner)
         old_assigner = self.tasklist[path][9]
-        self.__push_undoable("assigner", (path, old_assigner, new_assigner))
+        self.__push_undoable("change", (path, 9, old_assigner, new_assigner))
         
         self.tasklist[path][9] = new_assigner
         self.track_focus(widget = self.task_view)
@@ -508,7 +527,7 @@ class HiToDo(Gtk.Window):
             self.assignees.append([new_assignee])
             self.assignees_list.append(new_assignee)
         old_assignee = self.tasklist[path][10]
-        self.__push_undoable("assignee", (path, old_assignee, new_assignee))
+        self.__push_undoable("change", (path, 10, old_assignee, new_assignee))
         
         self.tasklist[path][10] = new_assignee
         self.track_focus(widget = self.task_view)
@@ -559,7 +578,7 @@ class HiToDo(Gtk.Window):
         #finally, set the new title if allowed
         if write is True:
             self.tasklist[path][13] = new_title
-            self.__push_undoable("title", (path, old_title, new_title))
+            self.__push_undoable("change", (path, 13, old_title, new_title))
     
     def title_edit_start(self, renderer, editor, path):
         self.title_edit_path = str(path)
@@ -1079,25 +1098,14 @@ class HiToDo(Gtk.Window):
                 if self.sellist[0] == path:
                     self.notes_buff.set_text(oldtext)
                 self.redobuffer.append(action)
-            elif action[0] == "title":
-                path = action[1][0]
-                oldtext = action[1][1]
-                self.tasklist[path][13] = oldtext
-                self.redobuffer.append(action)
-            elif action[0] == "status":
-                path = action[1][0]
-                oldtext = action[1][1]
-                self.tasklist[path][11] = oldtext
-                self.redobuffer.append(action)
-            elif action[0] == "assigner":
-                path = action[1][0]
-                oldtext = action[1][1]
-                self.tasklist[path][9] = oldtext
-                self.redobuffer.append(action)
-            elif action[0] == "assignee":
-                path = action[1][0]
-                oldtext = action[1][1]
-                self.tasklist[path][10] = oldtext
+            elif action[0] == "change":
+                # Handler generic field changes. Anything that needs extra
+                # processing should get its own handler.
+                params = action[1]
+                path = params[0]
+                field = params[1]
+                oldval = params[2]
+                self.tasklist[path][field] = oldval
                 self.redobuffer.append(action)
         
         #Note that we never set the undo or redo action's sensitivities. They
@@ -1131,25 +1139,14 @@ class HiToDo(Gtk.Window):
                 if self.sellist[0] == path:
                     self.notes_buff.set_text(newtext)
                 self.undobuffer.append(action)
-            elif action[0] == "title":
-                path = action[1][0]
-                newtext = action[1][2]
-                self.tasklist[path][13] = newtext
-                self.undobuffer.append(action)
-            elif action[0] == "status":
-                path = action[1][0]
-                newtext = action[1][2]
-                self.tasklist[path][11] = newtext
-                self.undobuffer.append(action)
-            elif action[0] == "assigner":
-                path = action[1][0]
-                newtext = action[1][2]
-                self.tasklist[path][9] = newtext
-                self.undobuffer.append(action)
-            elif action[0] == "assignee":
-                path = action[1][0]
-                newtext = action[1][2]
-                self.tasklist[path][10] = newtext
+            elif action[0] == "change":
+                # Handler generic field changes. Anything that needs extra
+                # processing should get its own handler.
+                params = action[1]
+                path = params[0]
+                field = params[1]
+                newval = params[3]
+                self.tasklist[path][field] = newval
                 self.undobuffer.append(action)
     
     def __push_undoable(self, action, data):
@@ -1345,11 +1342,11 @@ class HiToDo(Gtk.Window):
             0,      #pct complete
             0,      #est time taken
             0,      #act time taken
-            None,   #est begin
-            None,   #est complete
-            None,   #act begin
-            None,   #act complete
-            None,   #due
+            "",     #est begin
+            "",     #est complete
+            "",     #act begin
+            "",     #act complete
+            "",     #due
             "",     #from
             "",     #to
             "",     #status
@@ -1497,15 +1494,15 @@ class HiToDo(Gtk.Window):
         duetime = model[tree_iter][15]
         
         fmt = "%x %X" if duetime else "%x"
-        out = "" if val is None else val.strftime(fmt)
+        out = "" if val is "" else val.strftime(fmt)
         cell.set_property("text", str(out))
     
     def datecompare(self, model, row1, row2, data=None):
         sort_column, _ = model.get_sort_column_id()
         value1 = model.get_value(row1, sort_column)
-        if value1 is None: value1 = datetime.min
+        if value1 is "": value1 = datetime.min
         value2 = model.get_value(row2, sort_column)
-        if value2 is None: value2 = datetime.min
+        if value2 is "": value2 = datetime.min
         
         if value1 < value2:
             return -1
