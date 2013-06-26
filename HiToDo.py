@@ -328,10 +328,11 @@ class HiToDo(Gtk.Window):
             self.timer_start = None
             action.set_tooltip("Start tracking time toward current task")
     
-    def commit_done(self, renderer=None, path=None, data=None):
+    def commit_done(self, renderer=None, path=None, new_done=None):
         if path is None: return
         
-        done = renderer.get_active()
+        done = not new_done if new_done is not None else self.tasklist[path][12]
+        
         if not done:
             #we're transitioning from not-done to done
             
@@ -351,8 +352,9 @@ class HiToDo(Gtk.Window):
         self.tasklist[path][12] = not done
         self.tasklist[path][16] = done
         
-        #TODO add undo action
-        #self.__push_undoable("done", (path, done, not done))
+        #add undo action only on user click
+        if renderer is not None:
+            self.__push_undoable("done", (path, done, not done))
         
         #recalculate our parent's pct complete, if we have one
         self.calc_parent_pct(path)
@@ -1140,6 +1142,11 @@ class HiToDo(Gtk.Window):
                 oldval = action[1][1]
                 self.commit_est(path=path, new_est = oldval/3600)
                 self.redobuffer.append(action)
+            elif action[0] == "done":
+                path = action[1][0]
+                oldval = action[1][1]
+                self.commit_done(path=path, new_done = oldval)
+                self.redobuffer.append(action)
         
         #Note that we never set the undo or redo action's sensitivities. They
         #must always be sensitive to allow for undo/redo within the notes_view
@@ -1190,6 +1197,11 @@ class HiToDo(Gtk.Window):
                 path = action[1][0]
                 newval = action[1][2]
                 self.commit_est(path=path, new_est = newval/3600)
+                self.undobuffer.append(action)
+            elif action[0] == "done":
+                path = action[1][0]
+                newval = action[1][1]
+                self.commit_done(path=path, new_done = newval)
                 self.undobuffer.append(action)
     
     def __push_undoable(self, action, data):
