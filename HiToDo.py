@@ -27,6 +27,7 @@ from urllib import unquote
 from dateutil.parser import parse as dateparse
 from math import floor
 import xml.etree.ElementTree as et
+import operator
 
 import testing
 import dialogs
@@ -63,6 +64,11 @@ UI_XML = """
             <menuitem action='sel_none' />
             <menuitem action='sel_inv' />
             <separator />
+            <menu action='LabelMenu'>
+                <menuitem action='edit_assigners' />
+                <menuitem action='edit_assignees' />
+                <menuitem action='edit_statii' />
+            </menu>
             <menuitem action='prefs' />
         </menu>
         <menu action="ViewMenu">
@@ -99,6 +105,18 @@ UI_XML = """
         <separator />
         <toolitem action='track_spent' />
     </toolbar>
+    <popup name="TaskPopup">
+        <menuitem action="task_new" />
+        <menuitem action="task_newsub" />
+        <menuitem action='task_del' />
+        <separator />
+        <menuitem action='task_cut' />
+        <menuitem action='task_copy' />
+        <menuitem action='task_paste' />
+        <menuitem action='task_paste_into' />
+        <separator />
+        <menuitem action='track_spent' />
+    </popup>
 </ui>
 """
 
@@ -192,7 +210,12 @@ class HiToDo(Gtk.Window):
             parent_est = self.tasklist[parent_path][2]
             pest = (parent_est + out - old_est)/3600
             self.commit_est(path=parent_path, new_est=pest)
-        
+    
+    def commit_est_iter(self, treeiter=None, new_est=0):
+        if treeiter is None: return
+        path = str(self.tasklist.get_path(treeiter))
+        self.commit_est(path=path, new_spent=new_spent)
+    
     def est_edit_start(self, renderer, editor, path):
         val = self.tasklist[path][2]
         self.track_focus(widget = editor)
@@ -229,6 +252,11 @@ class HiToDo(Gtk.Window):
             parent_spent = self.tasklist[parent_path][3]
             pspent = (parent_spent + out - old_spent)/3600
             self.commit_spent(path=parent_path, new_spent=pspent)
+    
+    def commit_spent_iter(self, treeiter=None, new_spent=0):
+        if treeiter is None: return
+        path = str(self.tasklist.get_path(treeiter))
+        self.commit_spent(path=path, new_spent=new_spent)
         
     def spent_edit_start(self, renderer, editor, path):
         val = self.tasklist[path][3]
@@ -392,6 +420,48 @@ class HiToDo(Gtk.Window):
         
         self.tasklist[path][8] = dt
     
+    def commit_est_begin(self, widget=None, path=None, new_due=None):
+        if path is None: return
+        
+        if new_due.lower() == "tomorrow":
+            delta = timedelta(days=1)
+            dt = datetime.today() + delta
+        else:
+            try:
+                dt = dateparse(new_due, fuzzy=True)
+            except ValueError:
+                dt = None
+        
+        self.tasklist[path][4] = dt
+    
+    def commit_act_begin(self, widget=None, path=None, new_due=None):
+        if path is None: return
+        
+        if new_due.lower() == "tomorrow":
+            delta = timedelta(days=1)
+            dt = datetime.today() + delta
+        else:
+            try:
+                dt = dateparse(new_due, fuzzy=True)
+            except ValueError:
+                dt = None
+        
+        self.tasklist[path][6] = dt
+    
+    def commit_est_complete(self, widget=None, path=None, new_due=None):
+        if path is None: return
+        
+        if new_due.lower() == "tomorrow":
+            delta = timedelta(days=1)
+            dt = datetime.today() + delta
+        else:
+            try:
+                dt = dateparse(new_due, fuzzy=True)
+            except ValueError:
+                dt = None
+        
+        self.tasklist[path][5] = dt
+    
     def commit_complete(self, widget=None, path=None, new_complete=None):
         if path is None: return
         
@@ -492,6 +562,33 @@ class HiToDo(Gtk.Window):
         #TODO add calendar picker popup
         pass
     
+    def est_begin_edit_start(self, renderer, editor, path):
+        self.track_focus(widget = editor)
+        editor.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "appointment-new")
+        editor.connect("icon-press", self.est_begin_pick)
+    
+    def est_begin_pick(self, entry, pos, event, data=None):
+        #TODO add calendar/time picker popup
+        pass
+    
+    def act_begin_edit_start(self, renderer, editor, path):
+        self.track_focus(widget = editor)
+        editor.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "appointment-new")
+        editor.connect("icon-press", self.act_begin_pick)
+    
+    def act_begin_pick(self, entry, pos, event, data=None):
+        #TODO add calendar/time picker popup
+        pass
+    
+    def est_complete_edit_start(self, renderer, editor, path):
+        self.track_focus(widget = editor)
+        editor.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "appointment-new")
+        editor.connect("icon-press", self.est_complete_pick)
+    
+    def est_complete_pick(self, entry, pos, event, data=None):
+        #TODO add calendar/time picker popup
+        pass
+    
     def complete_edit_start(self, renderer, editor, path):
         self.track_focus(widget = editor)
         editor.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "appointment-new")
@@ -509,17 +606,19 @@ class HiToDo(Gtk.Window):
             #stop tracking if needed
             if self.tasklist[path][17]:
                 self.track_action.set_active(False)
-            refs.append((self.tasklist.get_iter(path), path))
+            refs.append((self.tasklist.get_iter(path), path, len(str(path))))
+        
+        refs.sort(key=operator.itemgetter(2))
         
         #TODO push action tuple to self.undobuffer; clear self.redobuffer
         
         #now we can remove them without invalidating paths
-        for ref, path in refs:
-            self.commit_spent(path=str(path), new_spent=0)
-            self.commit_est(path=str(path), new_est=0)
+        for ref, path, pathlen in refs:
+            self.commit_spent_iter(ref, new_spent=0)
+            self.commit_est(ref, new_est=0)
             
-            self.tasklist.remove(ref)
             self.calc_parent_pct(str(path))
+            self.tasklist.remove(ref)
         
         self.seliter = None
     
@@ -573,20 +672,20 @@ class HiToDo(Gtk.Window):
     def select_all(self, widget=None):
         if self.focus == self.task_view:
             self.selection.select_all()
+        
+            #enable controls which can act on a group
+            self.task_cut.set_sensitive(True)
+            self.task_copy.set_sensitive(True)
+            self.task_del.set_sensitive(True)
+            
+            #disable controls which require a single selection
+            self.task_paste.set_sensitive(False)
+            self.task_paste_into.set_sensitive(False)
+            self.notes_view.set_sensitive(False)
         elif self.focus == self.notes_view:
             self.focus.emit('select-all', True)
         elif self.title_editor is not None and self.focus == self.title_editor:
             self.focus.select_region(0, -1)
-        
-        #enable controls which can act on a group
-        self.task_cut.set_sensitive(True)
-        self.task_copy.set_sensitive(True)
-        self.task_del.set_sensitive(True)
-        
-        #disable controls which require a single selection
-        self.task_paste.set_sensitive(False)
-        self.task_paste_into.set_sensitive(False)
-        self.notes_view.set_sensitive(False)
     
     def select_none(self, widget=None):
         if self.focus == self.task_view:
@@ -640,7 +739,8 @@ class HiToDo(Gtk.Window):
         self.task_view.collapse_all()
     
     def new_file(self, widget=None):
-        self.confirm_discard()
+        if not self.confirm_discard(): return
+        
         self.tasklist.clear()
         self.file_name = ""
         self.file_dirty = False
@@ -669,6 +769,7 @@ class HiToDo(Gtk.Window):
     def __open_last(self):
         retval = self.recent_files.get_uris()
         if retval == []: return
+        if retval[0] == []: return
         uri = retval[0][0]
         fpath = urlparse(uri).path
         self.file_name = unquote(fpath)
@@ -693,11 +794,27 @@ class HiToDo(Gtk.Window):
             'to_list': self.assignees_list,
             'status_list': self.statii_list,
             'task_store': self.tasklist,
-            'cols': self.cols_visible
+            'cols': self.cols_visible,
+            'geometry': ()
         }
         rows_to_expand, selme = self.file_filter.read_to_store(data)
         
+        if len(self.cols_visible) <= len(self.cols):
+            codes = []
+            for code, flag in self.cols_visible:
+                codes.append(code)
+            former = 0
+            for col in self.cols:
+                try:
+                    i = codes.index(col[0])
+                except ValueError:
+                    self.cols_visible.insert(former, (col[0], False))
+                former += 1
+        
         #iterate assigners, assignees, and statii to put names into respective liststores
+        self.assigners.clear()
+        self.assignees.clear()
+        self.statii.clear()
         for n in self.assigners_list:
             self.assigners.append([n])
         for n in self.assignees_list:
@@ -705,7 +822,17 @@ class HiToDo(Gtk.Window):
         for n in self.statii_list:
             self.statii.append([n])
         
+        #show requested columns
         self.display_columns()
+        
+        #set window geometry
+        self.set_default_size(data['geometry'][1], data['geometry'][2])
+        if data['geometry'][0]:
+            self.maximize()
+        else:
+            self.unmaximize()
+            self.resize(data['geometry'][1], data['geometry'][2])
+        self.notes_view.set_size_request(data['geometry'][3], -1)
         
         #reconnect model to view
         self.task_view.set_model(self.tasklist)
@@ -732,10 +859,8 @@ class HiToDo(Gtk.Window):
         else:
             selpath = ''
         
-        del self.cols_visible[:]
-        for col in self.task_view.get_columns():
-            self.cols_visible.append(col.code)
-        
+        width, height = self.get_size()
+        task_width = width - self.task_pane.get_position()
         data = {
             'filename': self.file_name,
             'from_list': sorted(self.assigners_list),
@@ -744,7 +869,8 @@ class HiToDo(Gtk.Window):
             'task_store': self.tasklist,
             'task_view': self.task_view,
             'selection': selpath,
-            'cols': self.cols_visible
+            'cols': self.cols_visible,
+            'geometry': (self.maximized, width, height, task_width)
         }
         self.file_filter.write(data)
         
@@ -791,7 +917,7 @@ class HiToDo(Gtk.Window):
         
         fname = "Untitled List" if self.file_name == ""  else self.file_name
         
-        dlg = dialogs.htd_warn_discard(self, fname, diff_text)
+        dlg = dialogs.misc.htd_warn_discard(self, fname, diff_text)
         retval = dlg.run()
         dlg.destroy()
         
@@ -825,10 +951,10 @@ class HiToDo(Gtk.Window):
         self.about_dlg.hide()
     
     def set_prefs(self, widget=None):
-        self.prefs_dlg.show()
+        self.prefs_dlg.show_all()
     
     def set_docprops(self, widget=None):
-        self.docprops_dlg.show()
+        self.docprops_dlg.show_all()
     
     def do_cut(self, widget=None):
         if self.focus == self.notes_view or (self.title_editor is not None and self.focus == self.title_editor):
@@ -955,9 +1081,15 @@ class HiToDo(Gtk.Window):
     def display_columns(self):
         for col in self.task_view.get_columns():
             self.task_view.remove_column(col)
+        cols_vis = []
         
-        for col in self.cols_visible:
-            self.task_view.append_column(self.cols_available[col])
+        for col, vis in self.cols_visible:
+            if vis:
+                self.task_view.append_column(self.cols_available[col])
+                cols_vis.append(col)
+        
+        for row in self.cols:
+            row[2] = row[0] in cols_vis
         
         self.task_view.set_properties(expander_column=self.col_title)
     
@@ -990,8 +1122,105 @@ class HiToDo(Gtk.Window):
         if kvn == "Escape":
             self.commit_title(path=self.title_edit_path, new_title='', write=False)
     
+    def tasks_mouse_click(self, widget=None, event=None):
+        if event.button == 3 and event.type == Gdk.EventType.BUTTON_PRESS:
+            self.task_popup.show_all()
+            self.task_popup.popup(None, None, 
+                lambda menu, data: (
+                    event.get_root_coords()[0],
+                    event.get_root_coords()[1], True),
+                None, event.button, event.time)
+            return True
+    
     def toggle_toolbar(self, widget=None, event=None):
         self.toolbar.set_visible(widget.get_active())
+    
+    def track_maximized(self, widget, event, data=None):
+        mask = Gdk.WindowState.MAXIMIZED
+        self.maximized = (widget.get_window().get_state() & mask) == mask
+        
+    def toggle_col_visible(self, widget, path, data=None):
+        code = self.cols[path][0]
+        visible_now = self.cols[path][2]
+        real_idex = self.cols_visible.index((code, visible_now))
+        idex = real_idex
+        for col in self.cols_visible[:real_idex]:
+            if not col[1]: idex -= 1
+        
+        if visible_now:
+            self.task_view.remove_column(self.cols_available[code])
+        else:
+            self.task_view.insert_column(self.cols_available[code], idex)
+        
+        self.cols_visible[real_idex] = (code, not visible_now)
+        self.cols[path][2] = not visible_now
+        self.make_dirty()
+    
+    def move_col(self, widget, sel, offset):
+        colstore, orig = sel.get_selected()
+        if orig is None: return
+        if offset == "up":
+            target = colstore.iter_previous(orig)
+        else:
+            target = colstore.iter_next(orig)
+        
+        col1 = (colstore[orig][0], colstore[orig][2])
+        col2 = (colstore[target][0], colstore[target][2])
+        id1 = self.cols_visible.index(col1)
+        id2 = self.cols_visible.index(col2)
+        
+        small = min(id1, id2)
+        big = max(id1, id2)
+        #move small in front of big
+        s = self.cols_available[self.cols_visible[small][0]]
+        b = self.cols_available[self.cols_visible[big][0]]
+        self.task_view.move_column_after(s, b)
+        
+        self.cols_visible[id2], self.cols_visible[id1] = self.cols_visible[id1], self.cols_visible[id2]
+        colstore.swap(target, orig)
+        self.make_dirty()
+    
+    def make_stats(self, treeiter = None):
+        if treeiter is None:
+            treeiter = self.tasklist.get_iter_first()
+        
+        total = 0
+        total_open = 0
+        total_done = 0
+        
+        while treeiter is not None:
+            if self.tasklist.iter_n_children(treeiter):
+                childiter = self.tasklist.iter_children(treeiter)
+                ret = self.make_stats(childiter)
+                total += ret['total']
+                total_open += ret['open']
+                total_done += ret['done']
+            total += 1
+            if self.tasklist[treeiter][12]:
+                total_done += 1
+            else:
+                total_open += 1
+            treeiter = self.tasklist.iter_next(treeiter)
+        
+        return {'total': total, 'open': total_open, 'done': total_done}
+    
+    def edit_assigners(self, widget, data=None):
+        self.label_edit_dlg.set_title("Manage Assigners (From)")
+        self.label_edit_dlg.set_store(self.assigners)
+        self.label_edit_dlg.set_list(self.assigners_list)
+        self.label_edit_dlg.show_all()
+    
+    def edit_assignees(self, widget, data=None):
+        self.label_edit_dlg.set_title("Manage Assignees (To)")
+        self.label_edit_dlg.set_store(self.assignees)
+        self.label_edit_dlg.set_list(self.assignees_list)
+        self.label_edit_dlg.show_all()
+    
+    def edit_statii(self, widget, data=None):
+        self.label_edit_dlg.set_title("Manage Status Labels")
+        self.label_edit_dlg.set_store(self.statii)
+        self.label_edit_dlg.set_list(self.statii_list)
+        self.label_edit_dlg.show_all()
     
     def __init__(self):
         Gtk.Window.__init__(self)
@@ -1047,13 +1276,15 @@ class HiToDo(Gtk.Window):
             False   #spent tracked
         ]
         
-        self.assignees = Gtk.ListStore(str)
-        self.assignees_list = []
         self.assigners = Gtk.ListStore(str)
+        self.assigners.set_sort_column_id(0, Gtk.SortType.ASCENDING)
         self.assigners_list = []
+        self.assignees = Gtk.ListStore(str)
+        self.assignees.set_sort_column_id(0, Gtk.SortType.ASCENDING)
+        self.assignees_list = []
         self.statii = Gtk.ListStore(str)
+        self.statii.set_sort_column_id(0, Gtk.SortType.ASCENDING)
         self.statii_list = []
-        self.priority_adj = Gtk.Adjustment(5, 0, 26, 1, 5, 5)
         self.seliter = None
         self.sellist = None
         self.selcount = 0
@@ -1072,10 +1303,12 @@ class HiToDo(Gtk.Window):
         self.focus = None
         self.copied_rows = []
         self.cols_available = {}
-        self.cols_visible = ['priority', 'pct complete', 'time est', 'time spent', 'tracked', 'due date', 'complete date', 'from', 'to', 'status', 'done', 'title']
+        self.cols_visible = [('priority', True), ('pct complete', True), ('time est', True), ('time spent', True), ('tracked', True), ('est begin', False), ('est complete', False), ('due date', True), ('act begin', False), ('complete date', True), ('from', True), ('to', True), ('status', True), ('done', True), ('title', True)]
+        self.cols = Gtk.ListStore(str, str, bool, bool) #code, label for settings screen, visible flag, can hide flag
         self.open_last_file = True
         self.undobuffer = []
         self.redobuffer = []
+        self.maximized = False
         
         #create action groups
         top_actions = Gtk.ActionGroup("top_actions")
@@ -1090,6 +1323,7 @@ class HiToDo(Gtk.Window):
         menubar = uimanager.get_widget("/MenuBar")
         self.toolbar = uimanager.get_widget("/ToolBar")
         self.toolbar.get_style_context().add_class(Gtk.STYLE_CLASS_PRIMARY_TOOLBAR)
+        self.task_popup = uimanager.get_widget("/TaskPopup")
         
         #start with a simple stacked layout
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -1099,8 +1333,8 @@ class HiToDo(Gtk.Window):
         main_box.pack_start(self.toolbar, False, False, 0)
         
         #now we create a horizontal pane
-        task_pane = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
-        task_pane.set_position(900)
+        self.task_pane = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        self.task_pane.set_position(900)
         
         #add task list area
         task_scroll_win = Gtk.ScrolledWindow()
@@ -1119,10 +1353,20 @@ class HiToDo(Gtk.Window):
         self.task_view.set_properties(enable_tree_lines=True, reorderable=True, enable_search=True, search_column=13, rules_hint=True)
         self.task_view.connect('key-press-event', self.tasks_keys_dn)
         self.task_view.connect('focus-in-event', self.track_focus)
+        self.task_view.connect('button-press-event', self.tasks_mouse_click)
         task_scroll_win.add(self.task_view)
-        task_pane.pack1(task_scroll_win, True, True)
+        self.task_pane.pack1(task_scroll_win, True, True)
         
         #add notes area
+        notes_box = Gtk.Frame()
+        #notes_box.set_orientation(Gtk.Orientation.VERTICAL)
+        notes_box.set_shadow_type(Gtk.ShadowType.NONE)
+        notes_lbl = Gtk.Label()
+        notes_lbl.set_markup("<b>_Comments</b>")
+        notes_lbl.set_property("use-underline", True)
+        notes_box.set_label_widget(notes_lbl)
+        #notes_box.pack_start(notes_lbl, False, False, 3)
+        
         notes_scroll_win = Gtk.ScrolledWindow()
         notes_scroll_win.set_hexpand(True)
         notes_scroll_win.set_vexpand(True)
@@ -1135,10 +1379,15 @@ class HiToDo(Gtk.Window):
         self.notes_view.connect('key-release-event', self.notes_keys_up)
         self.notes_view.set_wrap_mode(Gtk.WrapMode.WORD)
         notes_scroll_win.add(self.notes_view)
-        task_pane.pack2(notes_scroll_win, True, True)
+        
+        notes_lbl.set_mnemonic_widget(self.notes_view)
+        
+        #notes_box.pack_start(notes_scroll_win, True, True, 0)
+        notes_box.add(notes_scroll_win)
+        self.task_pane.pack2(notes_box, True, True)
         
         #commit the task editing pane
-        main_box.pack_start(task_pane, True, True, 0)
+        main_box.pack_start(self.task_pane, True, True, 0)
         
         #commit the ui
         self.add(main_box)
@@ -1146,26 +1395,20 @@ class HiToDo(Gtk.Window):
         # create a clipboard for easy copying
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)       
         self.connect("delete-event", self.destroy)
+        self.connect("window-state-event", self.track_maximized)
         self.show_all()
         
-        self.open_dlg = dialogs.htd_open(self)
-        self.save_dlg = dialogs.htd_save(self)
-        self.about_dlg = dialogs.htd_about(self)
-        self.prefs_dlg = dialogs.htd_prefs(self)
-        self.docprops_dlg = dialogs.htd_docprops(self)
+        self.open_dlg = dialogs.misc.htd_open(self)
+        self.save_dlg = dialogs.misc.htd_save(self)
+        self.about_dlg = dialogs.misc.htd_about(self)
+        self.prefs_dlg = dialogs.prefs.main(self)
+        self.docprops_dlg = dialogs.docprops.main(self)
+        self.label_edit_dlg = dialogs.labeledit.main(self)
         
         if self.open_last_file: self.__open_last()
     
-    def due_render(self, col, cell, model, tree_iter, data):
-        val = model[tree_iter][8]
-        duetime = model[tree_iter][15]
-        
-        fmt = "%x %X" if duetime else "%x"
-        out = "" if val is None else val.strftime(fmt)
-        cell.set_property("text", str(out))
-    
-    def completed_render(self, col, cell, model, tree_iter, data):
-        val = model[tree_iter][7]
+    def date_render(self, col, cell, model, tree_iter, data):
+        val = model[tree_iter][data]
         duetime = model[tree_iter][15]
         
         fmt = "%x %X" if duetime else "%x"
@@ -1191,13 +1434,8 @@ class HiToDo(Gtk.Window):
         out = '' if val == '' else "[%s]" % val.replace(linesep, ' ')
         cell.set_property("text", out)
     
-    def est_render(self, col, cell, model, tree_iter, data):
-        val = model[tree_iter][2]
-        out = '' if val == 0 else '%1.2fH' % (val/3600)
-        cell.set_property("text", out)
-    
-    def spent_render(self, col, cell, model, tree_iter, data):
-        val = model[tree_iter][3]
+    def duration_render(self, col, cell, model, tree_iter, data):
+        val = model[tree_iter][data]
         out = '' if val == 0 else '%1.2fH' % (val/3600)
         cell.set_property("text", out)
     
@@ -1210,6 +1448,7 @@ class HiToDo(Gtk.Window):
         #col_priority.set_reorderable(True)
         col_priority.code = "priority"
         self.cols_available['priority'] = col_priority
+        self.cols.append(['priority', 'Priority (!)', True, True])
         
         pct = Gtk.CellRendererProgress()
         col_pct = Gtk.TreeViewColumn("%", pct, value=1, visible=16)
@@ -1217,6 +1456,7 @@ class HiToDo(Gtk.Window):
         col_pct.set_sort_column_id(1)
         col_pct.code = "pct complete"
         self.cols_available['pct complete'] = col_pct
+        self.cols.append(['pct complete', 'Percent Complete (%)', True, True])
         
         est = Gtk.CellRendererText(foreground="#999", editable=True)
         est.connect("edited", self.commit_est)
@@ -1224,9 +1464,10 @@ class HiToDo(Gtk.Window):
         col_est = Gtk.TreeViewColumn("Est", est, foreground_set=12)
         #col_est.set_reorderable(True)
         col_est.set_sort_column_id(2)
-        col_est.set_cell_data_func(est, self.est_render)
+        col_est.set_cell_data_func(est, self.duration_render, 2)
         col_est.code = "time est"
         self.cols_available['time est'] = col_est
+        self.cols.append(['time est', 'Est', True, True])
         
         spent = Gtk.CellRendererText(foreground="#999", editable=True)
         spent.connect("edited", self.commit_spent)
@@ -1234,15 +1475,39 @@ class HiToDo(Gtk.Window):
         col_spent = Gtk.TreeViewColumn("Spent", spent, foreground_set=12)
         #col_spent.set_reorderable(True)
         col_spent.set_sort_column_id(3)
-        col_spent.set_cell_data_func(spent, self.spent_render)
+        col_spent.set_cell_data_func(spent, self.duration_render, 3)
         col_spent.code = "time spent"
         self.cols_available['time spent'] = col_spent
+        self.cols.append(['time spent', 'Spent', True, True])
         
         tracking = Gtk.CellRendererText(foreground="#b00", text=u"\u231A")
         col_tracking = Gtk.TreeViewColumn(u"\u231A", tracking, visible=17)
         #col_tracking.set_reorderable(True)
         col_tracking.code = "tracked"
         self.cols_available['tracked'] = col_tracking
+        self.cols.append(['tracked', u'Tracking (\u231A)', True, True])
+        
+        est_begin = Gtk.CellRendererText(editable=True, foreground="#999")
+        est_begin.connect("edited", self.commit_est_begin)
+        est_begin.connect("editing-started", self.est_begin_edit_start, 4)
+        col_est_begin = Gtk.TreeViewColumn("Est Begin", est_begin, foreground_set=12)
+        #col_est_begin.set_reorderable(True)
+        col_est_begin.set_sort_column_id(4)
+        col_est_begin.set_cell_data_func(est_begin, self.date_render, 4)
+        col_est_begin.code = "est begin"
+        self.cols_available['est begin'] = col_est_begin
+        self.cols.append(['est begin', 'Est Begin', False, True])
+        
+        est_complete = Gtk.CellRendererText(editable=True, foreground="#999")
+        est_complete.connect("edited", self.commit_est_complete)
+        est_complete.connect("editing-started", self.est_complete_edit_start)
+        col_est_complete = Gtk.TreeViewColumn("Est Complete", est_complete, foreground_set=12)
+        #col_est_complete.set_reorderable(True)
+        col_est_complete.set_sort_column_id(4)
+        col_est_complete.set_cell_data_func(est_complete, self.date_render, 4)
+        col_est_complete.code = "est begin"
+        self.cols_available['est complete'] = col_est_complete
+        self.cols.append(['est complete', 'Est Complete', False, True])
         
         due = Gtk.CellRendererText(editable=True, foreground="#999")
         due.connect("edited", self.commit_due)
@@ -1250,9 +1515,21 @@ class HiToDo(Gtk.Window):
         col_due = Gtk.TreeViewColumn("Due", due, foreground_set=12)
         #col_due.set_reorderable(True)
         col_due.set_sort_column_id(8)
-        col_due.set_cell_data_func(due, self.due_render)
+        col_due.set_cell_data_func(due, self.date_render, 8)
         col_due.code = "due date"
         self.cols_available['due date'] = col_due
+        self.cols.append(['due date', 'Due', True, True])
+        
+        act_begin = Gtk.CellRendererText(editable=True, foreground="#999")
+        act_begin.connect("edited", self.commit_act_begin)
+        act_begin.connect("editing-started", self.act_begin_edit_start, 4)
+        col_act_begin = Gtk.TreeViewColumn("Begin", act_begin, foreground_set=12)
+        #col_act_begin.set_reorderable(True)
+        col_act_begin.set_sort_column_id(4)
+        col_act_begin.set_cell_data_func(act_begin, self.date_render, 4)
+        col_act_begin.code = "act begin"
+        self.cols_available['act begin'] = col_act_begin
+        self.cols.append(['act begin', 'Begin', False, True])
         
         completed = Gtk.CellRendererText(editable=True, foreground="#999")
         completed.connect("edited", self.commit_complete)
@@ -1260,9 +1537,10 @@ class HiToDo(Gtk.Window):
         col_completed = Gtk.TreeViewColumn("Completed", completed, foreground_set=12, visible=12)
         #col_completed.set_reorderable(True)
         col_completed.set_sort_column_id(7)
-        col_completed.set_cell_data_func(completed, self.completed_render)
+        col_completed.set_cell_data_func(completed, self.date_render, 7)
         col_completed.code = "complete date"
         self.cols_available['complete date'] = col_completed
+        self.cols.append(['complete date', 'Completed', True, True])
         
         assigner = Gtk.CellRendererCombo(model=self.assigners, has_entry=True, editable=True, foreground="#999", text_column=0)
         assigner.connect("edited", self.commit_assigner)
@@ -1272,6 +1550,7 @@ class HiToDo(Gtk.Window):
         col_assigner.set_sort_column_id(9)
         col_assigner.code = "from"
         self.cols_available['from'] = col_assigner
+        self.cols.append(['from', 'From', True, True])
         
         assignee = Gtk.CellRendererCombo(model=self.assignees, has_entry=True, editable=True, foreground="#999", text_column=0)
         assignee.connect("edited", self.commit_assignee)
@@ -1281,6 +1560,7 @@ class HiToDo(Gtk.Window):
         col_assignee.set_sort_column_id(10)
         col_assignee.code = "to"
         self.cols_available['to'] = col_assignee
+        self.cols.append(['to', 'To', True, True])
         
         status = Gtk.CellRendererCombo(model=self.statii, has_entry=True, editable=True, foreground="#999", text_column=0)
         status.connect("edited", self.commit_status)
@@ -1290,6 +1570,7 @@ class HiToDo(Gtk.Window):
         col_status.set_sort_column_id(11)
         col_status.code = "status"
         self.cols_available['status'] = col_status
+        self.cols.append(['status', 'Status', True, True])
         
         done = Gtk.CellRendererToggle(activatable=True, radio=False)
         done.connect("toggled", self.commit_done)
@@ -1298,6 +1579,7 @@ class HiToDo(Gtk.Window):
         #col_done.set_reorderable(True)
         col_done.code = "done"
         self.cols_available['done'] = col_done
+        self.cols.append(['done', u'Done (\u2713)', True, False])
         
         self.title_cell = Gtk.CellRendererText(editable=True, ellipsize=Pango.EllipsizeMode.NONE, foreground="#999")
         self.title_cell.connect("edited", self.commit_title)
@@ -1316,6 +1598,7 @@ class HiToDo(Gtk.Window):
         self.col_title.set_sort_column_id(13)
         self.col_title.code = "title"
         self.cols_available['title'] = self.col_title
+        self.cols.append(['title', 'Title', True, False])
     
     def create_top_actions(self, action_group):
         action_group.add_actions([
@@ -1325,13 +1608,17 @@ class HiToDo(Gtk.Window):
             ("close", Gtk.STOCK_CLOSE, None, None, None, self.new_file),
             ("quit", Gtk.STOCK_QUIT, None, None, None, self.destroy),
             ("help_about", Gtk.STOCK_ABOUT, None, None, None, self.show_about),
-            ("prefs", Gtk.STOCK_PREFERENCES, None, None, None, self.set_prefs),
+            ("prefs", Gtk.STOCK_PREFERENCES, "Pr_eferences", None, None, self.set_prefs),
             ("doc_props", Gtk.STOCK_PROPERTIES, None, None, None, self.set_docprops),
+            ("edit_assigners", None, "Assigne_rs (From)", None, "Manage this list's assigners", self.edit_assigners),
+            ("edit_assignees", None, "Assigne_es (To)", None, "Manage this list's assignees", self.edit_assignees),
+            ("edit_statii", None, "_Status", None, "Manage this list's status labels", self.edit_statii),
             ("FileMenu", None, "_File"),
             ("EditMenu", None, "_Edit"),
             ("TaskMenu", None, "_Task"),
             ("ViewMenu", None, "_View"),
-            ("HelpMenu", None, "_Help")
+            ("HelpMenu", None, "_Help"),
+            ("LabelMenu", None, "_Manage Labels")
         ])
         action_group.add_toggle_actions([
             ("show_toolbar", None, "_Toolbar", None, "Show or hide the toolbar", self.toggle_toolbar, True)

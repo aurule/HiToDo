@@ -8,6 +8,8 @@ default from, to, statii
     add/edit/remove
     only applies to new files
 show/hide toolbar
+open new files in same or different window
+use tabs or multiple windows for multiple documents
 
 document properties
 =====
@@ -18,3 +20,7 @@ current file's from, to, statii
 current file's cols
     add/remove/change order
     cannot remove "done" and "title"
+window geometry (save only, no dialog)
+    width
+    height
+    task view width

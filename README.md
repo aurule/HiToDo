@@ -1,8 +1,8 @@
 # HiToDo
 
-HiToDo is a heirarchical task list manager inspired by [ToDoList](http://www.abstractspoon.com/tdl_resources.html). It's designed to reproduce those features which I found most useful and needed in day-to-day use. There's a lot more that ToDoList can do, so check it out if you run windows!
+HiToDo is a heirarchical task list manager inspired by [ToDoList](http://www.abstractspoon.com/tdl_resources.html). It's designed to reproduce those features which I found most useful and needed in day-to-day use. There's a lot more that ToDoList can do, so check it out if you run Windows!
 
-Although it isn't completely finished, HiToDo is stable and usable day-to-day. However, I wouldn't recommend it for production use without a lot of backups (just in case) and the patience to recreate lists if/when the format changes.
+Although it isn't completely finished, HiToDo is stable and fairly usable for non-critical task management. However, I wouldn't recommend it for production use without a lot of backups and the patience to recreate lists as the format changes.
 
 ## Features
 
@@ -12,22 +12,31 @@ Although it isn't completely finished, HiToDo is stable and usable day-to-day. H
 * Arbitrary numeric priority levels
 * Completion percent tracking/display
 * Time estimate field
-* Time taken field with live tracking (push a button and it starts accruing time; push again and it adds that time to the task's spent total)
+* Time taken field with live tracking (click a button and it starts to accrue time; click again and it adds that time to the task's spent total)
 * Due date field
 * Completed date field
 * Assigner and Assignee fields with dropdown lists for convenience
 * Status field with dropdown list for convenience
 * Arbitrary-length plaintext notes for every task
 * Save/Open htdl format files - xml for easy portability
+* Cut, copy, paste, and paste-beneath operations for tasks
+* Cut, copy, and paste for title and notes fields
+* Undo/Redo for notes field
+* Task reordering via drag-and-drop
 
-**Coming Features:**
+**Planned Features:**
 
-* Unlimited per-session undo/redo
-* Task cut, copy, paste, and paste-beneath operations
-* Task reordering via drag-and-drop (may not be possible)
+* Unlimited per-session undo/redo for tasks and title field entry
+* Global preferences stored with GSettings
+* Option to open multiple lists at once using multiple windows (launched from within the program)
+* Option to open multiple lists at once via tabs instead of multiple windows
+* Open/Save of networked files
+* Built-in PGP encryption?
+* Compressed save files? It would open up a lot of possibilities with bundled files.
+    * File signing/integrity checksums
+    * Embedding linked files
 * [todo.txt](http://todotxt.com/) save/open
 * ToDoList save/open
-* Multiple lists at once via tabs
 
 # Requirements
 
