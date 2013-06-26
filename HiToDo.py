@@ -172,7 +172,10 @@ class HiToDo(Gtk.Window):
         self.force_parent_not_done(spath)
         self.calc_parent_pct(spath)
         
-        #TODO push action tuple to self.undobuffer; clear self.redobuffer
+        #push add action to undo list
+        ppath = self.tasklist.get_path(parent_iter)
+        selpath = self.sellist[0] if self.seliter is not None else None
+        self.__push_undoable("add", (spath, ppath, selpath))
         
         #select new row and immediately edit title field
         self.selection.select_iter(new_row_iter)
@@ -511,6 +514,11 @@ class HiToDo(Gtk.Window):
         start = self.notes_buff.get_iter_at_offset(0)
         end = self.notes_buff.get_iter_at_offset(-1)
         text = self.notes_buff.get_text(start, end, False)
+        
+        path = self.tasklist.get_path(self.seliter)
+        oldtext = self.tasklist[self.seliter][14]
+        self.__push_undoable("notes", (path, oldtext, text))
+        
         self.tasklist[self.seliter][14] = text
     
     def commit_title(self, widget=None, path=None, new_title=None, write=True):
@@ -526,6 +534,7 @@ class HiToDo(Gtk.Window):
         if new_title is None:
             if old_title == '':
                 self.del_task(path)
+                self.undobuffer.pop()
             return
         
         #If the new title is blank and the task is new, just delete it.
@@ -533,6 +542,7 @@ class HiToDo(Gtk.Window):
         if new_title == '':
             if old_title == '':
                 self.del_task(path)
+                self.undobuffer.pop()
                 return
             else:
                 return
@@ -606,7 +616,7 @@ class HiToDo(Gtk.Window):
             #stop tracking if needed
             if self.tasklist[path][17]:
                 self.track_action.set_active(False)
-            refs.append((self.tasklist.get_iter(path), path, len(str(path))))
+            refs.append((self.tasklist.get_iter(path), path, str.count(':')))
         
         refs.sort(key=operator.itemgetter(2))
         
@@ -1040,11 +1050,24 @@ class HiToDo(Gtk.Window):
         if self.focus == self.notes_view:
             self.notes_buff.undo()
         elif self.focus == self.task_view:
-            pass
-            #TODO
-            #pop action tuple from self.undobuffer
-            #execute its inverse
-            #push action tuple to self.redobuffer
+            if len(self.undobuffer) == 0: return
+            
+            #get action tuple
+            action = self.undobuffer.pop()
+            #execute action's inverse
+            if action[0] == "add":
+                paths = action[1]
+                data = self.tasklist[paths[0]][:]
+                self.del_task(paths[0])
+                self.redobuffer.append((action[0], (paths, data)))
+            elif action[0] == "notes":
+                path = action[1][0]
+                oldtext = action[1][1]
+                newtext = action[1][2]
+                self.tasklist[path][14] = oldtext
+                if self.sellist[0] == path:
+                    self.notes_buff.set_text(oldtext)
+                self.redobuffer.append(action)
         
         #Note that we never set the undo or redo action's sensitivities. They
         #must always be sensitive to allow for undo/redo within the notes_view
@@ -1054,19 +1077,33 @@ class HiToDo(Gtk.Window):
         if self.focus == self.notes_view:
             self.notes_buff.redo()
         elif self.focus == self.task_view:
-            pass
-            #TODO
-            #pop action tuple from self.redobuffer
-            #execute it
-            #push action tuple to self.undobuffer
-    
-    def push_undoable_change(self, treemodel, path, treeiter, data=None):
-        self.__push_undoable("change", path)
+            if len(self.redobuffer) == 0: return
+            
+            #get action tuple
+            action = self.redobuffer.pop()
+            #execute action
+            if action[0] == "add":
+                paths = action[1][0]
+                row_data = action[1][1]
+                if paths[2] is not None and paths[1] is not paths[2]:
+                    seliter = self.tasklist.get_iter(paths[2])
+                    new_row_iter = self.tasklist.insert_after(None, seliter, row_data)
+                else:
+                    parent_iter = self.tasklist.get_iter(paths[1])
+                    new_row_iter = self.tasklist.append(parent_iter, row_data)
+                newpath = str(self.tasklist.get_path(new_row_iter))
+                self.undobuffer.append((action[0], (newpath, paths[1], paths[2])))
+            elif action[0] == "notes":
+                path = action[1][0]
+                oldtext = action[1][1]
+                newtext = action[1][2]
+                self.tasklist[path][14] = newtext
+                if self.sellist[0] == path:
+                    self.notes_buff.set_text(newtext)
+                self.undobuffer.append(action)
     
     def __push_undoable(self, action, data):
-        if self.tasklist.get_path(self.seliter) == data:
-            print "hi there!"
-        pass
+        self.undobuffer.append((action, data))
         #push tuple to self.undobuffer
         
         #("new", path)
@@ -1075,7 +1112,6 @@ class HiToDo(Gtk.Window):
         #("done", path)
         #("paste", (path of first element, [paste_data]))
         
-        #clear self.redobuffer and disallow activation of Redo button
         del self.redobuffer[:]
     
     def display_columns(self):
@@ -1252,7 +1288,6 @@ class HiToDo(Gtk.Window):
         self.tasklist.set_sort_func(7, self.datecompare, None)
         self.tasklist.set_sort_func(8, self.datecompare, None)
         self.tasklist.connect("row-changed", self.make_dirty)
-        self.tasklist.connect("row-changed", self.push_undoable_change)
         self.tasklist.connect("row-deleted", self.make_dirty)
         
         self.defaults = [
