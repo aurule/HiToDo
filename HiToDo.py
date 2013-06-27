@@ -808,6 +808,11 @@ class HiToDo(Gtk.Window):
         if not self.confirm_discard(): return
         
         self.tasklist.clear()
+        
+        #clear undo and redo buffers
+        del self.undobuffer[:]
+        del self.redobuffer[:]
+        
         self.file_name = ""
         self.file_dirty = False
         self.update_title()
@@ -910,6 +915,10 @@ class HiToDo(Gtk.Window):
             self.selection.select_iter(self.tasklist.get_iter(selme))
         self.task_view.thaw_child_notify()
         self.task_view.grab_focus()
+        
+        #clear undo and redo buffers
+        del self.undobuffer[:]
+        del self.redobuffer[:]
         
         self.last_save = datetime.now()
         self.file_dirty = False
