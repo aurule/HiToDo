@@ -200,6 +200,7 @@ class HiToDo(Gtk.Window):
     
     def commit_est(self, widget=None, path=None, new_est=None):
         if path is None: return
+        if type(path) is str and path == "": return
         
         if not is_number(new_est): return
         old_est = self.tasklist[path][2]
@@ -207,7 +208,7 @@ class HiToDo(Gtk.Window):
         out = floor(new_est * 3600)
         self.tasklist[path][2] = int(out)
     
-        parts = path.rpartition(':')
+        parts = str(path).rpartition(':')
         parent_path = parts[0]
         if parent_path != "":
             parent_est = self.tasklist[parent_path][2]
@@ -221,7 +222,7 @@ class HiToDo(Gtk.Window):
     def commit_est_iter(self, treeiter=None, new_est=0):
         if treeiter is None: return
         path = str(self.tasklist.get_path(treeiter))
-        self.commit_est(path=path, new_spent=new_spent)
+        self.commit_est(path=path, new_est=new_est)
     
     def est_edit_start(self, renderer, editor, path):
         val = self.tasklist[path][2]
@@ -249,7 +250,8 @@ class HiToDo(Gtk.Window):
         self.__push_undoable("est", (path, old_est, total_est))
     
     def commit_spent(self, widget=None, path=None, new_spent=None):
-        if path is None or path == "": return
+        if path is None: return
+        if type(path) is str and path == "": return
         
         if not is_number(new_spent): return
         old_spent = self.tasklist[path][3]
@@ -257,7 +259,7 @@ class HiToDo(Gtk.Window):
         out = floor(new_spent * 3600)
         self.tasklist[path][3] = int(out)
     
-        parts = path.rpartition(':')
+        parts = str(path).rpartition(':')
         parent_path = parts[0]
         if parent_path != "":
             parent_spent = self.tasklist[parent_path][3]
@@ -668,10 +670,11 @@ class HiToDo(Gtk.Window):
         refs = []
         #first we get references to each row
         for path in self.sellist:
+            path = str(path)
             #stop tracking if needed
             if self.tasklist[path][17]:
                 self.track_action.set_active(False)
-            refs.append((self.tasklist.get_iter(path), path, str.count(':')))
+            refs.append((self.tasklist.get_iter(path), path, path.count(':')))
         
         refs.sort(key=operator.itemgetter(2))
         
@@ -693,6 +696,17 @@ class HiToDo(Gtk.Window):
         if self.tasklist[path][17]:
             self.track_action.set_active(False)
         treeiter = self.tasklist.get_iter(path)
+        
+        self.commit_spent(path=path, new_spent=0)
+        self.commit_est(path=path, new_est=0)
+        self.tasklist.remove(treeiter)
+        self.calc_parent_pct(str(path))
+    
+    def del_task_iter(self, treeiter):
+        #stop tracking if needed
+        if self.tasklist[treeiter][17]:
+            self.track_action.set_active(False)
+        path = self.tasklist.get_path(treeiter)
         
         self.commit_spent(path=path, new_spent=0)
         self.commit_est(path=path, new_est=0)
@@ -1045,26 +1059,35 @@ class HiToDo(Gtk.Window):
                 self.__copy_children(treeiter, len(self.copied_rows))
             self.clipboard.set_text("\n".join(row_texts), -1)
             self.del_current_task()
+            #TODO recalculate parent est, spent, and pct
+            
+            if widget is not None:
+                pass
+                #only push a "cut" undo if we were activated by the user (i.e. through a widget)
     
     def do_copy(self, widget=None):
         if self.focus == self.notes_view or (self.title_editor is not None and self.focus == self.title_editor):
             self.focus.emit('copy-clipboard')
         elif self.focus == self.task_view:
             if self.sellist is None: return
-            row_texts = []
-            del self.copied_rows[:]
-            for path in self.sellist:
-                row_texts.append(self.tasklist[path][13])
-                self.copied_rows.append([0] + self.tasklist[path][:])
-                treeiter = self.tasklist.get_iter(path)
-                self.__copy_children(treeiter, len(self.copied_rows))
+            row_texts = self.__do_copy_real(self.sellist, self.copied_rows)
             self.clipboard.set_text("\n".join(row_texts), -1)
     
-    def __copy_children(self, treeiter, parent_index):
+    def __do_copy_real(self, subject, rowlist):
+        row_texts = []
+        del rowlist[:]
+        for path in subject:
+            row_texts.append(self.tasklist[path][13])
+            rowlist.append([0] + self.tasklist[path][:])
+            treeiter = self.tasklist.get_iter(path)
+            self.__copy_children(treeiter, len(rowlist), rowlist)
+        return row_texts
+    
+    def __copy_children(self, treeiter, parent_index, rowlist):
         child_iter = self.tasklist.iter_children(treeiter)
         while child_iter != None:
-            self.copied_rows.append([parent_index] + self.tasklist[child_iter][:])
-            self.__copy_children(child_iter, len(self.copied_rows))
+            rowlist.append([parent_index] + self.tasklist[child_iter][:])
+            self.__copy_children(child_iter, len(rowlist), rowlist)
             child_iter = self.tasklist.iter_next(child_iter)
     
     def do_paste(self, widget=None):
@@ -1084,15 +1107,31 @@ class HiToDo(Gtk.Window):
                 else:
                     parent_iter = None
             
+            new_iters = []
             parents = [parent_iter]
+            last_row = self.seliter
             for row in self.copied_rows:
                 new_row = self.defaults[:]
-                inherit = [0,2,4,5,8,9,10,11,13,14] #columns to preserve from original row
+                inherit = [0,4,5,8,9,10,11,13,14] #columns to preserve from original row
                 for i in inherit:
                     new_row[i] = row[i+1]
-                treeiter = self.tasklist.append(parents[row[0]], new_row)
+
+                parent = parents[row[0]]
+                if parent == parent_iter:
+                    sibling = last_row
+                else:
+                    sibling = None
+                treeiter = self.tasklist.insert_after(parent, sibling, new_row)
+                self.commit_est_iter(treeiter, row[3]/3600)
+                #TODO recalculate parent pct
+                last_row = treeiter
+                
                 parents.append(treeiter)
+                if parents[row[0]] == parent_iter:
+                    new_iters.append(treeiter)
+                
             
+            self.__push_undoable("paste", (parent_iter, new_iters))
             self.make_dirty()
     
     def do_paste_into(self, widget=None):
@@ -1106,6 +1145,7 @@ class HiToDo(Gtk.Window):
             for i in inherit:
                 new_row[i] = row[i+1]
             treeiter = self.tasklist.append(parents[row[0]], new_row)
+            #TODO recalculate parent est, spent, and pct
             self.task_view.expand_to_path(self.tasklist.get_path(treeiter))
             parents.append(treeiter)
         
@@ -1156,6 +1196,11 @@ class HiToDo(Gtk.Window):
                 oldval = action[1][1]
                 self.commit_done(path=path, new_done = oldval)
                 self.redobuffer.append(action)
+            elif action[0] == "paste":
+                row_data = []
+                for treeiter in action[1][1]:
+                    self.tasklist.remove(treeiter)
+                #TODO recalculate parent est, spent, and pct
         
         #Note that we never set the undo or redo action's sensitivities. They
         #must always be sensitive to allow for undo/redo within the notes_view
@@ -1212,6 +1257,8 @@ class HiToDo(Gtk.Window):
                 newval = action[1][1]
                 self.commit_done(path=path, new_done = newval)
                 self.undobuffer.append(action)
+            elif action[0] == "paste":
+                pass
     
     def __push_undoable(self, action, data):
         self.undobuffer.append((action, data))
