@@ -173,7 +173,10 @@ class HiToDo(Gtk.Window):
         self.calc_parent_pct(spath)
         
         #push add action to undo list
-        ppath = self.tasklist.get_path(parent_iter)
+        if parent_iter is not None:
+            ppath = self.tasklist.get_path(parent_iter)
+        else:
+            ppath = None
         selpath = self.sellist[0] if self.seliter is not None else None
         self.__push_undoable("add", (spath, ppath, selpath))
         
@@ -200,6 +203,7 @@ class HiToDo(Gtk.Window):
     
     def commit_est(self, widget=None, path=None, new_est=None):
         if path is None: return
+        if type(path) is str and path == "": return
         
         if not is_number(new_est): return
         old_est = self.tasklist[path][2]
@@ -221,7 +225,7 @@ class HiToDo(Gtk.Window):
     def commit_est_iter(self, treeiter=None, new_est=0):
         if treeiter is None: return
         path = str(self.tasklist.get_path(treeiter))
-        self.commit_est(path=path, new_spent=new_spent)
+        self.commit_est(path=path, new_est=new_est)
     
     def est_edit_start(self, renderer, editor, path):
         val = self.tasklist[path][2]
@@ -249,7 +253,8 @@ class HiToDo(Gtk.Window):
         self.__push_undoable("est", (path, old_est, total_est))
     
     def commit_spent(self, widget=None, path=None, new_spent=None):
-        if path is None or path == "": return
+        if path is None: return
+        if type(path) is str and path == "": return
         
         if not is_number(new_spent): return
         old_spent = self.tasklist[path][3]
@@ -1085,12 +1090,21 @@ class HiToDo(Gtk.Window):
                     parent_iter = None
             
             parents = [parent_iter]
+            last_row = self.seliter
             for row in self.copied_rows:
                 new_row = self.defaults[:]
-                inherit = [0,2,4,5,8,9,10,11,13,14] #columns to preserve from original row
+                inherit = [0,4,5,8,9,10,11,13,14] #columns to preserve from original row
                 for i in inherit:
                     new_row[i] = row[i+1]
-                treeiter = self.tasklist.append(parents[row[0]], new_row)
+                parent = parents[row[0]]
+                if parent == parent_iter:
+                    sibling = last_row
+                else:
+                    sibling = None
+                treeiter = self.tasklist.insert_after(parent, sibling, new_row)
+                if parent == parent_iter: last_row = treeiter
+                self.commit_est_iter(treeiter, row[3]/3600)
+                self.calc_parent_pct(str(self.tasklist.get_path(treeiter)))
                 parents.append(treeiter)
             
             self.make_dirty()
@@ -1106,6 +1120,8 @@ class HiToDo(Gtk.Window):
             for i in inherit:
                 new_row[i] = row[i+1]
             treeiter = self.tasklist.append(parents[row[0]], new_row)
+            self.commit_est_iter(treeiter, row[3]/3600)
+            self.calc_parent_pct(str(self.tasklist.get_path(treeiter)))
             self.task_view.expand_to_path(self.tasklist.get_path(treeiter))
             parents.append(treeiter)
         
@@ -1156,6 +1172,10 @@ class HiToDo(Gtk.Window):
                 oldval = action[1][1]
                 self.commit_done(path=path, new_done = oldval)
                 self.redobuffer.append(action)
+            elif action[0] == "paste":
+                pass
+            elif action[0] == "del":
+                pass
         
         #Note that we never set the undo or redo action's sensitivities. They
         #must always be sensitive to allow for undo/redo within the notes_view
@@ -1177,7 +1197,7 @@ class HiToDo(Gtk.Window):
                     seliter = self.tasklist.get_iter(paths[2])
                     new_row_iter = self.tasklist.insert_after(None, seliter, row_data)
                 else:
-                    parent_iter = self.tasklist.get_iter(paths[1])
+                    parent_iter = self.tasklist.get_iter(paths[1]) if paths[1] is not None else None
                     new_row_iter = self.tasklist.append(parent_iter, row_data)
                 newpath = str(self.tasklist.get_path(new_row_iter))
                 self.undobuffer.append((action[0], (newpath, paths[1], paths[2])))
@@ -1212,6 +1232,10 @@ class HiToDo(Gtk.Window):
                 newval = action[1][1]
                 self.commit_done(path=path, new_done = newval)
                 self.undobuffer.append(action)
+            elif action[0] == "paste":
+                pass
+            elif action[0] == "del":
+                pass
     
     def __push_undoable(self, action, data):
         self.undobuffer.append((action, data))
