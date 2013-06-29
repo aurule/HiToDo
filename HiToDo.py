@@ -680,8 +680,8 @@ class HiToDo(Gtk.Window):
         
         refs.sort(key=operator.itemgetter(2))
         
-        #push action tuple to undo buffer
-        #TODO The problem here is that we could be deleting multiple tasks, including child tasks both implicitly (by deleting parent) and explicitly (by inclusion in sellist). Gotta work out how that functions.
+        #TODO push action tuple to undo buffer
+        #use copy methodology to store row data, but add sibling along with parent reference
         
         #now we can remove them without invalidating paths
         for ref, path, pathlen in refs:
@@ -1107,6 +1107,8 @@ class HiToDo(Gtk.Window):
                 self.calc_parent_pct(str(self.tasklist.get_path(treeiter)))
                 parents.append(treeiter)
             
+            #TODO push "paste" undo entry
+            
             self.make_dirty()
     
     def do_paste_into(self, widget=None):
@@ -1125,7 +1127,8 @@ class HiToDo(Gtk.Window):
             self.task_view.expand_to_path(self.tasklist.get_path(treeiter))
             parents.append(treeiter)
         
-        self.make_dirty()       
+        #TODO push "paste" undo
+        self.make_dirty()
     
     def do_undo(self, widget=None):
         if self.focus == self.notes_view:
