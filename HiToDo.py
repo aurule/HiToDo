@@ -806,7 +806,7 @@ class HiToDo(Gtk.Window):
             #disconnect selection changed handler
             self.selection.disconnect(self.sel_changed_handler)
             #invert recursively
-            self.__invert_tasklist_selection(self.tasklist.get_iter_first())
+            self.__invert_tasklist_selection(self.tasklist_filter.get_iter_first())
             #reconnect selection changed handler
             self.sel_changed_handler = self.selection.connect("changed", self.task_selected)
             self.task_selected(self.selection)
@@ -819,10 +819,10 @@ class HiToDo(Gtk.Window):
             else:
                 self.selection.select_iter(treeiter)
             #probe children
-            if self.tasklist.iter_has_child(treeiter):
-                child_iter = self.tasklist.iter_children(treeiter)
+            if self.tasklist_filter.iter_has_child(treeiter):
+                child_iter = self.tasklist_filter.iter_children(treeiter)
                 self.__invert_tasklist_selection(child_iter)
-            treeiter = self.tasklist.iter_next(treeiter)
+            treeiter = self.tasklist_filter.iter_next(treeiter)
     
     def expand_all(self, widget=None):
         self.task_view.expand_all()
@@ -941,7 +941,9 @@ class HiToDo(Gtk.Window):
             self.task_view.expand_row(path, False)
         if selme != '' and selme is not None:
             try:
-                self.selection.select_iter(self.tasklist.get_iter(selme))
+                treeiter = self.tasklist.get_iter(selme)
+                self.tasklist_filter.convert_child_iter_to_iter(treeiter)
+                self.selection.select_iter(treeiter)
             except ValueError:
                 self.selection.unselect_all()
         self.task_view.thaw_child_notify()
