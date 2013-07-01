@@ -181,6 +181,7 @@ class HiToDo(Gtk.Window):
         self.__push_undoable("add", (spath, ppath, selpath))
         
         #select new row and immediately edit title field
+        self.tasklist_filter.convert_child_iter_to_iter(new_row_iter)
         self.selection.select_iter(new_row_iter)
         if parent_iter is not None:
             self.task_view.expand_to_path(path)
@@ -933,14 +934,14 @@ class HiToDo(Gtk.Window):
         self.notes_view.set_size_request(data['geometry'][3], -1)
         
         #reconnect model to view
-        self.task_view.set_model(self.tasklist_filter)
+        self.task_view.set_model(self.tasklist)
         for pathstr in rows_to_expand:
             treeiter = self.tasklist.get_iter(pathstr)
             path = self.tasklist.get_path(treeiter)
             self.task_view.expand_row(path, False)
         if selme != '' and selme is not None:
             try:
-                self.selection.select_iter(self.tasklist_filter.get_iter(selme))
+                self.selection.select_iter(self.tasklist.get_iter(selme))
             except ValueError:
                 self.selection.unselect_all()
         self.task_view.thaw_child_notify()
@@ -1477,7 +1478,7 @@ class HiToDo(Gtk.Window):
         self.label_edit_dlg.show_all()
     
     def main_filter(self, model, treeiter, data=None):
-        return model[treeiter][0] < 5
+        return True
     
     def __init__(self):
         Gtk.Window.__init__(self)
