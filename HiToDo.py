@@ -681,8 +681,15 @@ class HiToDo(Gtk.Window):
         
         refs.sort(key=operator.itemgetter(2))
         
-        #TODO push action tuple to undo buffer
-        #use copy methodology to store row data, but add sibling along with parent reference
+        #push action tuple to undo buffer
+        row_data = []
+        self.__do_copy_real(self.sellist, row_data)
+        path = self.tasklist.get_path(refs[0][0])
+        path.prev()
+        spath = path.to_string()
+        path.up()
+        ppath = path.to_string()
+        self.__push_undoable("del", (ppath, spath, row_data)),
         
         #now we can remove them without invalidating paths
         for ref, path, pathlen in refs:
@@ -692,7 +699,8 @@ class HiToDo(Gtk.Window):
             self.calc_parent_pct(str(path))
             self.tasklist.remove(ref)
         
-        self.seliter = None
+        self.task_selected(self.selection)
+        #self.seliter = None
     
     def del_task(self, path):
         #stop tracking if needed
@@ -1115,15 +1123,19 @@ class HiToDo(Gtk.Window):
             spath = self.sellist[0] if self.seliter is not None else None
             self.__push_undoable("paste", (ppath, spath, self.copied_rows[:], new_iters))
     
-    def __do_paste_real(self, parent_iter, sibling_iter, row_data):
+    def __do_paste_real(self, parent_iter, sibling_iter, row_data, apply_filter=True):
         new_iters = []
         parents = [parent_iter]
         last_row = sibling_iter
         for row in row_data:
             new_row = self.defaults[:]
-            inherit = [0,4,5,8,9,10,11,13,14] #columns to preserve from original row
-            for i in inherit:
-                new_row[i] = row[i+1]
+            if apply_filter:
+                inherit = [0,4,5,8,9,10,11,13,14] #columns to preserve from original row
+                for i in inherit:
+                    new_row[i] = row[i+1]
+            else:
+                for i in range(len(self.defaults)):
+                    new_row[i] = row[i+1]
             
             parent = parents[row[0]]
             if parent == parent_iter:
@@ -1217,7 +1229,12 @@ class HiToDo(Gtk.Window):
                 
                 self.redobuffer.append(("paste", (data[0], data[1], data[2])))
             elif action[0] == "del":
-                pass
+                data = action[1]
+                parent_iter = self.tasklist.get_iter(data[0]) if data[0] is not None else None
+                sibling_iter = self.tasklist.get_iter(data[1]) if data[1] is not None else None
+                new_iters = self.__do_paste_real(parent_iter, sibling_iter, data[2], False)
+                self.task_selected(self.selection)
+                self.redobuffer.append(("del", (data[0], data[1], data[2], new_iters)))
         
         #Note that we never set the undo or redo action's sensitivities. They
         #must always be sensitive to allow for undo/redo within the notes_view
@@ -1282,7 +1299,21 @@ class HiToDo(Gtk.Window):
                 new_iters = self.__do_paste_real(parent_iter, sibling_iter, data[2])
                 self.undobuffer.append(("paste", (data[0], data[1], data[2], new_iters)))
             elif action[0] == "del":
-                pass
+                data = action[1]
+                for treeiter in data[3]:
+                    #ensure we aren't tracking anything
+                    if self.tasklist[treeiter][17]:
+                        self.track_action.set_active(False)
+                    
+                    self.commit_est_iter(treeiter, 0) #void our est time
+                    self.commit_spent_iter(treeiter, 0) #void our spent time
+                    self.tasklist.remove(treeiter)
+
+                #update parent pct done
+                if data[0] is not None:
+                    self.calc_pct(data[0])
+                
+                self.undobuffer.append(("del", (data[0], data[1], data[2])))
     
     def __push_undoable(self, action, data):
         self.undobuffer.append((action, data))
