@@ -1059,14 +1059,13 @@ class HiToDo(Gtk.Window):
                 row_texts.append(self.tasklist[path][13])
                 self.copied_rows.append([0] + self.tasklist[path][:])
                 treeiter = self.tasklist.get_iter(path)
-                self.__copy_children(treeiter, len(self.copied_rows))
+                self.__copy_children(treeiter, len(self.copied_rows), self.copied_rows)
             self.clipboard.set_text("\n".join(row_texts), -1)
             self.del_current_task()
-            #TODO recalculate parent est, spent, and pct
             
             if widget is not None:
                 pass
-                #only push a "cut" undo if we were activated by the user (i.e. through a widget)
+                #TODO only push a "cut" undo if we were activated by the user (i.e. through a widget)
     
     def do_copy(self, widget=None):
         if self.focus == self.notes_view or (self.title_editor is not None and self.focus == self.title_editor):
@@ -1109,52 +1108,51 @@ class HiToDo(Gtk.Window):
                     parent_iter = self.tasklist.get_iter(parent_path)
                 else:
                     parent_iter = None
+            new_iters = self.__do_paste_real(parent_iter, self.seliter, self.copied_rows)
+        
+            #push "paste" undo entry
+            ppath = parent_path if parent_iter is not None else None
+            spath = self.sellist[0] if self.seliter is not None else None
+            self.__push_undoable("paste", (ppath, spath, self.copied_rows[:], new_iters))
+    
+    def __do_paste_real(self, parent_iter, sibling_iter, row_data):
+        new_iters = []
+        parents = [parent_iter]
+        last_row = sibling_iter
+        for row in row_data:
+            new_row = self.defaults[:]
+            inherit = [0,4,5,8,9,10,11,13,14] #columns to preserve from original row
+            for i in inherit:
+                new_row[i] = row[i+1]
             
-            new_iters = []
-            parents = [parent_iter]
-            last_row = self.seliter
-            for row in self.copied_rows:
-                new_row = self.defaults[:]
-                inherit = [0,4,5,8,9,10,11,13,14] #columns to preserve from original row
-                for i in inherit:
-                    new_row[i] = row[i+1]
-                
-                parent = parents[row[0]]
-                if parent == parent_iter:
-                    sibling = last_row
-                else:
-                    sibling = None
-                treeiter = self.tasklist.insert_after(parent, sibling, new_row)
-                
-                if parent == parent_iter: last_row = treeiter
-                self.commit_est_iter(treeiter, row[3]/3600)
-                self.calc_parent_pct(str(self.tasklist.get_path(treeiter)))
-
-                parents.append(treeiter)
-                if parents[row[0]] == parent_iter:
-                    new_iters.append(treeiter)
+            parent = parents[row[0]]
+            if parent == parent_iter:
+                sibling = last_row
+            else:
+                sibling = None
+            treeiter = self.tasklist.insert_after(parent, sibling, new_row)
             
-            #TODO push "paste" undo entry
-            self.make_dirty()
+            parents.append(treeiter)
+            if parent == parent_iter:
+                new_iters.append(treeiter)
+                last_row = treeiter
+            
+            self.commit_est_iter(treeiter, row[3]/3600)
+            self.calc_parent_pct(str(self.tasklist.get_path(treeiter)))
+        
+        self.make_dirty()
+        return new_iters
     
     def do_paste_into(self, widget=None):
         if self.focus != self.task_view: return
         if self.seliter is None: return
         
-        parents = [self.seliter]
-        for row in self.copied_rows:
-            new_row = self.defaults[:]
-            inherit = [0,2,4,5,8,9,10,11,13,14] #columns to preserve from original row
-            for i in inherit:
-                new_row[i] = row[i+1]
-            treeiter = self.tasklist.append(parents[row[0]], new_row)
-
-            self.commit_est_iter(treeiter, row[3]/3600)
-            self.calc_parent_pct(str(self.tasklist.get_path(treeiter)))
-            self.task_view.expand_to_path(self.tasklist.get_path(treeiter))
-            parents.append(treeiter)
+        new_iters = self.__do_paste_real(self.seliter, None, self.copied_rows)
         
-        #TODO push "paste" undo
+        #push "paste" undo
+        ppath = self.sellist[0]
+        self.__push_undoable("paste", (ppath, None, self.copied_rows[:], new_iters))
+        
         self.make_dirty()
     
     def do_undo(self, widget=None):
@@ -1203,7 +1201,21 @@ class HiToDo(Gtk.Window):
                 self.commit_done(path=path, new_done = oldval)
                 self.redobuffer.append(action)
             elif action[0] == "paste":
-                pass
+                data = action[1]
+                for treeiter in data[3]:
+                    #ensure we aren't tracking anything
+                    if self.tasklist[treeiter][17]:
+                        self.track_action.set_active(False)
+                    
+                    self.commit_est_iter(treeiter, 0) #void our est time
+                    self.commit_spent_iter(treeiter, 0) #void our spent time
+                    self.tasklist.remove(treeiter)
+
+                #update parent pct done
+                if data[0] is not None:
+                    self.calc_pct(data[0])
+                
+                self.redobuffer.append(("paste", (data[0], data[1], data[2])))
             elif action[0] == "del":
                 pass
         
@@ -1263,7 +1275,12 @@ class HiToDo(Gtk.Window):
                 self.commit_done(path=path, new_done = newval)
                 self.undobuffer.append(action)
             elif action[0] == "paste":
-                pass
+                #need: initial parent, initial prev sibling, row data
+                data = action[1]
+                parent_iter = self.tasklist.get_iter(data[0]) if data[0] is not None else None
+                sibling_iter = self.tasklist.get_iter(data[1]) if data[1] is not None else None
+                new_iters = self.__do_paste_real(parent_iter, sibling_iter, data[2])
+                self.undobuffer.append(("paste", (data[0], data[1], data[2], new_iters)))
             elif action[0] == "del":
                 pass
     
