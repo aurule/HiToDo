@@ -881,6 +881,8 @@ class HiToDo(Gtk.Window):
         self.task_view.freeze_child_notify()
         self.task_view.set_model(None)
         self.tasklist.clear()
+        #TODO clear filter
+        #self.tasklist_filter.refilter()
         
         #add rows to self.tasklist
         del self.cols_visible[:]
@@ -931,13 +933,16 @@ class HiToDo(Gtk.Window):
         self.notes_view.set_size_request(data['geometry'][3], -1)
         
         #reconnect model to view
-        self.task_view.set_model(self.tasklist)
+        self.task_view.set_model(self.tasklist_filter)
         for pathstr in rows_to_expand:
             treeiter = self.tasklist.get_iter(pathstr)
             path = self.tasklist.get_path(treeiter)
             self.task_view.expand_row(path, False)
         if selme != '' and selme is not None:
-            self.selection.select_iter(self.tasklist.get_iter(selme))
+            try:
+                self.selection.select_iter(self.tasklist_filter.get_iter(selme))
+            except ValueError:
+                self.selection.unselect_all()
         self.task_view.thaw_child_notify()
         self.task_view.grab_focus()
         
@@ -1471,6 +1476,9 @@ class HiToDo(Gtk.Window):
         self.label_edit_dlg.set_list(self.statii_list)
         self.label_edit_dlg.show_all()
     
+    def main_filter(self, model, treeiter, data=None):
+        return model[treeiter][0] < 5
+    
     def __init__(self):
         Gtk.Window.__init__(self)
         self.set_default_size(1100, 700)
@@ -1502,6 +1510,8 @@ class HiToDo(Gtk.Window):
         self.tasklist.set_sort_func(8, self.datecompare, None)
         self.tasklist.connect("row-changed", self.make_dirty)
         self.tasklist.connect("row-deleted", self.make_dirty)
+        self.tasklist_filter = self.tasklist.filter_new()
+        self.tasklist_filter.set_visible_func(self.main_filter)
         
         self.defaults = [
             5,      #default priority
@@ -1588,7 +1598,7 @@ class HiToDo(Gtk.Window):
         task_scroll_win = Gtk.ScrolledWindow()
         task_scroll_win.set_hexpand(True)
         task_scroll_win.set_vexpand(True)
-        self.task_view = Gtk.TreeView(self.tasklist)
+        self.task_view = Gtk.TreeView(self.tasklist_filter)
         
         #set up columns
         self.create_columns()
