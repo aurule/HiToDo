@@ -23,14 +23,16 @@ Although it isn't completely finished, HiToDo is stable and fairly usable for no
 * Cut, copy, and paste for title and notes fields
 * Undo/Redo for notes field
 * Task reordering via drag-and-drop
+* Unlimited per-session undo/redo for tasks
 
 **Planned Features:**
 
-* Unlimited per-session undo/redo for tasks and title field entry
 * Global preferences stored with GSettings
 * Option to open multiple lists at once using multiple windows (launched from within the program)
 * Option to open multiple lists at once via tabs instead of multiple windows
 * Open/Save of networked files
+* Archive completed tasks
+* Merge and split task lists
 * Built-in PGP encryption?
 * Compressed save files? It would open up a lot of possibilities with bundled files.
     * File signing/integrity checksums
