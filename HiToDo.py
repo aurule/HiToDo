@@ -173,7 +173,10 @@ class HiToDo(Gtk.Window):
         self.calc_parent_pct(spath)
         
         #push add action to undo list
-        ppath = self.tasklist.get_path(parent_iter)
+        if parent_iter is not None:
+            ppath = self.tasklist.get_path(parent_iter)
+        else:
+            ppath = None
         selpath = self.sellist[0] if self.seliter is not None else None
         self.__push_undoable("add", (spath, ppath, selpath))
         
@@ -678,8 +681,8 @@ class HiToDo(Gtk.Window):
         
         refs.sort(key=operator.itemgetter(2))
         
-        #push action tuple to undo buffer
-        #TODO The problem here is that we could be deleting multiple tasks, including child tasks both implicitly (by deleting parent) and explicitly (by inclusion in sellist). Gotta work out how that functions.
+        #TODO push action tuple to undo buffer
+        #use copy methodology to store row data, but add sibling along with parent reference
         
         #now we can remove them without invalidating paths
         for ref, path, pathlen in refs:
@@ -1115,23 +1118,23 @@ class HiToDo(Gtk.Window):
                 inherit = [0,4,5,8,9,10,11,13,14] #columns to preserve from original row
                 for i in inherit:
                     new_row[i] = row[i+1]
-
+                
                 parent = parents[row[0]]
                 if parent == parent_iter:
                     sibling = last_row
                 else:
                     sibling = None
                 treeiter = self.tasklist.insert_after(parent, sibling, new_row)
-                self.commit_est_iter(treeiter, row[3]/3600)
-                #TODO recalculate parent pct
-                last_row = treeiter
                 
+                if parent == parent_iter: last_row = treeiter
+                self.commit_est_iter(treeiter, row[3]/3600)
+                self.calc_parent_pct(str(self.tasklist.get_path(treeiter)))
+
                 parents.append(treeiter)
                 if parents[row[0]] == parent_iter:
                     new_iters.append(treeiter)
-                
             
-            self.__push_undoable("paste", (parent_iter, new_iters))
+            #TODO push "paste" undo entry
             self.make_dirty()
     
     def do_paste_into(self, widget=None):
@@ -1145,11 +1148,14 @@ class HiToDo(Gtk.Window):
             for i in inherit:
                 new_row[i] = row[i+1]
             treeiter = self.tasklist.append(parents[row[0]], new_row)
-            #TODO recalculate parent est, spent, and pct
+
+            self.commit_est_iter(treeiter, row[3]/3600)
+            self.calc_parent_pct(str(self.tasklist.get_path(treeiter)))
             self.task_view.expand_to_path(self.tasklist.get_path(treeiter))
             parents.append(treeiter)
         
-        self.make_dirty()       
+        #TODO push "paste" undo
+        self.make_dirty()
     
     def do_undo(self, widget=None):
         if self.focus == self.notes_view:
@@ -1197,10 +1203,9 @@ class HiToDo(Gtk.Window):
                 self.commit_done(path=path, new_done = oldval)
                 self.redobuffer.append(action)
             elif action[0] == "paste":
-                row_data = []
-                for treeiter in action[1][1]:
-                    self.tasklist.remove(treeiter)
-                #TODO recalculate parent est, spent, and pct
+                pass
+            elif action[0] == "del":
+                pass
         
         #Note that we never set the undo or redo action's sensitivities. They
         #must always be sensitive to allow for undo/redo within the notes_view
@@ -1222,7 +1227,7 @@ class HiToDo(Gtk.Window):
                     seliter = self.tasklist.get_iter(paths[2])
                     new_row_iter = self.tasklist.insert_after(None, seliter, row_data)
                 else:
-                    parent_iter = self.tasklist.get_iter(paths[1])
+                    parent_iter = self.tasklist.get_iter(paths[1]) if paths[1] is not None else None
                     new_row_iter = self.tasklist.append(parent_iter, row_data)
                 newpath = str(self.tasklist.get_path(new_row_iter))
                 self.undobuffer.append((action[0], (newpath, paths[1], paths[2])))
@@ -1258,6 +1263,8 @@ class HiToDo(Gtk.Window):
                 self.commit_done(path=path, new_done = newval)
                 self.undobuffer.append(action)
             elif action[0] == "paste":
+                pass
+            elif action[0] == "del":
                 pass
     
     def __push_undoable(self, action, data):
