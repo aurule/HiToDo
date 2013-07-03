@@ -130,7 +130,7 @@ class HiToDo(Gtk.Window):
     
     def add_task(self, widget=None, parent_iter=None):
         self.commit_all()
-        print self.tasklist[parent_iter][13]
+        
         #we can inherit some things if we're a new child
         if parent_iter is None and self.parent is not None:
             parent_iter = self.parent
