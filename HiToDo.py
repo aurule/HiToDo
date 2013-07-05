@@ -165,7 +165,7 @@ class HiToDo(Gtk.Window):
         if self.seliter is not None and parent_iter is not self.seliter:
             new_row_iter = self.tasklist.insert_after(None, self.seliter, row_data)
         else:
-            new_row_iter = self.tasklist.append(parent_iter, row_data)
+            new_row_iter = self.tasklist.prepend(parent_iter, row_data)
         
         path = self.tasklist.get_path(new_row_iter)
         spath = str(path)
