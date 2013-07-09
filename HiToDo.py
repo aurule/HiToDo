@@ -377,7 +377,8 @@ class HiToDo(Gtk.Window):
             if self.tasklist[treeiter][17]:
                 self.track_action.set_active(False)
             self.tasklist[treeiter][1] = 100
-            self.tasklist[treeiter][7] = datetime.now()
+            if self.tasklist[treeiter][7] == "":
+                self.tasklist[treeiter][7] = datetime.now()
             self.tasklist[treeiter][12] = True
             self.tasklist[treeiter][16] = False
             if self.tasklist.iter_has_child(treeiter):
