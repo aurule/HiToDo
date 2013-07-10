@@ -168,7 +168,7 @@ class HiToDo(Gtk.Window):
             new_row_iter = self.tasklist.prepend(parent_iter, row_data)
         
         path = self.tasklist.get_path(new_row_iter)
-        spath = str(path)
+        spath = path.to_string()
         
         #ensure parent is not Done and recalc its pct complete
         self.force_parent_not_done(spath)
