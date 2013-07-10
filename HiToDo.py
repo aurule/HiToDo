@@ -842,6 +842,10 @@ class HiToDo(Gtk.Window):
         del self.undobuffer[:]
         del self.redobuffer[:]
         
+        #reset to default columns
+        self.cols_visible = self.cols_default
+        self.display_columns()
+        
         self.file_name = ""
         self.file_dirty = False
         self.update_title()
@@ -1240,6 +1244,7 @@ class HiToDo(Gtk.Window):
                 
                 self.redobuffer.append(("paste", (data[0], data[1], data[2])))
             elif action[0] == "del":
+                #TODO clean up task order
                 data = action[1]
                 parent_iter = self.tasklist.get_iter(data[0]) if data[0] is not None else None
                 sibling_iter = self.tasklist.get_iter(data[1]) if data[1] is not None else None
@@ -1303,7 +1308,7 @@ class HiToDo(Gtk.Window):
                 self.commit_done(path=path, new_done = newval)
                 self.undobuffer.append(action)
             elif action[0] == "paste":
-                #need: initial parent, initial prev sibling, row data
+                #TODO clean up task order
                 data = action[1]
                 parent_iter = self.tasklist.get_iter(data[0]) if data[0] is not None else None
                 sibling_iter = self.tasklist.get_iter(data[1]) if data[1] is not None else None
@@ -1486,7 +1491,13 @@ class HiToDo(Gtk.Window):
         return True
     
     def import_settings(self):
-        #TODO need to move col-order to cols_visible
+        #parse column order and visibility
+        col_order = self.settings.get_value("col-order")
+        col_mask = self.settings.get_value("col-visibility")
+        for i in range(len(col_order)):
+            self.cols_visible.append((col_order[i], col_mask[i]))
+            self.cols_default.append((col_order[i], col_mask[i]))
+        
         #TODO add assigners, assignees, statii
         self.open_last_file = self.settings.get_value("reopen")
         #TODO store use_tabs
@@ -1575,7 +1586,8 @@ class HiToDo(Gtk.Window):
         self.focus = None
         self.copied_rows = []
         self.cols_available = {}
-        self.cols_visible = [('priority', True), ('pct complete', True), ('time est', True), ('time spent', True), ('tracked', True), ('est begin', False), ('est complete', False), ('due date', True), ('act begin', False), ('complete date', True), ('from', True), ('to', True), ('status', True), ('done', True), ('title', True)]
+        self.cols_visible = []#[('priority', True), ('pct complete', True), ('time est', True), ('time spent', True), ('tracked', True), ('est begin', False), ('est complete', False), ('due date', True), ('act begin', False), ('complete date', True), ('from', True), ('to', True), ('status', True), ('done', True), ('title', True)]
+        self.cols_default = []
         self.cols = Gtk.ListStore(str, str, bool, bool) #code, label for settings screen, visible flag, can hide flag
         self.open_last_file = True
         self.undobuffer = []
