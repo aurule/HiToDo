@@ -1398,7 +1398,9 @@ class HiToDo(Gtk.Window):
             return True
     
     def toggle_toolbar(self, widget=None, event=None):
-        self.toolbar.set_visible(widget.get_active())
+        self.toolbar_visible = widget.get_active()
+        self.toolbar.set_visible(self.toolbar_visible)
+        self.settings.set_boolean("show-toolbar", self.toolbar_visible)
     
     def track_maximized(self, widget, event, data=None):
         mask = Gdk.WindowState.MAXIMIZED
@@ -1499,10 +1501,21 @@ class HiToDo(Gtk.Window):
             self.cols_default.append((col_order[i], col_mask[i]))
         
         #TODO add assigners, assignees, statii
+        
+        #store open last file
         self.open_last_file = self.settings.get_value("reopen")
+        
         #TODO store use_tabs
-        #TODO store toolbar vis
+        
+        #store toolbar vis
+        self.toolbar_visible = self.settings.get_boolean("show-toolbar")
+        
         #TODO store whether to clobber current file on open
+    
+    def settings_toolbar_vis_changed(self, settings, key, data=None):
+        self.toolbar_visible = settings.get_boolean("show-toolbar")
+        self.toolbar.set_visible(self.toolbar_visible)
+        self.toolbar_action.set_active(self.toolbar_visible)
     
     def __init__(self):
         Gtk.Window.__init__(self)
@@ -1593,7 +1606,9 @@ class HiToDo(Gtk.Window):
         self.undobuffer = []
         self.redobuffer = []
         self.maximized = False
+        self.toolbar_visible = True
         self.settings = Gio.Settings.new("apps.hitodo")
+        self.settings.connect("changed::show-toolbar", self.settings_toolbar_vis_changed)
         
         self.import_settings()
         
@@ -1685,6 +1700,10 @@ class HiToDo(Gtk.Window):
         self.connect("window-state-event", self.track_maximized)
         self.show_all()
         
+        #now we can hide the toolbar
+        self.toolbar.set_visible(self.toolbar_visible)
+        
+        #set up our dialogs
         self.open_dlg = dialogs.misc.htd_open(self)
         self.save_dlg = dialogs.misc.htd_save(self)
         self.about_dlg = dialogs.misc.htd_about(self)
@@ -1907,9 +1926,13 @@ class HiToDo(Gtk.Window):
             ("HelpMenu", None, "_Help"),
             ("LabelMenu", None, "_Manage Labels")
         ])
-        action_group.add_toggle_actions([
-            ("show_toolbar", None, "_Toolbar", None, "Show or hide the toolbar", self.toggle_toolbar, True)
-        ])
+        #action_group.add_toggle_actions([
+        #    ("show_toolbar", None, "_Toolbar", None, "Show or hide the toolbar", self.toggle_toolbar, self.toolbar_visible)
+        #])
+        self.toolbar_action = Gtk.ToggleAction("show_toolbar", "_Toolbar", "Show or hide the toolbar", None)
+        self.toolbar_action.set_active(self.toolbar_visible)
+        self.toolbar_action.connect("activate", self.toggle_toolbar)
+        action_group.add_action(self.toolbar_action)
         
         self.recent_files = Gtk.RecentAction("recents", "_Recent Files", "Open a recently-used file", None)
         self.recent_files.set_properties(icon_name="document-open-recent", local_only=True, sort_type=Gtk.RecentSortType.MRU, show_not_found=False, show_numbers=True)
