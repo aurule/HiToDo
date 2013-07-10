@@ -843,8 +843,23 @@ class HiToDo(Gtk.Window):
         del self.redobuffer[:]
         
         #reset to default columns
-        self.cols_visible = self.cols_default
+        self.cols_visible = self.cols_default[:]
         self.display_columns()
+        
+        #reset to default assigners, assignees, and statii
+        self.assigners_list = self.assigners_default[:]
+        self.assignees_list = self.assignees_default[:]
+        self.statii_list = self.statii_default[:]
+        
+        self.assigners.clear()
+        self.assignees.clear()
+        self.statii.clear()
+        for n in self.assigners_list:
+            self.assigners.append([n])
+        for n in self.assignees_list:
+            self.assignees.append([n])
+        for n in self.statii_list:
+            self.statii.append([n])
         
         self.file_name = ""
         self.file_dirty = False
@@ -1500,7 +1515,10 @@ class HiToDo(Gtk.Window):
             self.cols_visible.append((col_order[i], col_mask[i]))
             self.cols_default.append((col_order[i], col_mask[i]))
         
-        #TODO add assigners, assignees, statii
+        #add assigners, assignees, statii
+        self.assigners_default = list(self.settings.get_value("default-assigners"))
+        self.assignees_default = list(self.settings.get_value("default-assignees"))
+        self.statii_default = list(self.settings.get_value("default-statii"))
         
         #store open last file
         self.open_last_file = self.settings.get_value("reopen")
@@ -1575,12 +1593,15 @@ class HiToDo(Gtk.Window):
         self.assigners = Gtk.ListStore(str)
         self.assigners.set_sort_column_id(0, Gtk.SortType.ASCENDING)
         self.assigners_list = []
+        self.assigners_default = []
         self.assignees = Gtk.ListStore(str)
         self.assignees.set_sort_column_id(0, Gtk.SortType.ASCENDING)
         self.assignees_list = []
+        self.assignees_default = []
         self.statii = Gtk.ListStore(str)
         self.statii.set_sort_column_id(0, Gtk.SortType.ASCENDING)
         self.statii_list = []
+        self.statii_default = []
         self.seliter = None
         self.sellist = None
         self.selcount = 0
