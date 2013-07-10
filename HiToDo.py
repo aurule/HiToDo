@@ -18,7 +18,7 @@
 # along with HiToDo.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import division
-from gi.repository import Gtk, Gdk, Pango
+from gi.repository import Gtk, Gdk, Pango, Gio
 from datetime import datetime, timedelta
 from os import linesep
 from os.path import basename, dirname, splitext
@@ -1573,6 +1573,7 @@ class HiToDo(Gtk.Window):
         self.undobuffer = []
         self.redobuffer = []
         self.maximized = False
+        self.settings = Gio.Settings.new("apps.hitodo")
         
         #create action groups
         top_actions = Gtk.ActionGroup("top_actions")
