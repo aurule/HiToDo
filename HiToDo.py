@@ -1488,7 +1488,7 @@ class HiToDo(Gtk.Window):
     def import_settings(self):
         #TODO need to move col-order to cols_visible
         #TODO add assigners, assignees, statii
-        self.open_last_file = settings.get_value("reopen")
+        self.open_last_file = self.settings.get_value("reopen")
         #TODO store use_tabs
         #TODO store toolbar vis
         #TODO store whether to clobber current file on open
