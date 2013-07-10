@@ -18,7 +18,7 @@ You should have received a copy of the GNU General Public License
 along with HiToDo.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <schemalist>
-    <schema id="app.hitodo" path="/app/hitodo/">
+    <schema id="apps.hitodo" path="/apps/hitodo/">
         <key type="b" name="reopen">
             <default>true</default>
             <summary>Re-open the most recent file on program start</summary>

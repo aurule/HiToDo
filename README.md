@@ -28,15 +28,17 @@ Although it isn't completely finished, HiToDo is stable and fairly usable for no
 **Planned Features:**
 
 * Global preferences stored with GSettings
-* Option to open multiple lists at once using multiple windows (launched from within the program)
-* Option to open multiple lists at once via tabs instead of multiple windows
+* Open multiple files at once via multiple windows (launched from within the program) or tabs in a single window
 * Open/Save of networked files
 * Archive completed tasks
 * Merge and split task lists
-* Built-in PGP encryption?
+* Built-in encryption?
 * Compressed save files? It would open up a lot of possibilities with bundled files.
     * File signing/integrity checksums
     * Embedding linked files
+* i18n and l10n support
+* Attach URLs to tasks
+    * With compressed/bundled saves, files could also be embedded
 * [todo.txt](http://todotxt.com/) save/open
 * ToDoList save/open
 

@@ -18,7 +18,7 @@
 # along with HiToDo.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import division
-from gi.repository import Gtk, Gdk, Pango
+from gi.repository import Gtk, Gdk, Pango, Gio
 from datetime import datetime, timedelta
 from os import linesep
 from os.path import basename, dirname, splitext
@@ -377,7 +377,8 @@ class HiToDo(Gtk.Window):
             if self.tasklist[treeiter][17]:
                 self.track_action.set_active(False)
             self.tasklist[treeiter][1] = 100
-            self.tasklist[treeiter][7] = datetime.now()
+            if self.tasklist[treeiter][7] == "":
+                self.tasklist[treeiter][7] = datetime.now()
             self.tasklist[treeiter][12] = True
             self.tasklist[treeiter][16] = False
             if self.tasklist.iter_has_child(treeiter):
@@ -1484,6 +1485,14 @@ class HiToDo(Gtk.Window):
     def main_filter(self, model, treeiter, data=None):
         return True
     
+    def import_settings(self):
+        #TODO need to move col-order to cols_visible
+        #TODO add assigners, assignees, statii
+        self.open_last_file = settings.get_value("reopen")
+        #TODO store use_tabs
+        #TODO store toolbar vis
+        #TODO store whether to clobber current file on open
+    
     def __init__(self):
         Gtk.Window.__init__(self)
         self.set_default_size(1100, 700)
@@ -1572,6 +1581,9 @@ class HiToDo(Gtk.Window):
         self.undobuffer = []
         self.redobuffer = []
         self.maximized = False
+        self.settings = Gio.Settings.new("apps.hitodo")
+        
+        self.import_settings()
         
         #create action groups
         top_actions = Gtk.ActionGroup("top_actions")
