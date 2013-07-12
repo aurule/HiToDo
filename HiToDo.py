@@ -897,28 +897,64 @@ class HiToDo(Gtk.Window):
 
     def __do_open(self):
         '''Internal function to open a file from self.file_name using the reader at self.file_filter.'''
-        self.file_dirty = False
-        self.update_title()
+        templist = copymodel(self.tasklist)
+        data = {
+            'filename': self.file_name,
+            'from_list': [],
+            'to_list': [],
+            'status_list': [],
+            'task_store': templist,
+            'cols': [],
+            'geometry': ()
+            #data also has save_version, our_version, expanded, and selected keys
+        }
+        self.file_filter.read_to_store(data)
         
+        #check version compatability
+        file_version = data['save_version']
+        native_version = data['our_version']
+        force_save = False
+        if native_version < file_version:
+            response = self.version_warn_dlg.run()
+            if response == 2:
+                self.save_dlg.set_filename(data['filename'])
+                retcode = self.save_dlg.run()
+                self.save_dlg.hide()
+                if retcode != -3: return #cancel out if requested
+                
+                data['filename'] = self.save_dlg.get_filename()
+                self.file_filter = self.save_dlg.get_filter()
+                ext = splitext(data['filename'])[1]
+                if ext == '':
+                    data['filename'] += self.file_filter.file_extension
+                force_save = True
+            elif response == Gtk.ResponseType.CANCEL:
+                return
+            
+            self.version_warn_dlg.hide()
+        
+        #load vars
+        del self.cols_visible[:]
+        
+        self.file_name = data['filename']
+        self.assigners_list = data['from_list']
+        self.assignees_list = data['to_list']
+        self.statii_list = data['status_list']
+        #self.tasklist is handled later
+        self.cols_visible = data['cols']
+        rows_to_expand = data['expanded']
+        selme = data['selected']
+        
+        #add rows
         #when adding lots of rows, we want to disable the display until we're done
         self.task_view.freeze_child_notify()
         self.task_view.set_model(None)
         self.tasklist.clear()
         #TODO clear filter
         #self.tasklist_filter.refilter()
-        
-        #add rows to self.tasklist
-        del self.cols_visible[:]
-        data = {
-            'filename': self.file_name,
-            'from_list': self.assigners_list,
-            'to_list': self.assignees_list,
-            'status_list': self.statii_list,
-            'task_store': self.tasklist,
-            'cols': self.cols_visible,
-            'geometry': ()
-        }
-        rows_to_expand, selme = self.file_filter.read_to_store(data)
+        #now we can import the task list data from templist
+        templist.foreach(appendrow, (self.tasklist, range(templist.get_n_columns())))
+        del templist
         
         if len(self.cols_visible) <= len(self.cols):
             codes = []
@@ -958,8 +994,10 @@ class HiToDo(Gtk.Window):
         #reconnect model to view
         self.task_view.set_model(self.tasklist)
         for pathstr in rows_to_expand:
-            treeiter = self.tasklist.get_iter(pathstr)
-            path = self.tasklist.get_path(treeiter)
+            path = Gtk.TreePath.new_from_string(pathstr)
+            #if path is None: continue
+            #path = self.tasklist.get_iter(pathstr)
+            #path = self.tasklist.get_path(treeiter)
             self.task_view.expand_row(path, False)
         if selme != '' and selme is not None:
             try:
@@ -978,6 +1016,9 @@ class HiToDo(Gtk.Window):
         self.last_save = datetime.now()
         self.file_dirty = False
         self.update_title()
+        
+        if force_save:
+            self.save_file()
     
     def save_file(self, widget=None):
         if self.file_name == "":
@@ -1747,6 +1788,7 @@ class HiToDo(Gtk.Window):
         self.prefs_dlg = dialogs.prefs.main(self)
         self.docprops_dlg = dialogs.docprops.main(self)
         self.label_edit_dlg = dialogs.labeledit.main(self)
+        self.version_warn_dlg = dialogs.misc.htd_version_warning(self)
         
         if self.open_last_file: self.__open_last()
     
@@ -2052,6 +2094,28 @@ class HiToDo(Gtk.Window):
     def destroy(self, widget=None, data=None):
         if not self.confirm_discard(): return True
         Gtk.main_quit()
+
+def copymodel(model):
+    column_types = []
+    column_numbers = range(model.get_n_columns())
+    for i in column_numbers:
+        column_types.append(model.get_column_type(i))
+    copy = Gtk.TreeStore(*column_types)
+    return copy
+
+def appendrow(model, path, treeiter, data):
+    copy, column_numbers = data
+    strpath = path.to_string()
+    parts = strpath.rsplit(':', 1)
+    parent_path = parts[0]
+    
+    if parent_path == strpath: 
+        parent_iter = None
+    else:
+        parent_iter = copy.get_iter(parent_path)
+    newiter = copy.append(parent_iter)
+    for i in column_numbers:
+        copy.set_value(newiter, i, model.get_value(treeiter, i))
 
 def main():
     Gtk.main()

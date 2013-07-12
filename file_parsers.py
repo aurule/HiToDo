@@ -42,6 +42,10 @@ class htd_filter(Gtk.FileFilter):
         '''Reads todo list data from xml file. Data is a dictionary of data holders to fill.'''
         
         document = ElementTree.parse(data['filename'])
+        htd = document.getroot()
+        data['save_version'] = float(htd.get('version'))
+        data['our_version'] = float(self.file_version)
+        
         #get assigners, assignees, and statii lists
         assigners = document.find("assigners")
         for n in assigners.findall('name'):
@@ -74,7 +78,7 @@ class htd_filter(Gtk.FileFilter):
         
         #get highest-level tasklist element
         tlist = document.find("tasklist")
-        self.tasklist = data['task_store'] #store for use later
+        self.tasklist = data['task_store']
         self.__read_tasks(tlist, None)
         
         exp = document.find('expanded')
@@ -84,7 +88,8 @@ class htd_filter(Gtk.FileFilter):
         seldata = document.find('selected')
         sel = seldata.text
         
-        return (expanded_paths, sel)
+        data['expanded'] = expanded_paths
+        data['selected'] = sel
     
     def __read_tasks(self, tlist, parent=None):
         '''Internal function to recursively add tasks from an XML file to the treestore self.tasklist.'''
