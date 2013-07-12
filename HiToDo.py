@@ -43,6 +43,7 @@ UI_XML = """
             <separator />
             <menuitem action="save_file" />
             <menuitem action="saveas_file" />
+            <menuitem action="save_copy" />
             <separator />
             <menuitem action="doc_props" />
             <separator />
@@ -83,6 +84,8 @@ UI_XML = """
             <menuitem action='task_del' />
             <separator />
             <menuitem action='track_spent' />
+            <separator />
+            <menuitem action='archive_done' />
         </menu>
         <menu action='HelpMenu'>
             <menuitem action='help_about' />
@@ -917,16 +920,7 @@ class HiToDo(Gtk.Window):
         if native_version < file_version:
             response = self.version_warn_dlg.run()
             if response == 2:
-                self.save_dlg.set_filename(data['filename'])
-                retcode = self.save_dlg.run()
-                self.save_dlg.hide()
-                if retcode != -3: return #cancel out if requested
-                
-                data['filename'] = self.save_dlg.get_filename()
-                self.file_filter = self.save_dlg.get_filter()
-                ext = splitext(data['filename'])[1]
-                if ext == '':
-                    data['filename'] += self.file_filter.file_extension
+                data['filename'] = self.pick_savefile()
                 force_save = True
             elif response == Gtk.ResponseType.CANCEL:
                 return
@@ -1021,11 +1015,39 @@ class HiToDo(Gtk.Window):
         if force_save:
             self.save_file()
     
+    def pick_savefile(self):
+        if self.file_name != "":
+            self.save_dlg.set_filename(self.file_name)
+        else:
+            self.save_dlg.set_current_name("Untitled list.htdl")
+        retcode = self.save_dlg.run()
+        self.save_dlg.hide()
+        if retcode != -3: return #cancel out if requested
+        
+        filename = self.save_dlg.get_filename()
+        self.file_filter = self.save_dlg.get_filter()
+        ext = splitext(filename)[1]
+        if ext == '':
+            filename += self.file_filter.file_extension
+        
+        return filename
+    
+    def save_file_as(self, widget=None):
+        self.file_name = self.pick_savefile()
+        self.__do_save(self.file_name)
+    
     def save_file(self, widget=None):
         if self.file_name == "":
             self.save_file_as()
             return
         
+        self.__do_save(self.file_name)
+    
+    def save_copy(self, widget=None):
+        filename = self.pick_savefile()
+        self.__do_save(filename)
+    
+    def __do_save(self, filename):
         if self.seliter is not None:
             selpath = str(self.tasklist.get_path(self.seliter))
         else:
@@ -1034,7 +1056,7 @@ class HiToDo(Gtk.Window):
         width, height = self.get_size()
         task_width = width - self.task_pane.get_position()
         data = {
-            'filename': self.file_name,
+            'filename': filename,
             'from_list': sorted(self.assigners_list),
             'to_list': sorted(self.assignees_list),
             'status_list': sorted(self.statii_list),
@@ -1049,22 +1071,6 @@ class HiToDo(Gtk.Window):
         self.file_dirty = False
         self.update_title()
         self.last_save = datetime.now()
-    
-    def save_file_as(self, widget=None):
-        if self.file_name != "":
-            self.save_dlg.set_filename(self.file_name)
-        else:
-            self.save_dlg.set_current_name("Untitled list.htdl")
-        retcode = self.save_dlg.run()
-        self.save_dlg.hide()
-        if retcode != -3: return #cancel out if requested
-        
-        self.file_name = self.save_dlg.get_filename()
-        self.file_filter = self.save_dlg.get_filter()
-        ext = splitext(self.file_name)[1]
-        if ext == '':
-            self.file_name += self.file_filter.file_extension
-        self.save_file()
     
     def confirm_discard(self):
         if not self.file_dirty: return True
@@ -1991,6 +1997,8 @@ class HiToDo(Gtk.Window):
             ("new_file", Gtk.STOCK_NEW, None, "", None, self.new_file),
             ("open_file", Gtk.STOCK_OPEN, None, None, "Open file", self.open_file),
             ("saveas_file", Gtk.STOCK_SAVE_AS, None, None, None, self.save_file_as),
+            ("save_copy", None, "Sa_ve A Copy...", None, None, self.save_copy),
+            ("archive_done", None, "Arc_hive Completed Tasks", None, None, self.skip),
             ("close", Gtk.STOCK_CLOSE, None, None, None, self.new_file),
             ("quit", Gtk.STOCK_QUIT, None, None, None, self.destroy),
             ("help_about", Gtk.STOCK_ABOUT, None, None, None, self.show_about),
