@@ -1521,9 +1521,10 @@ class HiToDo(Gtk.Window):
         self.statii_default = list(self.settings.get_value("default-statii"))
         
         #store open last file
-        self.open_last_file = self.settings.get_value("reopen")
+        self.open_last_file = self.settings.get_boolean("reopen")
         
-        #TODO store use_tabs
+        #store use_tabs
+        self.use_tabs = self.settings.get_boolean("use-tabs")
         
         #store toolbar vis
         self.toolbar_visible = self.settings.get_boolean("show-toolbar")
@@ -1634,6 +1635,7 @@ class HiToDo(Gtk.Window):
         #These are overwridden by GSettings object
         self.toolbar_visible = True
         self.clobber = False
+        self.use_tabs = False
         
         self.import_settings()
         
