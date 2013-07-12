@@ -221,32 +221,42 @@ class HiToDo(Gtk.Window):
         self.commit_spent()
     
     def commit_est(self, widget=None, path=None, new_est=None):
+        '''Save user-entered time estimate. Value of 'new_est' is expected to be
+        in hours, so it's converted to seconds before saving.
+        
+        Once saved, we recurse up our chain of parents, adding our value to
+        theirs.'''
         if path is None: return
         if type(path) is str and path == "": return
-        
         if not is_number(new_est): return
-        old_est = self.tasklist[path][2]
+        
+        old_est = self.tasklist[path][2] #store for later
         new_est = float(new_est)
-        out = floor(new_est * 3600)
-        self.tasklist[path][2] = int(out)
+        out = floor(new_est * 3600) #convert to seconds
+        self.tasklist[path][2] = int(out) #save
     
+        #now we need to adjust our parent's total
         parts = str(path).rpartition(':')
-        parent_path = parts[0]
+        parent_path = parts[0] #find parent path
         if parent_path != "":
             parent_est = self.tasklist[parent_path][2]
-            pest = (parent_est + out - old_est)/3600
-            self.commit_est(path=parent_path, new_est=pest)
+            pest = (parent_est + out - old_est)/3600 #calculate new parent estimate
+            self.commit_est(path=parent_path, new_est=pest) #commit up the chain
 
-        #push undoable only on user click
+        # Push undoable only on user click, not internal call. Very important since we recurse.
         if widget is not None:
             self.__push_undoable("est", (path, old_est, int(out)))
     
     def commit_est_iter(self, treeiter=None, new_est=0):
+        '''Helper function to save a time estimate (in hours) when all we have
+        is a treeiter. See 'commit_est'.'''
         if treeiter is None: return
         path = str(self.tasklist.get_path(treeiter))
         self.commit_est(path=path, new_est=new_est)
     
     def est_edit_start(self, renderer, editor, path):
+        '''Set up time estimate editing field. Converts saved seconds into
+        hours, and adds an icon for recalculating. See 'derive_est'.'''
         val = self.tasklist[path][2]
         self.track_focus(widget = editor)
         editor.set_text(str(val/3600)) #don't display the H suffix during editing
@@ -255,20 +265,22 @@ class HiToDo(Gtk.Window):
         editor.connect("icon-press", self.derive_est, path)
     
     def derive_est(self, entry=None, pos=None, event=None, path=None):
-        # Peeks at the top level children's "est" totals. Assumes children are
-        # already calculated out and does not recurse.
+        '''Recalculate our time estimate based on our children's estimates. We
+        assume our children are already calculated, so we only have to peek at
+        our top-level children's time estimates.'''
         total_est = 0
         treeiter = self.tasklist.get_iter(path)
+        #no children means our est is 0 and we can stop
         if self.tasklist.iter_has_child(treeiter):
-            n_children = self.tasklist.iter_n_children(treeiter)
+            #loop through our children and add their est total to ours
             child_iter = self.tasklist.iter_children(treeiter)
             while child_iter is not None:
                 total_est += self.tasklist[child_iter][2]
                 child_iter = self.tasklist.iter_next(child_iter)
         old_est = self.tasklist[path][2]
-        self.tasklist[path][2] = total_est
+        self.commit_est(path = path, new_est = total_est/3600) #save it
         
-        #push undoable
+        #push undoable. We have to push our own because commit_est only pushes when called from the UI.
         self.__push_undoable("est", (path, old_est, total_est))
     
     def commit_spent(self, widget=None, path=None, new_spent=None):
@@ -293,6 +305,8 @@ class HiToDo(Gtk.Window):
             self.__push_undoable("spent", (path, old_spent, int(out)))
     
     def commit_spent_iter(self, treeiter=None, new_spent=0):
+        '''Helper function to save time spent (in hours) when all we have is a
+        treeiter. See 'commit_spent'.'''
         if treeiter is None: return
         path = str(self.tasklist.get_path(treeiter))
         self.commit_spent(path=path, new_spent=new_spent)
@@ -317,7 +331,7 @@ class HiToDo(Gtk.Window):
                 total_spent += self.tasklist[child_iter][3]
                 child_iter = self.tasklist.iter_next(child_iter)
         old_spent = self.tasklist[path][3]
-        self.tasklist[path][3] = total_spent
+        self.commit_spent(path=path, new_spent = total_spent) #save it
         
         #push undoable
         self.__push_undoable("spent", (path, old_spent, total_spent))
