@@ -1528,7 +1528,8 @@ class HiToDo(Gtk.Window):
         #store toolbar vis
         self.toolbar_visible = self.settings.get_boolean("show-toolbar")
         
-        #TODO store whether to clobber current file on open
+        #store whether to clobber current file on open
+        self.clobber = self.settings.get_boolean("clobber-on-new")
     
     def settings_toolbar_vis_changed(self, settings, key, data=None):
         self.toolbar_visible = settings.get_boolean("show-toolbar")
@@ -1627,9 +1628,12 @@ class HiToDo(Gtk.Window):
         self.undobuffer = []
         self.redobuffer = []
         self.maximized = False
-        self.toolbar_visible = True
+        
         self.settings = Gio.Settings.new("apps.hitodo")
         self.settings.connect("changed::show-toolbar", self.settings_toolbar_vis_changed)
+        #These are overwridden by GSettings object
+        self.toolbar_visible = True
+        self.clobber = False
         
         self.import_settings()
         

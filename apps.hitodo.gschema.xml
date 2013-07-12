@@ -34,10 +34,10 @@ along with HiToDo.  If not, see <http://www.gnu.org/licenses/>.
             <summary>Use tabs for multiple files</summary>
             <description>When true, multiple task lists can be opened within the same window using a set of tabs. When false, every task list is shown in its own window.</description>
         </key>
-        <key type="b" name="open-in-new-window">
-            <default>true</default>
-            <summary>Open new files in their own window. Ignored when use-tabs is True.</summary>
-            <description>When true, opening a new file will create a new HiToDo instance for that task list. When false, opening a new file closes the current file and reuses its window.</description>
+        <key type="b" name="clobber-on-new">
+            <default>false</default>
+            <summary>Open new files in the same window. Ignored when use-tabs is True.</summary>
+            <description>When true, opening a new file closes the current file and reuses its window. When false, opening a new file will create a new HiToDo window for that task list.</description>
         </key>
         <key type="as" name="default-statii">
             <default>[]</default>
