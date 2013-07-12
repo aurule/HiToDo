@@ -1630,8 +1630,18 @@ class HiToDo(Gtk.Window):
         self.redobuffer = []
         self.maximized = False
         
+        #construct settings object and changed::* bindings
         self.settings = Gio.Settings.new("apps.hitodo")
+        self.settings.connect("changed::col-order", self.skip)
+        self.settings.connect("changed::col-visibility", self.skip)
+        self.settings.connect("changed::default-assigners", self.skip)
+        self.settings.connect("changed::default-assignees", self.skip)
+        self.settings.connect("changed::default-statii", self.skip)
+        self.settings.connect("changed::reopen", self.skip)
+        self.settings.connect("changed::use-tabs", self.skip)
         self.settings.connect("changed::show-toolbar", self.settings_toolbar_vis_changed)
+        self.settings.connect("changed::clobber-on-new", self.skip)
+        
         #These are overwridden by GSettings object
         self.toolbar_visible = True
         self.clobber = False
