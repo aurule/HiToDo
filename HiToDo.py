@@ -897,7 +897,7 @@ class HiToDo(Gtk.Window):
 
     def __do_open(self):
         '''Internal function to open a file from self.file_name using the reader at self.file_filter.'''
-        templist = copymodel(self.tasklist)
+        templist = copy_treemodel(self.tasklist)
         data = {
             'filename': self.file_name,
             'from_list': [],
@@ -952,8 +952,9 @@ class HiToDo(Gtk.Window):
         self.tasklist.clear()
         #TODO clear filter
         #self.tasklist_filter.refilter()
+        
         #now we can import the task list data from templist
-        templist.foreach(appendrow, (self.tasklist, range(templist.get_n_columns())))
+        templist.foreach(append_row, self.tasklist)
         del templist
         
         if len(self.cols_visible) <= len(self.cols):
@@ -2095,27 +2096,25 @@ class HiToDo(Gtk.Window):
         if not self.confirm_discard(): return True
         Gtk.main_quit()
 
-def copymodel(model):
+def copy_treemodel(orig):
+    '''Create a new treemodel with the same columns as 'model'.'''
     column_types = []
-    column_numbers = range(model.get_n_columns())
+    column_numbers = range(orig.get_n_columns())
     for i in column_numbers:
-        column_types.append(model.get_column_type(i))
+        column_types.append(orig.get_column_type(i))
     copy = Gtk.TreeStore(*column_types)
     return copy
 
-def appendrow(model, path, treeiter, data):
-    copy, column_numbers = data
+def append_row(orig, path, treeiter, copy):
+    '''Append a row to the treemodel 'copy' from the treemodel 'orig' while preserving parent-child relationships.
+    Meant to be run as 'orig.foreach(append_row, copy)'.'''
     strpath = path.to_string()
+    
     parts = strpath.rsplit(':', 1)
     parent_path = parts[0]
+    parent_iter = None if parent_path == strpath else copy.get_iter(parent_path)
     
-    if parent_path == strpath: 
-        parent_iter = None
-    else:
-        parent_iter = copy.get_iter(parent_path)
-    newiter = copy.append(parent_iter)
-    for i in column_numbers:
-        copy.set_value(newiter, i, model.get_value(treeiter, i))
+    copy.append(parent_iter, orig[treeiter][:])
 
 def main():
     Gtk.main()
