@@ -24,6 +24,7 @@ class main(Gtk.Dialog):
         Gtk.Dialog.__init__(self, "Manage Labels", parent, flags)
         close = self.add_button(Gtk.STOCK_CLOSE, Gtk.ResponseType.CLOSE)
         close.connect("clicked", self.disappear)
+        self.set_default_response(Gtk.ResponseType.CLOSE)
         
         #internal vars
         self.treestore = None

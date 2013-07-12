@@ -54,6 +54,7 @@ class htd_warn_discard(Gtk.MessageDialog):
         self.add_button("Close _without Saving", Gtk.ResponseType.CLOSE)
         self.add_button(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
         self.add_button(Gtk.STOCK_SAVE, Gtk.ResponseType.ACCEPT)
+        self.set_default_response(Gtk.ResponseType.ACCEPT)
 
 class htd_about(Gtk.AboutDialog):
     def __init__(self, parent):

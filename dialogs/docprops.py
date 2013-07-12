@@ -24,6 +24,7 @@ class main(Gtk.Dialog):
         Gtk.Dialog.__init__(self, "Document Properties", parent, flags)
         close = self.add_button(Gtk.STOCK_OK, Gtk.ResponseType.CLOSE)
         close.connect("clicked", self.disappear)
+        self.set_default_response(Gtk.ResponseType.CLOSE)
         content = self.get_content_area()
         self.parent = parent
         
