@@ -212,9 +212,6 @@ class HiToDo(Gtk.Window):
         '''Commit all possibly-in-progress edits.'''
         self.commit_title()
         self.commit_notes()
-        self.commit_status()
-        self.commit_assigner()
-        self.commit_assignee()
         self.commit_date(field = 8)
         self.commit_priority()
     
@@ -380,6 +377,17 @@ class HiToDo(Gtk.Window):
             action.set_tooltip("Start tracking time toward current task")
     
     def commit_done(self, renderer=None, path=None, new_done=None):
+        '''Toggles a task's 'done' flag (field 12) and handles tracking and pct
+        propagation. Note that field 16 is the 'anti-done' flag and always set
+        to the opposite value of field 12.
+        
+        When transition to done state, pct is set to 100, children are forced to
+        'done' state (see force_children_done), the 'completed' timestamp is
+        set, and tracking is toggled off if applicable.
+        
+        When transition to the not-done state, our parent is set to not-done
+        (see force_parent_not_done), our parent's pct is recalculated (see
+        calc_parent_pct), and our own pct is recalculated (see calc_pct).'''
         if path is None: return
         
         done = not new_done if new_done is not None else self.tasklist[path][12]
@@ -409,25 +417,40 @@ class HiToDo(Gtk.Window):
         self.calc_parent_pct(path)
     
     def force_children_done(self, path):
+        '''Finds the first child of 'path' and uses a private function to mark
+        it and all of its peers done. See __force_peers_done().'''
         treeiter = self.tasklist.get_iter(path)
         child_iter = self.tasklist.iter_children(treeiter)
         self.__force_peers_done(child_iter)
     
     def __force_peers_done(self, treeiter):
+        '''Marks all tasks on this level as done, and recurses to every task's
+        children.
+        
+        See commit_done() for a description of what happens when transition to
+        the done state.'''
         while treeiter != None:
+            #handle tracking
             if self.tasklist[treeiter][17]:
                 self.track_action.set_active(False)
+            #set pct complete
             self.tasklist[treeiter][1] = 100
+            #set complete timestamp if not already present
             if self.tasklist[treeiter][7] == "":
                 self.tasklist[treeiter][7] = datetime.now()
+            #set done and anti-done flags
             self.tasklist[treeiter][12] = True
             self.tasklist[treeiter][16] = False
+            #recurse if necessary
             if self.tasklist.iter_has_child(treeiter):
                 child_iter = self.tasklist.iter_children(treeiter)
                 self.__force_peers_done(child_iter)
+            #iterate to next sibling
             treeiter = self.tasklist.iter_next(treeiter)
     
     def force_parent_not_done(self, path):
+        '''Iterates all levels of path, marking the first row of each level
+        not done.'''
         parts = path.split(':')
         oldpath = ''
         for parent_path in parts:
@@ -438,6 +461,8 @@ class HiToDo(Gtk.Window):
             oldpath = newpath + ':'
     
     def calc_parent_pct(self, path):
+        '''Gets the parent path of 'path' and uses a private function to
+        calculate the parent's pct complete. See __do_pct().'''
         parts = path.partition(':')
         parent_path = parts[0]
         if parent_path == path: return
@@ -446,6 +471,11 @@ class HiToDo(Gtk.Window):
         self.__do_pct(parent_iter)
     
     def calc_pct(self, path):
+        '''Uses a private function to calculate the pct complete of the row at
+        'path'. When the row has no children, its pct complete is set to zero
+        as a shortcut. See __do_pct().
+        
+        This function does not handle the case where the row is marked done.'''
         treeiter = self.tasklist.get_iter(path)
         if self.tasklist.iter_n_children(treeiter) == 0:
             self.tasklist[treeiter][1] = 0
@@ -454,7 +484,9 @@ class HiToDo(Gtk.Window):
         self.__do_pct(treeiter)
     
     def __do_pct(self, treeiter):
-        '''Calculates pct complete from the number of done leaves. Branch children are ignored for the calculation.'''
+        '''Calculates the pct complete of the row at 'treeiter' from the number
+        of children marked done. Children with children of their own (branches)
+        are ignored.'''
         n_children = 0 #This is not the liststore's child count. It omits children who have children of their own.
         n_done = 0 #Also omits children who have children.
         child_iter = self.tasklist.iter_children(treeiter)
@@ -474,6 +506,7 @@ class HiToDo(Gtk.Window):
         return n_children, n_done
     
     def commit_priority(self, widget=None, path=None, new_priority=None):
+        '''Sets the priority for 'path' to the value of 'new_priority'.'''
         if path is None: return
         
         old_val = self.tasklist[path][0]
@@ -481,15 +514,18 @@ class HiToDo(Gtk.Window):
         #priorities have to be integers
         if new_priority.isdigit():
             self.tasklist[path][0] = int(new_priority)
-        
-        self.__push_undoable("change", (path, 0, old_val, int(new_priority)))
+            self.__push_undoable("change", (path, 0, old_val, int(new_priority)))
     
     def commit_date(self, widget=None, path=None, new_date=None, field=None):
+        '''Sets the value of a date field (due, complete, act begin, est begin,
+        est complete) to the value of 'new_date'. The dateparse module is used to
+        convert the string input into a datetime object.'''
         if path is None: return
         
         old_val = self.tasklist[path][field]
         
         if new_date.lower() == "tomorrow":
+            #manually handle "tomorrow" keyword, along with others in the future
             delta = timedelta(days=1)
             dt = datetime.today() + delta
         elif new_date == "":
@@ -504,47 +540,58 @@ class HiToDo(Gtk.Window):
         self.__push_undoable("change", (path, field, old_val, dt))
     
     def commit_status(self, widget=None, path=None, new_status=None):
+        '''Set the status string of 'path' to the value of 'new_status'. That
+        value is also added to our internal list and liststore of status
+        strings, if not already present.'''
         if path is None: return
         
+        #add the new status to our lists if necessary
         if new_status != '' and new_status not in self.statii_list:
-            self.statii.append([new_status])
-            self.statii_list.append(new_status)
+            self.statii.append([new_status]) #liststore
+            self.statii_list.append(new_status) #normal list
         old_status = self.tasklist[path][11]
-        self.__push_undoable("change", (path, 11, old_status, new_status))
         
         self.tasklist[path][11] = new_status
         self.track_focus(widget = self.task_view)
+        self.__push_undoable("change", (path, 11, old_status, new_status))
     
     def commit_assigner(self, widget=None, path=None, new_assigner=None):
+        '''Set the status string of 'path' to the value of 'new_assigner'. That
+        value is also added to our internal list and liststore of assigner
+        strings, if not already present.'''
         if path is None: return
         
         if new_assigner != '' and new_assigner not in self.assigners_list:
             self.assigners.append([new_assigner])
             self.assigners_list.append(new_assigner)
         old_assigner = self.tasklist[path][9]
-        self.__push_undoable("change", (path, 9, old_assigner, new_assigner))
         
         self.tasklist[path][9] = new_assigner
         self.track_focus(widget = self.task_view)
+        self.__push_undoable("change", (path, 9, old_assigner, new_assigner))
     
     def commit_assignee(self, widget=None, path=None, new_assignee=None):
+        '''Set the status string of 'path' to the value of 'new_assignee'. That
+        value is also added to our internal list and liststore of assignee
+        strings, if not already present.'''
         if path is None: return
         
         if new_assignee != '' and new_assignee not in self.assignees_list:
             self.assignees.append([new_assignee])
             self.assignees_list.append(new_assignee)
         old_assignee = self.tasklist[path][10]
-        self.__push_undoable("change", (path, 10, old_assignee, new_assignee))
         
         self.tasklist[path][10] = new_assignee
         self.track_focus(widget = self.task_view)
+        self.__push_undoable("change", (path, 10, old_assignee, new_assignee))
     
     def commit_notes(self, widget=None, data=None):
+        '''Save the user-entered notes text to the notes field.'''
         if self.seliter is None: return
         if self.notes_view.has_focus():
             self.task_view.grab_focus()
         else:
-            return
+            return #just in case we were called when the notes view was not actually being used
         
         start = self.notes_buff.get_iter_at_offset(0)
         end = self.notes_buff.get_iter_at_offset(-1)
@@ -552,9 +599,9 @@ class HiToDo(Gtk.Window):
         
         path = self.tasklist.get_path(self.seliter)
         oldtext = self.tasklist[self.seliter][14]
-        self.__push_undoable("notes", (path, oldtext, text))
         
         self.tasklist[self.seliter][14] = text
+        self.__push_undoable("notes", (path, oldtext, text))
     
     def commit_title(self, widget=None, path=None, new_title=None, write=True):
         if path is None:
