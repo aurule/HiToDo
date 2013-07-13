@@ -78,6 +78,10 @@ class main(Gtk.Dialog):
         self.view.set_model(None)
         self.hide()
     
+    def show(self):
+        Gtk.Dialog.show()
+        self.grab_focus()
+    
     def set_store(self, treestore):
         self.treestore = treestore
         self.view.set_model(self.treestore)
