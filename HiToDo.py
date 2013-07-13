@@ -217,8 +217,6 @@ class HiToDo(Gtk.Window):
         self.commit_assignee()
         self.commit_date(field = 8)
         self.commit_priority()
-        self.commit_est()
-        self.commit_spent()
     
     def commit_est(self, widget=None, path=None, new_est=None):
         '''Save user-entered time estimate. Value of 'new_est' is expected to be
@@ -251,7 +249,7 @@ class HiToDo(Gtk.Window):
         '''Helper function to save a time estimate (in hours) when all we have
         is a treeiter. See 'commit_est'.'''
         if treeiter is None: return
-        path = str(self.tasklist.get_path(treeiter))
+        path = self.tasklist.get_path(treeiter).to_string()
         self.commit_est(path=path, new_est=new_est)
     
     def est_edit_start(self, renderer, editor, path):
@@ -284,6 +282,11 @@ class HiToDo(Gtk.Window):
         self.__push_undoable("est", (path, old_est, total_est))
     
     def commit_spent(self, widget=None, path=None, new_spent=None):
+        '''Save user-entered time spent. Value of 'new_spent' is expected to be
+        in hours, so it's converted to seconds before saving.
+        
+        Once saved, we recurse up our chain of parents, adding our value to
+        theirs.'''
         if path is None: return
         if type(path) is str and path == "": return
         
@@ -308,10 +311,12 @@ class HiToDo(Gtk.Window):
         '''Helper function to save time spent (in hours) when all we have is a
         treeiter. See 'commit_spent'.'''
         if treeiter is None: return
-        path = str(self.tasklist.get_path(treeiter))
+        path = self.tasklist.get_path(treeiter).to_string()
         self.commit_spent(path=path, new_spent=new_spent)
         
     def spent_edit_start(self, renderer, editor, path):
+        '''Set up time spent editing field. Converts saved seconds into
+        hours, and adds an icon for recalculating. See 'derive_spent'.'''
         val = self.tasklist[path][3]
         self.track_focus(widget = editor)
         editor.set_text(str(val/3600)) #don't display the H suffix during editing
@@ -320,8 +325,9 @@ class HiToDo(Gtk.Window):
         editor.connect("icon-press", self.derive_spent, path)
     
     def derive_spent(self, entry=None, pos=None, event=None, path=None):
-        # Peeks at the top level children's "spent" totals. Assumes children are
-        # already calculated out and does not recurse.
+        '''Recalculate our time spent based on our children's estimates. We
+        assume our children are already calculated, so we only have to peek at
+        our top-level children's time spent.'''
         total_spent = 0
         treeiter = self.tasklist.get_iter(path)
         if self.tasklist.iter_has_child(treeiter):
@@ -337,6 +343,13 @@ class HiToDo(Gtk.Window):
         self.__push_undoable("spent", (path, old_spent, total_spent))
     
     def track_spent(self, action=None, data=None):
+        '''Handles time spent tracking. Only really useful when called from the
+        UI. When tracking is toggled on, a timestamp is saved. When tracking is
+        toggled off, a new timestamp is fetched and the difference applied to
+        that row's time spent total.
+        
+        Only one row (task) can be tracked at a time. We store a treeiter
+        pointing to that row as well as set the row's tracked flag (field 17).'''
         on = action.get_active()
         if on:
             if self.seliter is None:
@@ -356,7 +369,7 @@ class HiToDo(Gtk.Window):
             
             diff = datetime.now() - self.timer_start
             secs = int(diff.total_seconds())
-            path = str(self.tasklist.get_path(self.tracking))
+            path = self.tasklist.get_path(self.tracking).to_string()
             nspent = (self.tasklist[self.tracking][3] + secs) / 3600
             self.commit_spent(path=path, new_spent = nspent)
             self.tasklist[self.tracking][17] = False
@@ -968,7 +981,7 @@ class HiToDo(Gtk.Window):
     
     def __do_save(self, filename):
         if self.seliter is not None:
-            selpath = str(self.tasklist.get_path(self.seliter))
+            selpath = self.tasklist.get_path(self.seliter).to_string()
         else:
             selpath = ''
         
@@ -1102,7 +1115,7 @@ class HiToDo(Gtk.Window):
             if self.seliter is None:
                 parent_iter = None
             else:
-                path = str(self.tasklist.get_path(self.seliter))
+                path = self.tasklist.get_path(self.seliter).to_string()
                 parts = path.rpartition(':')
                 parent_path = parts[0]
                 if parent_path != "":
@@ -1143,7 +1156,7 @@ class HiToDo(Gtk.Window):
                 last_row = treeiter
             
             self.commit_est_iter(treeiter, row[3]/3600)
-            self.calc_parent_pct(str(self.tasklist.get_path(treeiter)))
+            self.calc_parent_pct(self.tasklist.get_path(treeiter).to_string())
         
         self.make_dirty()
         return new_iters
@@ -1252,7 +1265,7 @@ class HiToDo(Gtk.Window):
                 else:
                     parent_iter = self.tasklist.get_iter(paths[1]) if paths[1] is not None else None
                     new_row_iter = self.tasklist.append(parent_iter, row_data)
-                newpath = str(self.tasklist.get_path(new_row_iter))
+                newpath = self.tasklist.get_path(new_row_iter).to_string()
                 self.undobuffer.append((action[0], (newpath, paths[1], paths[2])))
             elif action[0] == "notes":
                 path = action[1][0]
