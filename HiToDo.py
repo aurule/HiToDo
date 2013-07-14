@@ -604,31 +604,31 @@ class HiToDo(Gtk.Window):
         self.__push_undoable("notes", (path, oldtext, text))
     
     def commit_title(self, widget=None, path=None, new_title=None, write=True):
+        '''Save the user-entered title.
+        
+        When the entry is blank, we simply revert to the previous title. If the
+        title is made blank on a new task, however, the task is deleted instead,
+        as there is no previous title to use.
+        
+        The 'write' flag is used when we want to evaluate 'new_title' against
+        the old title, but don't want to change anything if it doesn't revert.'''
         if path is None:
             if self.title_editor is None: return
-            path = self.title_edit_path
-            new_title = self.title_editor.get_text()
-            self.title_editor.disconnect(self.title_key_press_catcher)
-        self.title_editor = None #clear this to prevent eating memory
+            #if we have no path, but there is an active title editing field, we can use that instead
+            path = self.title_edit_path #grab the stored path
+            new_title = self.title_editor.get_text() #get user text
+            self.title_editor.disconnect(self.title_key_press_catcher) #kill off the key catcher
+        self.title_editor = None #clear this once it's no longer necessary
         
         old_title = self.tasklist[path][13]
         
-        if new_title is None:
-            if old_title == '':
-                self.del_task(path)
-                self.undobuffer.pop()
-            return
-        
         # If the new title is blank...
-        if new_title == '':
+        if new_title is None or new_title == '':
             if old_title == '':
                 # and the task is new, just delete it.
                 self.del_task(path)
                 self.undobuffer.pop()
-                return
-            else:
-                # but the task has an existing title, cancel the edit.
-                return
+            return # cancel the edit.
         
         #finally, set the new title if allowed
         if write is True:
@@ -636,28 +636,40 @@ class HiToDo(Gtk.Window):
             self.__push_undoable("change", (path, 13, old_title, new_title))
     
     def title_edit_start(self, renderer, editor, path):
-        self.title_edit_path = str(path)
-        self.title_edit_old_val = self.tasklist[path][13]
+        '''Set up the title editor widget and store its edit path. We also set
+        the internal focus to the editor (see track_focus()) and attach a key
+        listener. See title_keys_dn().'''
+        self.title_edit_path = path
         self.title_editor = editor
         self.track_focus(widget=editor)
         self.title_key_press_catcher = editor.connect("key-press-event", self.title_keys_dn)
     
     def combo_edit_start(self, renderer, editor, path):
+        '''Sets internal focus to the combot widget. See track_focus().'''
         self.track_focus(widget=editor.get_child())
     
     def priority_edit_start(self, renderer, editor, path):
+        '''Sets internal focus to the priority widget. See track_focus().'''
         self.track_focus(widget = editor)
     
     def date_edit_start(self, renderer, editor, path):
+        '''Sets up the date editing widget and sets internal focus to it. These
+        have an icon which pops up a reference calendar. See track_focus().'''
         self.track_focus(widget = editor)
         editor.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "appointment-new")
         editor.connect("icon-press", self.date_pick)
     
     def date_pick(self, entry, pos, event, data=None):
+        '''Displays a calendar popoup for date entry widgets. See date_edit_start().'''
         #TODO add calendar picker popup
         pass
     
     def del_current_task(self, widget=None):
+        '''Removes every selected row from the task list. These are stored in
+        self.sellist (see 'task_selected()').
+        
+        Spent time tracking is ended as needed. Parent pct complete, time spent,
+        and est are recaulculated.'''
         if self.sellist is None: return
         refs = []
         #first we get references to each row
@@ -685,13 +697,14 @@ class HiToDo(Gtk.Window):
             self.commit_spent_iter(ref, new_spent=0)
             self.commit_est(ref, new_est=0)
             
-            self.calc_parent_pct(str(path))
+            self.calc_parent_pct(path.to_string())
             self.tasklist.remove(ref)
         
         self.task_selected(self.selection)
-        #self.seliter = None
     
     def del_task(self, path):
+        '''Deletes the row at 'path'. Ceases tracking and recalculates parent
+        time spent, est, and pct complete.'''
         #stop tracking if needed
         if self.tasklist[path][17]:
             self.track_action.set_active(False)
@@ -703,17 +716,14 @@ class HiToDo(Gtk.Window):
         self.calc_parent_pct(str(path))
     
     def del_task_iter(self, treeiter):
-        #stop tracking if needed
-        if self.tasklist[treeiter][17]:
-            self.track_action.set_active(False)
+        '''Deletes the row at 'treeiter'. Just a wrapper for del_task().'''
         path = self.tasklist.get_path(treeiter)
-        
-        self.commit_spent(path=path, new_spent=0)
-        self.commit_est(path=path, new_est=0)
-        self.tasklist.remove(treeiter)
-        self.calc_parent_pct(str(path))
+        self.del_task(path)
     
     def task_selected(self, widget):
+        '''Stores references to the task(s) selected by the user. Also sets the
+        correct buffer for notes editing and enables/disables row editing
+        controls (cut, copy, paste, etc.) as needed.'''
         self.selcount = widget.count_selected_rows()
         self.sellist = widget.get_selected_rows()[1]
         
@@ -750,6 +760,9 @@ class HiToDo(Gtk.Window):
         self.notes_buff.clear_undo()
     
     def select_all(self, widget=None):
+        '''Handles Select All events based on the internal focus pointer. If
+        focus is on the task list, controls are enabled/disabled as required.
+        Currently supports the task view, notes view, and title editor.'''
         if self.focus == self.task_view:
             self.selection.select_all()
         
@@ -768,22 +781,27 @@ class HiToDo(Gtk.Window):
             self.focus.select_region(0, -1)
     
     def select_none(self, widget=None):
+        '''Handles Select None events based on the internal focus pointer. If
+        focus is on the task list, controls are enabled/disabled as required.
+        Currently supports the task view, notes view, and title editor.'''
         if self.focus == self.task_view:
             self.selection.unselect_all()
+        
+            #disable controls which require a selection
+            self.task_cut.set_sensitive(False)
+            self.task_copy.set_sensitive(False)
+            self.task_paste.set_sensitive(False)
+            self.task_paste_into.set_sensitive(False)
+            self.notes_view.set_sensitive(False)
+            self.task_del.set_sensitive(False)
         elif self.focus == self.notes_view:
             self.focus.emit('select-all', False)
         elif self.title_editor is not None and self.focus == self.title_editor:
             self.focus.select_region(0,0)
-        
-        #disable controls which require a selection
-        self.task_cut.set_sensitive(False)
-        self.task_copy.set_sensitive(False)
-        self.task_paste.set_sensitive(False)
-        self.task_paste_into.set_sensitive(False)
-        self.notes_view.set_sensitive(False)
-        self.task_del.set_sensitive(False)
     
     def select_inv(self, widget=None):
+        '''Inverts task selection: all selected tasks are unselected, and all
+        previously unselected tasks are selected. Uses select all or select none where possible, and otherwise calls a private function to invert recursively (see __invert_tasklist_selection()).'''
         if self.focus != self.task_view: return
         
         if self.selcount == 0:
@@ -800,6 +818,7 @@ class HiToDo(Gtk.Window):
             self.task_selected(self.selection)
     
     def __invert_tasklist_selection(self, treeiter):
+        '''Recursively switches each row's selected status, inverting the user's selection.'''
         while treeiter != None:
             #swap selection state on iter
             if self.selection.iter_is_selected(treeiter):
@@ -813,12 +832,20 @@ class HiToDo(Gtk.Window):
             treeiter = self.tasklist_filter.iter_next(treeiter)
     
     def expand_all(self, widget=None):
+        '''Expands all tasks.'''
         self.task_view.expand_all()
     
     def collapse_all(self, widget=None):
+        '''Collapses all tasks.'''
         self.task_view.collapse_all()
     
     def new_file(self, widget=None):
+        '''Creates a new file by clearing the treestore, undo/redo buffer,
+        visible columns, assigners, assignees, statii, file name, etc.
+        
+        Right now, it replaces the current file without question, but in the
+        future will honor a settings variable to possibly open a new window or
+        tab instead.'''
         if not self.confirm_discard(): return
         
         self.tasklist.clear()
