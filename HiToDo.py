@@ -878,6 +878,8 @@ class HiToDo(Gtk.Window):
         self.update_title()
     
     def open_file(self, widget=None):
+        '''Prompts the user the choose a file to load. Uses __do_open() to read
+        the file once it's known.'''
         if not self.confirm_discard(): return
         
         retcode = self.open_dlg.run()
@@ -889,6 +891,8 @@ class HiToDo(Gtk.Window):
         self.__do_open()
     
     def open_recent(self, widget):
+        '''Opens a file from the Recent Files widget. Saves file information and
+        calls __do_open() for the real work.'''
         if not self.confirm_discard(): return
         
         uri = widget.get_current_uri()
@@ -898,6 +902,7 @@ class HiToDo(Gtk.Window):
         self.__do_open()
 
     def __open_last(self):
+        '''Private function to open the most recent file on program start.'''
         retval = self.recent_files.get_uris()
         if retval == []: return
         if retval[0] == []: return
@@ -908,7 +913,12 @@ class HiToDo(Gtk.Window):
         self.__do_open()
 
     def __do_open(self):
-        '''Internal function to open a file from self.file_name using the reader at self.file_filter.'''
+        '''Private function which opens the file at self.file_name using the
+        reader self.file_filter.
+        
+        First, self.file_filter processes the file and puts the file's data into
+        a dict for loading. Save version is checked for compatability and then
+        things are loaded into our internal vars.'''
         templist = copy_treemodel(self.tasklist)
         data = {
             'filename': self.file_name,
@@ -960,6 +970,7 @@ class HiToDo(Gtk.Window):
         templist.foreach(append_row, self.tasklist)
         del templist
         
+        #adjust for different column lists
         if len(self.cols_visible) <= len(self.cols):
             codes = []
             for code, flag in self.cols_visible:
@@ -993,13 +1004,18 @@ class HiToDo(Gtk.Window):
         else:
             self.unmaximize()
             self.resize(data['geometry'][1], data['geometry'][2])
+        #this is still a little buggy, but it approximates the sidebar width fairly well
         self.notes_view.set_size_request(data['geometry'][3], -1)
         
         #reconnect model to view
         self.task_view.set_model(self.tasklist)
+        
+        #expand requested rows
         for pathstr in rows_to_expand:
             path = Gtk.TreePath.new_from_string(pathstr)
             self.task_view.expand_row(path, False)
+        
+        #select requested rows
         if selme != '' and selme is not None:
             try:
                 treeiter = self.tasklist.get_iter(selme)
@@ -1007,6 +1023,8 @@ class HiToDo(Gtk.Window):
                 self.selection.select_iter(treeiter)
             except ValueError:
                 self.selection.unselect_all()
+        
+        #start sending signals again and take focus
         self.task_view.thaw_child_notify()
         self.task_view.grab_focus()
         
@@ -1018,10 +1036,15 @@ class HiToDo(Gtk.Window):
         self.file_dirty = False
         self.update_title()
         
+        # If we opened a file as a "copy", what we're really doing is a quick
+        # file-open and file-save-as operation. This is the saving bit.
         if force_save:
             self.save_file()
     
     def pick_savefile(self):
+        '''Prompts the user to pick a save location. The chosen extension is
+        added automatically if the user left it out, and the resulting full path
+        is returned.'''
         if self.file_name != "":
             self.save_dlg.set_filename(self.file_name)
         else:
