@@ -697,7 +697,7 @@ class HiToDo(Gtk.Window):
             self.commit_spent_iter(ref, new_spent=0)
             self.commit_est(ref, new_est=0)
             
-            self.calc_parent_pct(path.to_string())
+            self.calc_parent_pct(str(path))
             self.tasklist.remove(ref)
         
         self.task_selected(self.selection)
@@ -1045,27 +1045,35 @@ class HiToDo(Gtk.Window):
         '''Prompts the user to pick a save location. The chosen extension is
         added automatically if the user left it out, and the resulting full path
         is returned.'''
+        #set up starting name
         if self.file_name != "":
             self.save_dlg.set_filename(self.file_name)
         else:
             self.save_dlg.set_current_name("Untitled list.htdl")
+        #show the dialog
         retcode = self.save_dlg.run()
         self.save_dlg.hide()
         if retcode != -3: return #cancel out if requested
         
+        #get entered path+filename
         filename = self.save_dlg.get_filename()
         self.file_filter = self.save_dlg.get_filter()
         ext = splitext(filename)[1]
         if ext == '':
+            #add extension if needed
             filename += self.file_filter.file_extension
         
         return filename
     
     def save_file_as(self, widget=None):
+        '''Prompts user for a save location (see pick_savefile()) and then saves
+        there using __do_save(). The location is preserved for future saves.'''
         self.file_name = self.pick_savefile()
         self.__do_save(self.file_name)
     
     def save_file(self, widget=None):
+        '''Saves the current file at its known location. If we don't have a
+        location yet, the user is prompted to choose one.'''
         if self.file_name == "":
             self.save_file_as()
             return
@@ -1073,10 +1081,18 @@ class HiToDo(Gtk.Window):
         self.__do_save(self.file_name)
     
     def save_copy(self, widget=None):
+        '''Prompts the user to pick a save location then saves the current file
+        there. However, the new location is then discarded and will not be used
+        for future saves.'''
         filename = self.pick_savefile()
         self.__do_save(filename)
     
-    def __do_save(self, filename):
+    def __do_save(self, filename, file_filter=None):
+        '''Private function to save our data to the file at 'filename'. The data
+        is bundled into a dict and all the writing is handled by a filter from
+        file_parsers.py.'''
+        if file_filter is None: file_filter = file_parsers.pick_filter(filename)
+        
         if self.seliter is not None:
             selpath = self.tasklist.get_path(self.seliter).to_string()
         else:
@@ -1095,15 +1111,19 @@ class HiToDo(Gtk.Window):
             'cols': self.cols_visible,
             'geometry': (self.maximized, width, height, task_width)
         }
-        self.file_filter.write(data)
+        file_filter.write(data)
         
         self.file_dirty = False
         self.update_title()
         self.last_save = datetime.now()
     
     def confirm_discard(self):
+        '''Prompts the user about discarding unsaved changes. Returns True if
+        the user wants to discard their changes, and False otherwise. Handles
+        saving with save_file().'''
         if not self.file_dirty: return True
         
+        #get the right unit
         diff = datetime.now() - self.last_save
         sec = diff.total_seconds()
         if sec > 86400:
@@ -1119,9 +1139,11 @@ class HiToDo(Gtk.Window):
             diff_num = int(sec)
             diff_unit = "second"
         
+        #construct the time field
         diff_text = "%s %s" % (diff_num, diff_unit)
         if diff_num > 1: diff_text += "s"
         
+        #make sure we have a file name of some sort
         fname = "Untitled List" if self.file_name == ""  else self.file_name
         
         dlg = dialogs.misc.htd_warn_discard(self, fname, diff_text)
@@ -1140,10 +1162,14 @@ class HiToDo(Gtk.Window):
             return False
     
     def make_dirty(self, path=None, it=None, data=None):
+        '''Marks our data as dirty (unsaved) and changes the title to reflect
+        this. See update_title().'''
         self.file_dirty = True
         self.update_title()
     
     def update_title(self):
+        '''Updates the window's title to reflect the current file's name, path,
+        and dirty state.'''
         if self.file_name != "":
             ttl = "%s (%s) - HiToDo" % (basename(self.file_name), dirname(self.file_name))
         else:
@@ -1154,6 +1180,7 @@ class HiToDo(Gtk.Window):
         self.set_title(self.title)
     
     def show_about(self, widget=None):
+        '''Shows the About dialog.'''
         self.about_dlg.run()
         self.about_dlg.hide()
     
@@ -1161,24 +1188,28 @@ class HiToDo(Gtk.Window):
         self.prefs_dlg.show_all()
     
     def set_docprops(self, widget=None):
+        '''Shows the Document Properties dialog. See move_col() and
+        toggle_col_visible() for how column settings are manipulated.'''
         self.docprops_dlg.show_all()
     
     def do_cut(self, widget=None):
+        '''Applies cut operation depending on current internal focus. For notes
+        or title, the 'cut-clipboard' signal is emitted. For the task list, the
+        selected rows are copied to internal storage and the clipboard, then
+        deleted. See __do_copy_real().'''
         if self.focus == self.notes_view or (self.title_editor is not None and self.focus == self.title_editor):
             self.focus.emit('cut-clipboard')
         elif self.focus == self.task_view:
             if self.sellist is None: return
-            row_texts = []
-            del self.copied_rows[:]
-            for path in self.sellist:
-                row_texts.append(self.tasklist[path][13])
-                self.copied_rows.append([0] + self.tasklist[path][:])
-                treeiter = self.tasklist.get_iter(path)
-                self.__copy_children(treeiter, len(self.copied_rows), self.copied_rows)
+            row_texts = self.__do_copy_real(self.sellist, self.copied_rows)
             self.clipboard.set_text("\n".join(row_texts), -1)
             self.del_current_task() #this also pushes an undo action
     
     def do_copy(self, widget=None):
+        '''Applies copy operation depending on current internal focus. For notes
+        or title, the 'copy-clipboard' signal is emitted. For the task list, the
+        selected rows are copied to internal storage and the clipboard. See
+        __do_copy_real().'''
         if self.focus == self.notes_view or (self.title_editor is not None and self.focus == self.title_editor):
             self.focus.emit('copy-clipboard')
         elif self.focus == self.task_view:
@@ -1187,16 +1218,23 @@ class HiToDo(Gtk.Window):
             self.clipboard.set_text("\n".join(row_texts), -1)
     
     def __do_copy_real(self, subject, rowlist):
+        '''Iterates selected rows and their children, storing shallow copies of
+        their data with [:]. See __copy_children() for child recursion.'''
         row_texts = []
         del rowlist[:]
         for path in subject:
             row_texts.append(self.tasklist[path][13])
+            # We store a parent reference along with each row's data. At the top
+            # level, that reference is obviously nothing, but children refer to
+            # their parent iters to maintain the tree.
             rowlist.append([0] + self.tasklist[path][:])
             treeiter = self.tasklist.get_iter(path)
             self.__copy_children(treeiter, len(rowlist), rowlist)
         return row_texts
     
     def __copy_children(self, treeiter, parent_index, rowlist):
+        '''Iterates a list of children and recurses to their own children,
+        storing shallow copies of their data with [:].'''
         child_iter = self.tasklist.iter_children(treeiter)
         while child_iter != None:
             rowlist.append([parent_index] + self.tasklist[child_iter][:])
@@ -1204,6 +1242,10 @@ class HiToDo(Gtk.Window):
             child_iter = self.tasklist.iter_next(child_iter)
     
     def do_paste(self, widget=None):
+        '''Applies paste operation depending on current internal focus. For
+        notes or title, the 'paste-clipboard' signal is emitted. For the task
+        list, new rows are created after the current row and populated with data
+        our internal 'clipboard' of rows. See __do_paste_real().'''
         if self.focus == self.notes_view or (self.title_editor is not None and self.focus == self.title_editor):
             self.focus.emit('paste-clipboard')
         elif self.focus == self.task_view:
@@ -1212,6 +1254,7 @@ class HiToDo(Gtk.Window):
             if self.seliter is None:
                 parent_iter = None
             else:
+                #get parent
                 path = self.tasklist.get_path(self.seliter).to_string()
                 parts = path.rpartition(':')
                 parent_path = parts[0]
@@ -1219,6 +1262,8 @@ class HiToDo(Gtk.Window):
                     parent_iter = self.tasklist.get_iter(parent_path)
                 else:
                     parent_iter = None
+            
+            #do the actual pasting
             new_iters = self.__do_paste_real(parent_iter, self.seliter, self.copied_rows)
         
             #push "paste" undo entry
@@ -1227,9 +1272,19 @@ class HiToDo(Gtk.Window):
             self.__push_undoable("paste", (ppath, spath, self.copied_rows[:], new_iters))
     
     def __do_paste_real(self, parent_iter, sibling_iter, row_data, apply_filter=True):
+        '''Private function which creates new rows and populates them with data
+        from the internal clipboard.
+        
+        If apply_filter is True, the data is first filtered to remove done
+        state, completion date, etc. as these are often undesirable in pasted
+        rows. Setting that flag to false forces all row data to be copied
+        verbatim, which is good when dealing with undo/redo operations.'''
         new_iters = []
-        parents = [parent_iter]
-        last_row = sibling_iter
+        # Since row data is stored in a flat list, we have to track parentage and siblings manually.
+        parents = [parent_iter] # List of parents by index. Top level always points to the meta-parent we were given.
+        last_row = sibling_iter # Track previous sibling to maintain row order
+        
+        #iterate row data and add it
         for row in row_data:
             new_row = self.defaults[:]
             if apply_filter:
@@ -1240,18 +1295,22 @@ class HiToDo(Gtk.Window):
                 for i in range(len(self.defaults)):
                     new_row[i] = row[i+1]
             
+            #handle parent/sibling logic
             parent = parents[row[0]]
             if parent == parent_iter:
                 sibling = last_row
             else:
                 sibling = None
+            #add the new row with its data
             treeiter = self.tasklist.insert_after(parent, sibling, new_row)
             
+            #add new parent to the lsit
             parents.append(treeiter)
             if parent == parent_iter:
                 new_iters.append(treeiter)
                 last_row = treeiter
             
+            #update time est and percent separately
             self.commit_est_iter(treeiter, row[3]/3600)
             self.calc_parent_pct(self.tasklist.get_path(treeiter).to_string())
         
@@ -1259,6 +1318,8 @@ class HiToDo(Gtk.Window):
         return new_iters
     
     def do_paste_into(self, widget=None):
+        '''Sets up a paste operation with a row as the new parent. See
+        __do_paste_real().'''
         if self.focus != self.task_view: return
         if self.seliter is None: return
         
@@ -1271,6 +1332,11 @@ class HiToDo(Gtk.Window):
         self.make_dirty()
     
     def do_undo(self, widget=None):
+        '''Handles undo logic. For the notes entry, it just calls that object's
+        own undo() function (see undobuffer module). For the task list, it
+        relies on a list of undoable actions pushed by every function which
+        supports undo (see __push_undoable()). Each action has its own undo
+        procedure.'''
         #Note that we never set the undo or redo action's sensitivities. They
         #must always be sensitive to allow for undo/redo within the notes_view
         #widget, regardless of the task undo/redo buffers' statii.
@@ -1345,6 +1411,10 @@ class HiToDo(Gtk.Window):
                 self.redobuffer.append(("del", (data[0], data[1], data[2], new_iters)))
     
     def do_redo(self, widget=None):
+        '''Handles redo logic. For the notes entry, it just calls that object's
+        own redo() function (see undobuffer module). For the task list, it
+        relies on a list of undoable actions which were pushed to the redo stack
+        by do_undo(). Each action has its own redo procedure.'''
         if self.focus == self.notes_view:
             self.notes_buff.redo()
         elif self.focus == self.task_view:
@@ -1420,25 +1490,37 @@ class HiToDo(Gtk.Window):
                 self.undobuffer.append(("del", (data[0], data[1], data[2])))
     
     def __push_undoable(self, action, data):
+        '''Pushes a tuple onto the undobuffer list consisting of the action name
+        and accompanying data. The name must be recognized by do_undo() and
+        do_redo().'''
         self.undobuffer.append((action, data))
         del self.redobuffer[:]
     
     def display_columns(self):
+        '''Clears the currently displayed columns and loads the ones specified
+        in 'self.cols_visible'. Order is honored.'''
+        #clear current cols
         for col in self.task_view.get_columns():
             self.task_view.remove_column(col)
         cols_vis = []
         
+        #add columns from global var, in order specified
         for col, vis in self.cols_visible:
             if vis:
                 self.task_view.append_column(self.cols_available[col])
                 cols_vis.append(col)
         
+        #mark new visibilities
         for row in self.cols:
             row[2] = row[0] in cols_vis
         
+        #ensure the title column always expands to show children
         self.task_view.set_properties(expander_column=self.col_title)
     
     def notes_keys_dn(self, widget=None, event=None):
+        '''Catches key-down events in the notes editor to enable custom actions.
+        Currently it tracks the status of the Control_* and Enter keys. When
+        Control+Enter appear together, the contents of the editor are saved.'''
         kvn = Gdk.keyval_name(event.keyval)
         if kvn == "Control_L" or kvn == "Control_R":
             self.notes_ctl_mask = True
@@ -1448,11 +1530,16 @@ class HiToDo(Gtk.Window):
             return True
     
     def notes_keys_up(self, widget=None, event=None):
+        '''Catches key-up events in the notes editor. Used to clear the
+        Control-key state mask.'''
         kvn = Gdk.keyval_name(event.keyval)
         if kvn == "Control_L" or kvn == "Control_R":
             self.notes_ctl_mask = False
     
     def tasks_keys_dn(self, widget=None, event=None):
+        '''Catches key-down events for the task list itself. This allows us to
+        bind the Delete key to del_current_task() and force F2 to begin editing
+        the current row's title.'''
         kvn = Gdk.keyval_name(event.keyval)
         if kvn == "Delete":
             self.del_current_task()
@@ -1463,11 +1550,15 @@ class HiToDo(Gtk.Window):
             return True
     
     def title_keys_dn(self, widget=None, event=None):
+        '''Catches key-down events for the task title editor. Lets us cancel
+        in-progress edits when the Escape key is pressed.'''
         kvn = Gdk.keyval_name(event.keyval)
         if kvn == "Escape":
             self.commit_title(path=self.title_edit_path, new_title='', write=False)
     
     def tasks_mouse_click(self, widget=None, event=None):
+        '''Catches mouse clicks for the task list. Allows us to show the context
+        menu on a right-click.'''
         if event.button == 3 and event.type == Gdk.EventType.BUTTON_PRESS:
             self.task_popup.show_all()
             self.task_popup.popup(None, None, 
@@ -1478,11 +1569,15 @@ class HiToDo(Gtk.Window):
             return True
     
     def toggle_toolbar(self, widget=None, event=None):
+        '''Toggles visibility of the toolbar. Sets the bar's visibility setting,
+        internal flag, and gsettings var.'''
         self.toolbar_visible = widget.get_active()
         self.toolbar.set_visible(self.toolbar_visible)
         self.settings.set_boolean("show-toolbar", self.toolbar_visible)
     
     def track_maximized(self, widget, event, data=None):
+        '''Tracks the window's maximized state. We save this as part of the
+        window geometry in htdl files.'''
         mask = Gdk.WindowState.MAXIMIZED
         self.maximized = (widget.get_window().get_state() & mask) == mask
         
