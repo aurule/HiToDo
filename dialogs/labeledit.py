@@ -50,7 +50,7 @@ class main(Gtk.Dialog):
         self.instructions = Gtk.Label()
         self.instructions.set_line_wrap(True)
         self.instructions.set_max_width_chars(12)
-        frame_contents.pack_start(self.instructions, False, True, 5)
+        frame_contents.pack_start(self.instructions, True, True, 5)
         
         content = Gtk.Box()
         content.set_property("orientation", Gtk.Orientation.HORIZONTAL)

@@ -50,9 +50,26 @@ class main(Gtk.Dialog):
         self.hide()
     
     def create_cols_tab(self):
+        frame = Gtk.Frame()
+        frame_lbl = Gtk.Label("<b>List Columns</b>")
+        frame_lbl.set_property("use-markup", True)
+        frame.set_label_widget(frame_lbl)
+        
+        first_box = Gtk.Box()
+        first_box.set_orientation(Gtk.Orientation.VERTICAL)
+        first_box.set_property("margin-left", 12)
+        frame.add(first_box)
+        
+        #explanation text
+        expolbl = Gtk.Label("Choose which columns to show. To change their order, use the up and down buttons.")
+        expolbl.set_property("wrap", True)
+        expolbl.set_max_width_chars(24)
+        first_box.pack_start(expolbl, False, False, 0)
+        
         #set up main box
         main_box = Gtk.Box()
-        main_box.set_orientation(Gtk.Orientation.VERTICAL)
+        main_box.set_orientation(Gtk.Orientation.HORIZONTAL)
+        first_box.pack_start(main_box, True, True, 0)
         
         #start with a list widget for the columns
         #first a scrolling window to put it in
@@ -81,29 +98,33 @@ class main(Gtk.Dialog):
         
         #up/down buttons
         btnbox = Gtk.ButtonBox()
-        btnbox.set_orientation(Gtk.Orientation.HORIZONTAL)
+        btnbox.set_orientation(Gtk.Orientation.VERTICAL)
         btnbox.set_homogeneous(True)
-        btnbox.set_layout(Gtk.ButtonBoxStyle.CENTER)
+        btnbox.set_layout(Gtk.ButtonBoxStyle.START)
         
         upbtn = Gtk.Button(Gtk.STOCK_GO_UP)
         upbtn.set_use_stock(True)
         upbtn.connect("clicked", self.parent.move_col, col_sel, "up")
-        btnbox.pack_start(upbtn, True, False, 0)
+        btnbox.pack_start(upbtn, False, False, 0)
         
         dnbtn = Gtk.Button(Gtk.STOCK_GO_DOWN)
         dnbtn.set_use_stock(True)
         dnbtn.connect("clicked", self.parent.move_col, col_sel, "dn")
-        btnbox.pack_start(dnbtn, True, False, 0)
+        btnbox.pack_start(dnbtn, False, False, 0)
         
-        main_box.pack_start(btnbox, True, True, 0)
+        sep = Gtk.Separator()
+        sep.set_property("orientation", Gtk.Orientation.HORIZONTAL)
+        btnbox.pack_start(sep, False, False, 0)
+        btnbox.set_child_non_homogeneous(sep, True)
         
-        #explanation text
-        expolbl = Gtk.Label("Choose which columns to show. To change their order, use the up and down buttons.")
-        expolbl.set_property("wrap", True)
-        expolbl.set_max_width_chars(24)
-        main_box.pack_start(expolbl, False, False, 0)
+        defaultbtn = Gtk.Button("De_fault")
+        defaultbtn.set_use_underline(True)
+        defaultbtn.connect("clicked", self.parent.reset_cols)
+        btnbox.pack_start(defaultbtn, False, False, 0)
         
-        return main_box
+        main_box.pack_start(btnbox, False, False, 0)
+        
+        return frame
     
     def create_stats_tab(self):
         main_box = Gtk.Box()

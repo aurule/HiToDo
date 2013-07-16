@@ -1642,6 +1642,10 @@ class HiToDo(Gtk.Window):
         colstore.swap(target, orig)
         self.make_dirty()
     
+    def reset_cols(self, widget):
+        self.cols_visible = self.cols_default[:]
+        self.display_columns()
+    
     def make_stats(self, treeiter = None):
         '''Creates a dict of document statistics. Right now, it includes the
         total number of tasks, number open, and number done. Used by Document
@@ -2178,7 +2182,7 @@ class HiToDo(Gtk.Window):
             ("quit", Gtk.STOCK_QUIT, None, None, None, self.destroy),
             ("help_about", Gtk.STOCK_ABOUT, None, None, None, self.show_about),
             ("prefs", Gtk.STOCK_PREFERENCES, "Pr_eferences", None, None, self.set_prefs),
-            ("doc_props", Gtk.STOCK_PROPERTIES, None, None, None, self.set_docprops),
+            ("doc_props", Gtk.STOCK_PROPERTIES, "_Document Properties", None, None, self.set_docprops),
             ("edit_assigners", None, "Assigne_rs (From)", None, "Manage this list's assigners", self.edit_assigners),
             ("edit_assignees", None, "Assigne_es (To)", None, "Manage this list's assignees", self.edit_assignees),
             ("edit_statii", None, "_Status", None, "Manage this list's status labels", self.edit_statii),
