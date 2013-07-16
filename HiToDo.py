@@ -1582,47 +1582,67 @@ class HiToDo(Gtk.Window):
         self.maximized = (widget.get_window().get_state() & mask) == mask
         
     def toggle_col_visible(self, widget, path, data=None):
-        code = self.cols[path][0]
-        visible_now = self.cols[path][2]
-        real_idex = self.cols_visible.index((code, visible_now))
+        '''Adds and removes columns from the task list. Used by Document
+        Properties.'''
+        code = self.cols[path][0] #internal name of the column
+        visible_now = self.cols[path][2] #current state
+        real_idex = self.cols_visible.index((code, visible_now)) #index of the row
         idex = real_idex
+        # Now we modify the index based on the visibility of the other columns.
+        # This gives us an index relative to the columns displayed by the task
+        # list.
         for col in self.cols_visible[:real_idex]:
             if not col[1]: idex -= 1
         
+        #remove or insert as necessary
         if visible_now:
             self.task_view.remove_column(self.cols_available[code])
         else:
             self.task_view.insert_column(self.cols_available[code], idex)
         
+        #update flags in 'cols_visible' list, 'cols' liststore
         self.cols_visible[real_idex] = (code, not visible_now)
         self.cols[path][2] = not visible_now
         self.make_dirty()
     
     def move_col(self, widget, sel, offset):
+        '''Shift a column up or down in the column list. Effectively moves
+        columns left or right within the task list's display. Used by Document
+        Properties dialog.'''
         colstore, orig = sel.get_selected()
         if orig is None: return
+        
+        #store the treeiter we'll swap with
         if offset == "up":
             target = colstore.iter_previous(orig)
         else:
             target = colstore.iter_next(orig)
         
+        #store column tuples; consists of column name and visible flag
         col1 = (colstore[orig][0], colstore[orig][2])
         col2 = (colstore[target][0], colstore[target][2])
+        #now cache their indexes
         id1 = self.cols_visible.index(col1)
         id2 = self.cols_visible.index(col2)
         
+        # We can only actually shift in one direction, so we work out how to do
+        # that using the relative indices of the columns. I.e. we move the
+        # smaller index in front of the bigger index.
         small = min(id1, id2)
         big = max(id1, id2)
-        #move small in front of big
         s = self.cols_available[self.cols_visible[small][0]]
         b = self.cols_available[self.cols_visible[big][0]]
-        self.task_view.move_column_after(s, b)
+        self.task_view.move_column_after(s, b) #do the shift
         
+        #swap positions in 'cols_visible' list and 'colstore' liststore
         self.cols_visible[id2], self.cols_visible[id1] = self.cols_visible[id1], self.cols_visible[id2]
         colstore.swap(target, orig)
         self.make_dirty()
     
     def make_stats(self, treeiter = None):
+        '''Creates a dict of document statistics. Right now, it includes the
+        total number of tasks, number open, and number done. Used by Document
+        Properties dialog.'''
         if treeiter is None:
             treeiter = self.tasklist.get_iter_first()
         
@@ -1647,27 +1667,38 @@ class HiToDo(Gtk.Window):
         return {'total': total, 'open': total_open, 'done': total_done}
     
     def edit_assigners(self, widget, data=None):
+        '''Wrapper for the label edit dialog (see the 'labeledit' module). Sets
+        up the dialog's title, the liststore to edit, and the list to use for
+        reference.'''
         self.label_edit_dlg.set_title("Manage Assigners (From)")
         self.label_edit_dlg.set_store(self.assigners)
         self.label_edit_dlg.set_list(self.assigners_list)
         self.label_edit_dlg.show_all()
     
     def edit_assignees(self, widget, data=None):
+        '''Wrapper for the label edit dialog (see the 'labeledit' module). Sets
+        up the dialog's title, the liststore to edit, and the list to use for
+        reference.'''
         self.label_edit_dlg.set_title("Manage Assignees (To)")
         self.label_edit_dlg.set_store(self.assignees)
         self.label_edit_dlg.set_list(self.assignees_list)
         self.label_edit_dlg.show_all()
     
     def edit_statii(self, widget, data=None):
+        '''Wrapper for the label edit dialog (see the 'labeledit' module). Sets
+        up the dialog's title, the liststore to edit, and the list to use for
+        reference.'''
         self.label_edit_dlg.set_title("Manage Status Labels")
         self.label_edit_dlg.set_store(self.statii)
         self.label_edit_dlg.set_list(self.statii_list)
         self.label_edit_dlg.show_all()
     
     def main_filter(self, model, treeiter, data=None):
+        '''Task list filtering function. Currently a placeholder.'''
         return True
     
     def import_settings(self):
+        '''Loads global setting vars from gsettings object.'''
         #parse column order and visibility
         col_order = self.settings.get_value("col-order")
         col_mask = self.settings.get_value("col-visibility")
@@ -1693,11 +1724,14 @@ class HiToDo(Gtk.Window):
         self.clobber = self.settings.get_boolean("clobber-on-new")
     
     def settings_toolbar_vis_changed(self, settings, key, data=None):
+        '''Handles external changes to the toolbar visibility setting.'''
         self.toolbar_visible = settings.get_boolean("show-toolbar")
         self.toolbar.set_visible(self.toolbar_visible)
         self.toolbar_action.set_active(self.toolbar_visible)
     
     def __init__(self):
+        '''Program setup and initialization. Sets up internal variables and
+        constructs the UI with some helper functions.'''
         Gtk.Window.__init__(self)
         self.set_default_size(1100, 700)
         self.title = "Untitled List - HiToDo"
@@ -1912,6 +1946,8 @@ class HiToDo(Gtk.Window):
         if self.open_last_file: self.__open_last()
     
     def date_render(self, col, cell, model, tree_iter, data):
+        '''Cell renderer for date cells. Converts datetime objects from the
+        tasklist model to displayable strings.'''
         val = model[tree_iter][data]
         duetime = model[tree_iter][15]
         
@@ -1920,6 +1956,8 @@ class HiToDo(Gtk.Window):
         cell.set_property("text", str(out))
     
     def datecompare(self, model, row1, row2, data=None):
+        '''Sorting function for date cells. Compares datetime objects from two
+        rows.'''
         sort_column, _ = model.get_sort_column_id()
         value1 = model.get_value(row1, sort_column)
         if value1 is "": value1 = datetime.min
@@ -1934,16 +1972,21 @@ class HiToDo(Gtk.Window):
             return 1
     
     def note_render(self, col, cell, model, tree_iter, data):
+        '''Cell renderer for notes field. Eliminates line breaks so that no task
+        entry takes up multiple lines.'''
         val = model[tree_iter][14]
         out = '' if val == '' else "[%s]" % val.replace(linesep, ' ')
         cell.set_property("text", out)
     
     def duration_render(self, col, cell, model, tree_iter, data):
+        '''Cell renderer for est and spent cells. Converts seconds into hours
+        with a suffix. May expand later to intelligently use other units.'''
         val = model[tree_iter][data]
         out = '' if val == 0 else '%1.2fH' % (val/3600)
         cell.set_property("text", out)
     
     def create_columns(self):
+        '''Creates the columns used by the task list view.'''
         priority = Gtk.CellRendererText(editable=True, foreground="#999")
         priority.connect("edited", self.commit_priority)
         priority.connect("editing-started", self.priority_edit_start)
@@ -2105,6 +2148,8 @@ class HiToDo(Gtk.Window):
         self.cols.append(['title', 'Title', True, False])
     
     def create_top_actions(self, action_group):
+        '''Creates actions for UI menus and buttons. These are application-wide
+        actions.'''
         action_group.add_actions([
             ("new_file", Gtk.STOCK_NEW, None, "", None, self.new_file),
             ("open_file", Gtk.STOCK_OPEN, None, None, "Open file", self.open_file),
@@ -2147,6 +2192,8 @@ class HiToDo(Gtk.Window):
         
         
     def create_task_actions(self, action_group):
+        '''Creates actions for UI menus and buttons. These are task-specific
+        actions.'''
         action_group.add_actions([
             ("task_newsub", Gtk.STOCK_INDENT, "New S_ubtask", "<Primary><Shift>N", "Add a new subtask", self.add_subtask),
             ("sel_all", Gtk.STOCK_SELECT_ALL, None, "<Primary>A", None, self.select_all),
@@ -2199,6 +2246,7 @@ class HiToDo(Gtk.Window):
         action_group.add_action_with_accel(self.track_action, "<Primary>T")
     
     def create_ui_manager(self):
+        '''Constructs a ui manager, complete with acceleratorgroup.'''
         uimanager = Gtk.UIManager()
 
         # Throws exception if something went wrong
@@ -2210,6 +2258,7 @@ class HiToDo(Gtk.Window):
         return uimanager
     
     def destroy(self, widget=None, data=None):
+        '''Shows the 'confirm discard' dialog before closing, if applicable.'''
         if not self.confirm_discard(): return True
         Gtk.main_quit()
 
