@@ -123,6 +123,9 @@ UI_XML = """
 </ui>
 """
 
+CSS = '''
+'''
+
 # Define the gui and its actions.
 class HiToDo(Gtk.Window):
     def skip(self, widget=None):
@@ -1671,8 +1674,10 @@ class HiToDo(Gtk.Window):
         up the dialog's title, the liststore to edit, and the list to use for
         reference.'''
         self.label_edit_dlg.set_title("Manage Assigners (From)")
+        self.label_edit_dlg.set_frame_label("Manage Assigners")
         self.label_edit_dlg.set_store(self.assigners)
         self.label_edit_dlg.set_list(self.assigners_list)
+        self.label_edit_dlg.set_instructions("Assigners", "From")
         self.label_edit_dlg.show_all()
     
     def edit_assignees(self, widget, data=None):
@@ -1680,8 +1685,10 @@ class HiToDo(Gtk.Window):
         up the dialog's title, the liststore to edit, and the list to use for
         reference.'''
         self.label_edit_dlg.set_title("Manage Assignees (To)")
+        self.label_edit_dlg.set_frame_label("Manage Assignees")
         self.label_edit_dlg.set_store(self.assignees)
         self.label_edit_dlg.set_list(self.assignees_list)
+        self.label_edit_dlg.set_instructions("Assignees", "To")
         self.label_edit_dlg.show_all()
     
     def edit_statii(self, widget, data=None):
@@ -1689,8 +1696,10 @@ class HiToDo(Gtk.Window):
         up the dialog's title, the liststore to edit, and the list to use for
         reference.'''
         self.label_edit_dlg.set_title("Manage Status Labels")
+        self.label_edit_dlg.set_frame_label("Manage Status Labels")
         self.label_edit_dlg.set_store(self.statii)
         self.label_edit_dlg.set_list(self.statii_list)
+        self.label_edit_dlg.set_instructions("Status labels", "Status")
         self.label_edit_dlg.show_all()
     
     def main_filter(self, model, treeiter, data=None):
@@ -1924,6 +1933,15 @@ class HiToDo(Gtk.Window):
         
         #commit the ui
         self.add(main_box)
+        
+        #set up styling
+        style_provider = Gtk.CssProvider()
+        style_provider.load_from_data(CSS)
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(), 
+            style_provider,     
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
         
         # create a clipboard for easy copying
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)       

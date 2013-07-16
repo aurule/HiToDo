@@ -26,6 +26,8 @@ class main(Gtk.Dialog):
         close.connect("clicked", self.disappear)
         self.set_default_response(Gtk.ResponseType.CLOSE)
         
+        self.set_name("htd_label_edit_dlg")
+        
         #internal vars
         self.treestore = None
         self.parent = parent
@@ -35,7 +37,24 @@ class main(Gtk.Dialog):
         self.name_key_press_catcher = None
         
         #get content area and do widget setup
-        content = self.get_content_area()
+        content_area = self.get_content_area()
+        self.frame = Gtk.Frame()
+        self.frame.set_property("shadow-type", Gtk.ShadowType.NONE)
+        content_area.pack_start(self.frame, True, True, 5)
+        
+        frame_contents = Gtk.Box()
+        frame_contents.set_property("orientation", Gtk.Orientation.VERTICAL)
+        frame_contents.set_property("margin-left", 12)
+        self.frame.add(frame_contents)
+        
+        self.instructions = Gtk.Label()
+        self.instructions.set_line_wrap(True)
+        self.instructions.set_max_width_chars(12)
+        frame_contents.pack_start(self.instructions, False, True, 5)
+        
+        content = Gtk.Box()
+        content.set_property("orientation", Gtk.Orientation.HORIZONTAL)
+        frame_contents.pack_start(content, True, True, 5)
         
         #start with a list widget for the columns
         #first a scrolling window to put it in
@@ -57,22 +76,23 @@ class main(Gtk.Dialog):
         
         #add it
         scroller.add(self.view)
-        content.pack_start(scroller, True, True, 0)
+        content.pack_start(scroller, True, True, 5)
         
-        #now for the "add" field and delete button
-        actions = self.get_action_area() #get button area
+        #now for the add and delete buttons
+        actions = Gtk.ButtonBox()
+        actions.set_properties(orientation=Gtk.Orientation.VERTICAL, homogeneous=True)
+        actions.set_layout(Gtk.ButtonBoxStyle.START)
+        content.pack_start(actions, False, False, 5)
         
         addbtn = Gtk.Button(Gtk.STOCK_ADD)
         addbtn.set_use_stock(True)
         addbtn.connect("clicked", self.add_label)
         actions.pack_start(addbtn, False, False, 0)
-        actions.set_child_secondary(addbtn, True)
         
         delbtn = Gtk.Button(Gtk.STOCK_REMOVE)
         delbtn.set_use_stock(True)
         delbtn.connect("clicked", self.del_selected_label)
         actions.pack_start(delbtn, False, False, 0)
-        actions.set_child_secondary(delbtn, True)
     
     def disappear(self, widget=None):
         self.view.set_model(None)
@@ -82,6 +102,11 @@ class main(Gtk.Dialog):
         Gtk.Dialog.show()
         self.grab_focus()
     
+    def set_frame_label(self, title):
+        lbl = Gtk.Label("<b>%s</b>" % title)
+        lbl.set_use_markup(True)
+        self.frame.set_label_widget(lbl)
+    
     def set_store(self, treestore):
         self.treestore = treestore
         self.view.set_model(self.treestore)
@@ -89,6 +114,9 @@ class main(Gtk.Dialog):
     def set_list(self, label_list):
         label_list.sort()
         self.label_list = label_list
+    
+    def set_instructions(self, field, colname):
+        self.instructions.set_text("Choose which %s will appear in the %s dropdown list." % (field, colname))
     
     def add_label(self, widget, data=None):
         newiter = self.treestore.append("")
