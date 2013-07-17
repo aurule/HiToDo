@@ -1710,6 +1710,11 @@ class HiToDo(Gtk.Window):
         '''Task list filtering function. Currently a placeholder.'''
         return True
     
+    def archive_done(self, widget, data=None):
+        '''Saves top-level done tasks (and descendents) to a separate archive
+        file, then deletes them. Currently a placeholder.'''
+        pass
+    
     def import_settings(self):
         '''Loads global setting vars from gsettings object.'''
         #parse column order and visibility
@@ -2177,7 +2182,7 @@ class HiToDo(Gtk.Window):
             ("open_file", Gtk.STOCK_OPEN, None, None, "Open file", self.open_file),
             ("saveas_file", Gtk.STOCK_SAVE_AS, None, None, None, self.save_file_as),
             ("save_copy", None, "Sa_ve A Copy...", None, None, self.save_copy),
-            ("archive_done", None, "Arc_hive Completed Tasks", None, None, self.skip),
+            ("archive_done", None, "Arc_hive Completed Tasks", None, None, self.archive_done),
             ("close", Gtk.STOCK_CLOSE, None, None, None, self.new_file),
             ("quit", Gtk.STOCK_QUIT, None, None, None, self.destroy),
             ("help_about", Gtk.STOCK_ABOUT, None, None, None, self.show_about),
