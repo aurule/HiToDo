@@ -1571,13 +1571,6 @@ class HiToDo(Gtk.Window):
                 None, event.button, event.time)
             return True
     
-    def toggle_toolbar(self, widget=None, event=None):
-        '''Toggles visibility of the toolbar. Sets the bar's visibility setting,
-        internal flag, and gsettings var.'''
-        self.toolbar_visible = widget.get_active()
-        self.toolbar.set_visible(self.toolbar_visible)
-        self.settings.set_boolean("show-toolbar", self.toolbar_visible)
-    
     def track_maximized(self, widget, event, data=None):
         '''Tracks the window's maximized state. We save this as part of the
         window geometry in htdl files.'''
@@ -1741,11 +1734,39 @@ class HiToDo(Gtk.Window):
         #store whether to clobber current file on open
         self.clobber = self.settings.get_boolean("clobber-on-new")
     
+    def toggle_toolbar(self, widget=None, event=None):
+        '''Toggles visibility of the toolbar. Toggles the gsettings far, whose
+        update triggers a separate function to update the bar's visibility
+        setting and our internal flag.'''
+        self.settings.set_boolean("show-toolbar", widget.get_active())
+    
     def settings_toolbar_vis_changed(self, settings, key, data=None):
         '''Handles external changes to the toolbar visibility setting.'''
         self.toolbar_visible = settings.get_boolean("show-toolbar")
         self.toolbar.set_visible(self.toolbar_visible)
         self.toolbar_action.set_active(self.toolbar_visible)
+    
+    def toggle_reopen(self, widget, data=None):
+        self.settings.set_boolean("reopen", widget.get_active())
+    
+    def settings_reopen_changed(self, settings, key, data=None):
+        self.open_last_file = settings.get_boolean("reopen")
+        self.prefs_dlg.reopen_toggle.set_active(self.open_last_file)
+    
+    def toggle_clobber(self, widget, data=None):
+        self.settings.set_boolean("clobber-on-new", widget.get_active())
+    
+    def settings_clobber_changed(self, settings, key, data=None):
+        self.clobber = settings.get_boolean("clobber-on-new")
+        self.prefs_dlg.clobber_toggle.set_active(self.clobber)
+    
+    def toggle_use_tabs(self, widget, data=None):
+        self.settings.set_boolean("use-tabs", widget.get_active())
+    
+    def settings_use_tabs_changed(self, settings, key, data=None):
+        self.use_tabs = settings.get_boolean("use-tabs")
+        self.prefs_dlg.use_tabs_toggle.set_active(self.use_tabs)
+        self.prefs_dlg.use_wins_toggle.set_active(not self.use_tabs)
     
     def __init__(self):
         '''Program setup and initialization. Sets up internal variables and
@@ -1837,7 +1858,6 @@ class HiToDo(Gtk.Window):
         self.cols_visible = []
         self.cols_default = []
         self.cols = Gtk.ListStore(str, str, bool, bool) #code, label for settings screen, visible flag, can hide flag
-        self.open_last_file = True
         self.undobuffer = []
         self.redobuffer = []
         self.maximized = False
@@ -1849,15 +1869,16 @@ class HiToDo(Gtk.Window):
         self.settings.connect("changed::default-assigners", self.skip)
         self.settings.connect("changed::default-assignees", self.skip)
         self.settings.connect("changed::default-statii", self.skip)
-        self.settings.connect("changed::reopen", self.skip)
-        self.settings.connect("changed::use-tabs", self.skip)
+        self.settings.connect("changed::reopen", self.settings_reopen_changed)
+        self.settings.connect("changed::use-tabs", self.settings_use_tabs_changed)
         self.settings.connect("changed::show-toolbar", self.settings_toolbar_vis_changed)
-        self.settings.connect("changed::clobber-on-new", self.skip)
+        self.settings.connect("changed::clobber-on-new", self.settings_clobber_changed)
         
         #These are overwridden by GSettings object
         self.toolbar_visible = True
         self.clobber = False
         self.use_tabs = False
+        self.open_last_file = True
         
         self.import_settings()
         
@@ -1966,6 +1987,7 @@ class HiToDo(Gtk.Window):
         self.save_dlg = dialogs.misc.htd_save(self)
         self.about_dlg = dialogs.misc.htd_about(self)
         self.prefs_dlg = dialogs.prefs.main(self)
+        self.settings_use_tabs_changed(self.settings, key=None, data=None) #toggle visibility here to avoid errors from a spurious "toggled" event
         self.docprops_dlg = dialogs.docprops.main(self)
         self.label_edit_dlg = dialogs.labeledit.main(self)
         self.version_warn_dlg = dialogs.misc.htd_version_warning(self)
