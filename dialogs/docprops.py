@@ -29,7 +29,7 @@ class main(Gtk.Dialog):
         self.parent = parent
         
         nb = Gtk.Notebook()
-        nb.set_border_width(5)
+        nb.set_property("margin", 10)
         
         #Stats tab
         statlbl = Gtk.Label("_Stats")
@@ -54,6 +54,8 @@ class main(Gtk.Dialog):
         frame_lbl = Gtk.Label("<b>List Columns</b>")
         frame_lbl.set_property("use-markup", True)
         frame.set_label_widget(frame_lbl)
+        frame.set_property("margin", 10)
+        frame.set_property("shadow-type", Gtk.ShadowType.NONE)
         
         first_box = Gtk.Box()
         first_box.set_orientation(Gtk.Orientation.VERTICAL)
@@ -129,6 +131,7 @@ class main(Gtk.Dialog):
     def create_stats_tab(self):
         main_box = Gtk.Box()
         main_box.set_orientation(Gtk.Orientation.VERTICAL)
+        main_box.set_property("margin", 10)
         
         #first up are stats directly related to tasks
         tasksframe = Gtk.Frame()

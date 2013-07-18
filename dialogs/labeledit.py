@@ -40,7 +40,8 @@ class main(Gtk.Dialog):
         content_area = self.get_content_area()
         self.frame = Gtk.Frame()
         self.frame.set_property("shadow-type", Gtk.ShadowType.NONE)
-        content_area.pack_start(self.frame, True, True, 5)
+        self.frame.set_property("margin", 6)
+        content_area.pack_start(self.frame, True, True, 0)
         
         frame_contents = Gtk.Box()
         frame_contents.set_property("orientation", Gtk.Orientation.VERTICAL)
