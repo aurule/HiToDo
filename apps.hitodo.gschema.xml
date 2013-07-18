@@ -36,8 +36,8 @@ along with HiToDo.  If not, see <http://www.gnu.org/licenses/>.
         </key>
         <key type="b" name="clobber-on-new">
             <default>false</default>
-            <summary>Open new files in the same window. Ignored when use-tabs is True.</summary>
-            <description>When true, opening a new file closes the current file and reuses its window. When false, opening a new file will create a new HiToDo window for that task list.</description>
+            <summary>Open new files in the same window or tab.</summary>
+            <description>When true, opening a new file closes the current file and reuses its window. When false, opening a new file will create a new HiToDo window or tab for that task list.</description>
         </key>
         <key type="as" name="default-statii">
             <default>[]</default>
