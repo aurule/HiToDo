@@ -49,14 +49,13 @@ class main(Gtk.Dialog):
         layout_box.set_property("margin-left", 12)
         
         self.use_tabs_toggle = Gtk.RadioButton.new_with_mnemonic_from_widget(None, "Use _Tabs to show multiple task lists")
-        self.use_tabs_toggle.set_sensitive(False) #TODO remove this block once tabs are actually implemented
         self.use_tabs_toggle.connect("toggled", self.parent.toggle_use_tabs)
         layout_box.pack_start(self.use_tabs_toggle, False, False, 2)
         self.use_wins_toggle = Gtk.RadioButton.new_with_mnemonic_from_widget(self.use_tabs_toggle, "Use _Windows to show multiple task lists")
         layout_box.pack_start(self.use_wins_toggle, False, False, 2)
         
         layout_frame.add(layout_box)
-        iface_content.pack_start(layout_frame, False, True, 0)
+        #iface_content.pack_start(layout_frame, False, True, 0) #TODO remove this block once tabs are actually implemented
         
         behavior_frame = Gtk.Frame()
         behavior_lbl = Gtk.Label("<b>Behavior</b>")
@@ -70,6 +69,7 @@ class main(Gtk.Dialog):
         
         self.clobber_toggle = Gtk.CheckButton.new_with_mnemonic("Cl_ose the current task list before opening a new one")
         self.clobber_toggle.set_active(self.parent.clobber)
+        self.clobber_toggle.set_sensitive(False) #TODO remove this block once tabs are actually implemented
         self.clobber_toggle.connect("toggled", self.parent.toggle_clobber)
         behavior_box.pack_start(self.clobber_toggle, False, False, 5)
         

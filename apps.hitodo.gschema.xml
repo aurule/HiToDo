@@ -35,7 +35,7 @@ along with HiToDo.  If not, see <http://www.gnu.org/licenses/>.
             <description>When true, multiple task lists can be opened within the same window using a set of tabs. When false, every task list is shown in its own window.</description>
         </key>
         <key type="b" name="clobber-on-new">
-            <default>false</default>
+            <default>true</default>
             <summary>Open new files in the same window or tab.</summary>
             <description>When true, opening a new file closes the current file and reuses its window. When false, opening a new file will create a new HiToDo window or tab for that task list.</description>
         </key>
