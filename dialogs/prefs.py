@@ -17,6 +17,8 @@
 
 from gi.repository import Gtk, Gdk
 
+import labeledit
+
 class main(Gtk.Dialog):
     def __init__(self, parent):
         flags = Gtk.DialogFlags.DESTROY_WITH_PARENT
@@ -92,7 +94,7 @@ class main(Gtk.Dialog):
         labels_content.set_property("margin", 6)
         
         from_frame = Gtk.Frame()
-        from_lbl = Gtk.Label("<b>Assigners (From)</b>")
+        from_lbl = Gtk.Label("<b>Default Assigners (From)</b>")
         from_lbl.set_property("use-markup", True)
         from_frame.set_label_widget(from_lbl)
         from_frame.set_property("shadow-type", Gtk.ShadowType.NONE)
@@ -103,6 +105,9 @@ class main(Gtk.Dialog):
         
         self.assigners_list_label = Gtk.Label()
         self.assigners_list_label.set_max_width_chars(24)
+        self.assigners_list_label.set_property("use-markup", True)
+        text = ', '.join(self.parent.assigners_default) if len(self.parent.assigners_default) else '<i>None</i>'
+        self.assigners_list_label.set_markup(text)
         from_box.pack_start(self.assigners_list_label, True, True, 2)
         
         from_edit_box = Gtk.ButtonBox()
@@ -118,7 +123,7 @@ class main(Gtk.Dialog):
         labels_content.pack_start(from_frame, False, True, 0)
         
         to_frame = Gtk.Frame()
-        to_lbl = Gtk.Label("<b>Assignees (To)</b>")
+        to_lbl = Gtk.Label("<b>Default Assignees (To)</b>")
         to_lbl.set_property("use-markup", True)
         to_frame.set_label_widget(to_lbl)
         to_frame.set_property("shadow-type", Gtk.ShadowType.NONE)
@@ -130,6 +135,9 @@ class main(Gtk.Dialog):
         
         self.assignees_list_label = Gtk.Label()
         self.assignees_list_label.set_max_width_chars(24)
+        self.assignees_list_label.set_property("use-markup", True)
+        text = ', '.join(self.parent.assigners_default) if len(self.parent.assignees_default) else '<i>None</i>'
+        self.assignees_list_label.set_markup(text)
         to_box.pack_start(self.assignees_list_label, True, True, 2)
         
         to_edit_box = Gtk.ButtonBox()
@@ -146,7 +154,7 @@ class main(Gtk.Dialog):
         
         
         status_frame = Gtk.Frame()
-        status_lbl = Gtk.Label("<b>Status</b>")
+        status_lbl = Gtk.Label("<b>Default Status</b>")
         status_lbl.set_property("use-markup", True)
         status_frame.set_label_widget(status_lbl)
         status_frame.set_property("shadow-type", Gtk.ShadowType.NONE)
@@ -158,6 +166,9 @@ class main(Gtk.Dialog):
         
         self.status_list_label = Gtk.Label()
         self.status_list_label.set_max_width_chars(24)
+        self.status_list_label.set_property("use-markup", True)
+        text = ', '.join(self.parent.statii_default) if len(self.parent.statii_default) else '<i>None</i>'
+        self.status_list_label.set_markup(text)
         status_box.pack_start(self.status_list_label, True, True, 2)
         
         status_edit_box = Gtk.ButtonBox()
@@ -258,3 +269,11 @@ class main(Gtk.Dialog):
     
     def disappear(self, widget=None):
         self.hide()
+    
+    def make_labelstore(self, label_list):
+        pass
+        #TODO set up a treestore from elements of label_list
+        
+    
+    def make_dirty(self):
+        pass
