@@ -22,6 +22,8 @@ from xml.etree.ElementTree import SubElement
 from dateutil.parser import parse as dateparse
 from datetime import datetime
 from os.path import splitext, isfile
+from tempfile import mkstemp
+import gzip
 
 def pick_filter(file_name):
     ext = splitext(file_name)[1]
@@ -39,8 +41,9 @@ class htd_filter(Gtk.FileFilter):
 
     def read_to_store(self, data):
         '''Reads todo list data from xml file. Data is a dictionary of data holders to fill.'''
-
-        document = ElementTree.parse(data['filename'])
+        f = gzip.open(data['filename'], 'rb')
+        document = ElementTree.parse(f)
+        f.close()
         htd = document.getroot()
         data['save_version'] = float(htd.get('version'))
         data['our_version'] = float(self.file_version)
@@ -155,7 +158,6 @@ class htd_filter(Gtk.FileFilter):
 
     def write_simple(self, data):
         '''Writes todo list data to xml file. Data is a dictionary of data pieces to store.'''
-
         htd = Element('htd')
         htd.set('version', self.file_version)
 
@@ -208,12 +210,13 @@ class htd_filter(Gtk.FileFilter):
         self.store_tasks(data['task_store'], tasklist)
 
         #write to file
-        ofile = open(data['filename'], 'w')
+        ofile = gzip.open(data['filename'], 'wb')
         ofile.write(ElementTree.tostring(htd, encoding="UTF-8"))
         ofile.close()
 
     def write_append(self, data):
         '''Appends tasks to an existing file. CAUTION: This function does not add or update anything besides tasks.'''
+
         document = ElementTree.parse(data['filename'])
         htd = document.getroot()
         tasklist = document.find("tasklist")
@@ -221,7 +224,7 @@ class htd_filter(Gtk.FileFilter):
         self.store_tasks(data['task_store'], tasklist)
 
         #write to file
-        ofile = open(data['filename'], 'w')
+        ofile = gzip.open(data['filename'], 'wb')
         ofile.write(ElementTree.tostring(htd, encoding="UTF-8"))
         ofile.close()
 
