@@ -24,29 +24,28 @@ Although it isn't completely finished, HiToDo is stable and fairly usable for no
 * Undo/Redo for notes field
 * Task reordering via drag-and-drop
 * Unlimited per-session undo/redo for tasks
+* Preferences stored with GSettings
+* Archive completed tasks
+* Compressed save files using gzip
 
 **Planned Features:**
-
-* Global preferences stored with GSettings
 * Open multiple files at once via multiple windows (launched from within the program) or tabs in a single window
 * Open/Save of networked files
-* Archive completed tasks
 * Merge and split task lists
-* Compressed save files
-    * Would open up a lot of possibilities with bundled files
-    * File signing/integrity checksums
-    * Embedding linked files
-* i18n and l10n support
+* File signing/integrity checksums
+* Embedding linked files, other bundled files
+* i18n / l10n support
 * Attach URLs to tasks
 * Built-in encryption?
 * ToDoList save/open
 
 # Requirements
 
-HiToDo requires
-* Python 2.5 or higher (2.7.5 recommended)
-* GTK+ 3.2 or higher with python-gi bindings
+HiToDo requires at least:
+* Python 2.5
+* GTK+ 3.2 with python-gi bindings
 * python-dateutil 1.5
+* zlib 1.1.4
 
 # License
 
