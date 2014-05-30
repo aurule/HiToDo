@@ -21,13 +21,12 @@ from xml.etree.ElementTree import Element
 from xml.etree.ElementTree import SubElement
 from dateutil.parser import parse as dateparse
 from datetime import datetime
-from os.path import splitext
+from os.path import splitext, isfile
 
 def pick_filter(file_name):
     ext = splitext(file_name)[1]
     if ext == '.htdl':
-        f = htd_filter()
-        return f
+        return htd_filter()
 
 class htd_filter(Gtk.FileFilter):
     def __init__(self):
@@ -37,60 +36,60 @@ class htd_filter(Gtk.FileFilter):
         self.file_extension = ".htdl"
         self.tasklist = None
         self.file_version = "1.0"
-    
+
     def read_to_store(self, data):
         '''Reads todo list data from xml file. Data is a dictionary of data holders to fill.'''
-        
+
         document = ElementTree.parse(data['filename'])
         htd = document.getroot()
         data['save_version'] = float(htd.get('version'))
         data['our_version'] = float(self.file_version)
-        
+
         #get assigners, assignees, and statii lists
         assigners = document.find("assigners")
         for n in assigners.findall('name'):
             if n.text not in data['from_list']:
                 data['from_list'].append(n.text)
-        
+
         assignees = document.find("assignees")
         for n in assignees.findall('name'):
             if n.text not in data['to_list']:
                 data['to_list'].append(n.text)
-        
+
         statii = document.find("statii")
         for n in statii.findall('name'):
             if n.text not in data['status_list']:
                 data['status_list'].append(n.text)
-        
+
         #get visible column list
         columns = document.find('columns')
         for c in columns.findall('col'):
             data['cols'].append((c.text, c.attrib['visible'] == "True"))
-        
+
         #get window geometry
         geo = document.find('geometry')
         maxed = geo.find('maximized').text == "True"
         height = int(geo.find('height').text)
         width = int(geo.find('width').text)
         task_width = int(geo.find('task-width').text)
-        
+
         data['geometry'] = (maxed, height, width, task_width)
-        
+
         #get highest-level tasklist element
         tlist = document.find("tasklist")
         self.tasklist = data['task_store']
         self.__read_tasks(tlist, None)
-        
+
         exp = document.find('expanded')
         expanded_paths = []
         for n in exp.findall('path'):
             expanded_paths.append(n.text)
         seldata = document.find('selected')
         sel = seldata.text
-        
+
         data['expanded'] = expanded_paths
         data['selected'] = sel
-    
+
     def __read_tasks(self, tlist, parent=None):
         '''Internal function to recursively add tasks from an XML file to the treestore self.tasklist.'''
         for task in tlist.iterfind('./task'):
@@ -143,48 +142,54 @@ class htd_filter(Gtk.FileFilter):
             tasks.append(task.find('due').get('useTime') == "True")
             tasks.append(not done) #inverse done
             tasks.append(False) #time track flag
-            
+
             #append to store
             treeiter = self.tasklist.append(parent, tasks)
             self.__read_tasks(task.find('tasklist'), treeiter)
-    
-    def write(self, data):
+
+    def write(self, data, append):
+        if append is True and isfile(data['filename']):
+            self.write_append(data)
+        else:
+            self.write_simple(data)
+
+    def write_simple(self, data):
         '''Writes todo list data to xml file. Data is a dictionary of data pieces to store.'''
 
         htd = Element('htd')
         htd.set('version', self.file_version)
-        
+
         #store assigners, assignees, and statii lists
         assigners = SubElement(htd, 'assigners')
         for f in data['from_list']:
             e = SubElement(assigners, 'name')
             e.text = unicode(f, 'utf-8')
-        
+
         assignees = SubElement(htd, 'assignees')
         for f in data['to_list']:
             e = SubElement(assignees, 'name')
             e.text = unicode(f, 'utf-8')
-        
+
         statii = SubElement(htd, 'statii')
         for f in data['status_list']:
             e = SubElement(statii, 'name')
             e.text = unicode(f, 'utf-8')
-        
+
         #store list of expanded rows
         exp = SubElement(htd, 'expanded')
         data['task_view'].map_expanded_rows(self.map_expanded, exp)
-        
+
         #store path of selected row
         sel = SubElement(htd, 'selected')
         sel.text = data['selection']
-        
+
         #store cols list
         columns = SubElement(htd, 'columns')
         for col, vis in data['cols']:
             c = SubElement(columns, 'col')
             c.set("visible", str(vis))
             c.text = col
-        
+
         #store window geometry
         geo = SubElement(htd, 'geometry')
         maxed = SubElement(geo, 'maximized')
@@ -195,28 +200,41 @@ class htd_filter(Gtk.FileFilter):
         width.text = str(data['geometry'][2])
         task_width = SubElement(geo, 'task-width')
         task_width.text = str(data['geometry'][3])
-        
+
         #create master tasklist element
         tasklist = SubElement(htd, 'tasklist')
-        
+
         #iterate tasks and add to tasklist element
         self.store_tasks(data['task_store'], tasklist)
-        
+
         #write to file
         ofile = open(data['filename'], 'w')
         ofile.write(ElementTree.tostring(htd, encoding="UTF-8"))
         ofile.close()
-    
+
+    def write_append(self, data):
+        '''Appends tasks to an existing file. CAUTION: This function does not add or update anything besides tasks.'''
+        document = ElementTree.parse(data['filename'])
+        htd = document.getroot()
+        tasklist = document.find("tasklist")
+        # TODO update the rest of the saved info
+        self.store_tasks(data['task_store'], tasklist)
+
+        #write to file
+        ofile = open(data['filename'], 'w')
+        ofile.write(ElementTree.tostring(htd, encoding="UTF-8"))
+        ofile.close()
+
     def map_expanded(self, treeview, path, xml):
         row = SubElement(xml, 'path')
         row.text = str(path)
-    
+
     def store_tasks(self, treestore, taskelem):
         self.tasklist = treestore
         treeiter = self.tasklist.get_iter_first()
         self.__store_peers(treeiter, taskelem)
         self.tasklist = None
-    
+
     def __store_peers(self, treeiter, taskelem):
         while treeiter is not None:
             task = SubElement(taskelem, 'task')
@@ -228,58 +246,58 @@ class htd_filter(Gtk.FileFilter):
             e.text = str(self.tasklist[treeiter][2])
             e = SubElement(task, 'spent') #time spent
             e.text = str(self.tasklist[treeiter][3])
-            
+
             #duetime flag changes datetime format
             duetime = self.tasklist[treeiter][15]
             fmt = "%Y-%m-%d %H:%M" if duetime else "%Y-%m-%d" #uses ISO 8601 format
-            
+
             #due
             if self.tasklist[treeiter][8] is not '':
                 val = self.tasklist[treeiter][8]
                 out = "" if val is '' else val.strftime(fmt)
-                
+
                 due = SubElement(task, 'due')
                 due.text = out
                 due.set('useTime', str(self.tasklist[treeiter][15]))
             else:
                 due = SubElement(task, 'due')
                 due.set('useTime', str(self.tasklist[treeiter][15]))
-            
+
             #completed
             if self.tasklist[treeiter][7] is not '':
                 val = self.tasklist[treeiter][7]
                 out = "" if val is '' else val.strftime(fmt)
-                
+
                 e = SubElement(task, 'completed')
                 e.text = out
             else:
                 SubElement(task, 'completed')
-            
+
             #est begin
             if self.tasklist[treeiter][4] is not '':
                 val = self.tasklist[treeiter][4]
                 out = "" if val is '' else val.strftime(fmt)
-                
+
                 e = SubElement(task, 'est-begin')
                 e.text = out
             else:
                 SubElement(task, 'est-begin')
-            
+
             #est complete
             if self.tasklist[treeiter][5] is not '':
                 val = self.tasklist[treeiter][5]
                 out = "" if val is '' else val.strftime(fmt)
-                
+
                 e = SubElement(task, 'est-complete')
                 e.text = out
             else:
                 SubElement(task, 'est-complete')
-            
+
             #act begin
             if self.tasklist[treeiter][6] is not "":
                 val = self.tasklist[treeiter][6]
                 out = "" if val is '' else val.strftime(fmt)
-                
+
                 e = SubElement(task, 'act-begin')
                 e.text = out
             else:

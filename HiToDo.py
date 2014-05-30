@@ -1071,7 +1071,7 @@ class HiToDo(Gtk.Window):
         '''Prompts user for a save location (see pick_savefile()) and then saves
         there using __do_save(). The location is preserved for future saves.'''
         self.file_name = self.pick_savefile()
-        self.__do_save(self.file_name)
+        self.__do_save(self.file_name, self.tasklist)
 
     def save_file(self, widget=None):
         '''Saves the current file at its known location. If we don't have a
@@ -1080,23 +1080,23 @@ class HiToDo(Gtk.Window):
             self.save_file_as()
             return
 
-        self.__do_save(self.file_name)
+        self.__do_save(self.file_name, self.tasklist)
 
     def save_copy(self, widget=None):
         '''Prompts the user to pick a save location then saves the current file
         there. However, the new location is then discarded and will not be used
         for future saves.'''
         filename = self.pick_savefile()
-        self.__do_save(filename)
+        self.__do_save(filename, self.tasklist)
 
-    def __do_save(self, filename, file_filter=None):
+    def __do_save(self, filename, tasklist, append=False, file_filter=None):
         '''Private function to save our data to the file at 'filename'. The data
         is bundled into a dict and all the writing is handled by a filter from
         file_parsers.py.'''
         if file_filter is None: file_filter = file_parsers.pick_filter(filename)
 
-        if self.seliter is not None:
-            selpath = self.tasklist.get_path(self.seliter).to_string()
+        if tasklist is self.tasklist and self.seliter is not None:
+            selpath = tasklist.get_path(self.seliter).to_string()
         else:
             selpath = ''
 
@@ -1107,13 +1107,13 @@ class HiToDo(Gtk.Window):
             'from_list': sorted(self.assigners_list),
             'to_list': sorted(self.assignees_list),
             'status_list': sorted(self.statii_list),
-            'task_store': self.tasklist,
+            'task_store': tasklist,
             'task_view': self.task_view,
             'selection': selpath,
             'cols': self.cols_visible,
             'geometry': (self.maximized, width, height, task_width)
         }
-        file_filter.write(data)
+        file_filter.write(data, append)
 
         self.file_dirty = False
         self.update_title()
@@ -1705,7 +1705,55 @@ class HiToDo(Gtk.Window):
     def archive_done(self, widget, data=None):
         '''Saves top-level done tasks (and descendents) to a separate archive
         file, then deletes them. Currently a placeholder.'''
-        pass
+
+        # show the export dialog
+        dlg = dialogs.misc.htd_warn_archive(self)
+        retval = dlg.run()
+        dlg.destroy()
+
+        if retval == -3:
+            #do the archive operation
+
+            # archive filename is our path + _archive + ext
+            bits = splitext(self.file_name)
+            archive_path = bits[0]+'_archive'+bits[1]
+
+            # someplace to store the DONE entries
+            # templist = copy_treemodel(self.tasklist)
+
+            # disable signals while we make big changes to the model
+            self.task_view.freeze_child_notify()
+
+            # loop through self.tasklist, adding DONE entries and descendents to templist and removing them from our list
+            archive_filter = self.tasklist.filter_new(None)
+            archive_filter.set_visible_column(12)
+
+            # append our rows to the selected file
+            self.__do_save(archive_path, archive_filter, True)
+            del archive_filter
+
+            # remove rows from the main file
+            treeiter = self.tasklist.get_iter_first()
+            while self.tasklist.iter_is_valid(treeiter):
+                if self.tasklist[treeiter][12] is True:
+                    self.tasklist.remove(treeiter)
+                else:
+                    treeiter = self.tasklist.iter_next(treeiter)
+
+            #start sending signals again and take focus
+            self.task_view.thaw_child_notify()
+            self.task_view.grab_focus()
+
+            #clear undo and redo buffers
+            del self.undobuffer[:]
+            del self.redobuffer[:]
+
+            self.file_dirty = True
+            self.update_title()
+            return True
+        else:
+            #cancel or any other code (like from esc key)
+            return False
 
     def import_settings(self):
         '''Loads global setting vars from gsettings object.'''
