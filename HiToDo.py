@@ -1734,7 +1734,7 @@ class HiToDo(Gtk.Window):
 
             # remove rows from the main file
             treeiter = self.tasklist.get_iter_first()
-            while self.tasklist.iter_is_valid(treeiter):
+            while treeiter is not None:
                 if self.tasklist[treeiter][12] is True:
                     self.tasklist.remove(treeiter)
                 else:
