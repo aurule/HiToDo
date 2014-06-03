@@ -641,6 +641,7 @@ class HiToDo(Gtk.Window):
         '''Set up the title editor widget and store its edit path. We also set
         the internal focus to the editor (see track_focus()) and attach a key
         listener. See title_keys_dn().'''
+        editor.set_text(self.tasklist[path][13])
         self.title_edit_path = path
         self.title_editor = editor
         self.track_focus(widget=editor)
@@ -2067,12 +2068,13 @@ class HiToDo(Gtk.Window):
         else:
             return 1
 
-    def note_render(self, col, cell, model, tree_iter, data):
+    def title_render(self, col, cell, model, tree_iter, data):
         '''Cell renderer for notes field. Eliminates line breaks so that no task
         entry takes up multiple lines.'''
-        val = model[tree_iter][14]
-        out = '' if val == '' else "[%s]" % val.replace(linesep, ' ')
-        cell.set_property("text", out)
+        text = model[tree_iter][13]
+        notes = model[tree_iter][14]
+        out = text if notes == '' else "%s  <span color=\"#999\">[%s]</span>" % (text, notes.replace(linesep, ' '))
+        cell.set_property("markup", out)
 
     def duration_render(self, col, cell, model, tree_iter, data):
         '''Cell renderer for est and spent cells. Converts seconds into hours
@@ -2224,20 +2226,15 @@ class HiToDo(Gtk.Window):
         self.cols_available['done'] = col_done
         self.cols.append(['done', u'Done (\u2713)', True, False])
 
-        self.title_cell = Gtk.CellRendererText(editable=True, ellipsize=Pango.EllipsizeMode.NONE, foreground="#999")
+        self.title_cell = Gtk.CellRendererText(editable=True, ellipsize=Pango.EllipsizeMode.MIDDLE, foreground="#999")
         self.title_cell.connect("edited", self.commit_title)
         self.title_cell.connect("editing-started", self.title_edit_start)
         self.title_cell.connect("editing-canceled", self.commit_title, None, None, True)
-        note = Gtk.CellRendererText(editable=False, ellipsize=Pango.EllipsizeMode.MIDDLE, foreground="#999")
         self.col_title = Gtk.TreeViewColumn("Title")
-        #self.col_title.set_reorderable(True)
         self.col_title.pack_start(self.title_cell, True)
-        self.col_title.pack_start(note, False)
-        self.col_title.add_attribute(self.title_cell, "text", 13)
         self.col_title.add_attribute(self.title_cell, "foreground-set", 12)
         self.col_title.add_attribute(self.title_cell, "strikethrough", 12)
-        self.col_title.set_cell_data_func(note, self.note_render)
-        self.col_title.add_attribute(note, "strikethrough", 12)
+        self.col_title.set_cell_data_func(self.title_cell, self.title_render)
         self.col_title.set_sort_column_id(13)
         self.col_title.code = "title"
         self.cols_available['title'] = self.col_title
