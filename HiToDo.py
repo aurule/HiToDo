@@ -28,6 +28,7 @@ from dateutil.parser import parse as dateparse
 from math import floor
 import xml.etree.ElementTree as et
 import operator
+from cgi import escape
 
 import testing
 import dialogs
@@ -2073,7 +2074,7 @@ class HiToDo(Gtk.Window):
         entry takes up multiple lines.'''
         text = model[tree_iter][13]
         notes = model[tree_iter][14]
-        out = text if notes == '' else "%s  <span color=\"#999\">[%s]</span>" % (text, notes.replace(linesep, ' '))
+        out = escape(text) if notes == '' else "%s  <span color=\"#999\">[%s]</span>" % (escape(text), escape(notes.replace(linesep, ' ')))
         cell.set_property("markup", out)
 
     def duration_render(self, col, cell, model, tree_iter, data):
