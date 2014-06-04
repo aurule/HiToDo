@@ -70,7 +70,7 @@ class htd_about(Gtk.AboutDialog):
         Gtk.AboutDialog.__init__(self)
         self.set_transient_for(parent)
         self.set_program_name("HiToDO")
-        self.set_version("0.9")
+        self.set_version(parent.program_version)
         self.set_copyright(u"Copyright \xa9 2013 Peter Andrews")
         self.set_comments("Heirarchical task manager inspired by AbstractSpoon's ToDoList.")
         self.set_license_type(Gtk.License.GPL_3_0)

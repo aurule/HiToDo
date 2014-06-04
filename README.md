@@ -1,6 +1,8 @@
 # HiToDo
 
-HiToDo is a heirarchical task list manager inspired by [ToDoList](http://www.abstractspoon.com/tdl_resources.html). It's designed to reproduce those features which I found most useful and needed in day-to-day use. There's a lot more that ToDoList can do, so check it out if you run Windows!
+*Version 0.9.X*
+
+HiToDo is a heirarchical task list manager inspired by [ToDoList](http://www.abstractspoon.com/tdl_resources.html). It's designed to reproduce those features which I found most useful and necessary in day-to-day use. There's a lot more that ToDoList can do, so check it out if you run Windows!
 
 Although it isn't completely finished, HiToDo is stable and fairly usable for non-critical task management. However, I wouldn't recommend it for production use without a lot of backups and the patience to recreate lists as the format changes.
 
@@ -46,6 +48,10 @@ HiToDo requires at least:
 * GTK+ 3.2 with python-gi bindings
 * python-dateutil 1.5
 * zlib 1.1.4
+
+## Versioning
+
+HiToDo uses [Symantic Versioning](http://semver.org/) for its releases.
 
 # License
 

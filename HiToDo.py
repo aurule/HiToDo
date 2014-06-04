@@ -35,6 +35,8 @@ import dialogs
 import file_parsers
 import undobuffer
 
+program_version = "0.9.3"
+
 UI_XML = """
 <ui>
     <menubar name='MenuBar'>
