@@ -35,8 +35,6 @@ import dialogs
 import file_parsers
 import undobuffer
 
-program_version = "0.9.3"
-
 UI_XML = """
 <ui>
     <menubar name='MenuBar'>
@@ -130,6 +128,8 @@ CSS = '''
 
 # Define the gui and its actions.
 class HiToDo(Gtk.Window):
+    program_version = "0.9.3"
+
     def skip(self, widget=None):
         '''Placeholder function for unimplemented UI actions.'''
         pass
