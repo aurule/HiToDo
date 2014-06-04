@@ -52,7 +52,7 @@ class htd_warn_archive(Gtk.MessageDialog):
         Gtk.MessageDialog.__init__(self, parent, flags, Gtk.MessageType.WARNING, Gtk.ButtonsType.NONE, "Archive completed tasks?")
         self.format_secondary_text("This will move all top-level completed tasks to an archive list. This action cannot be undone.")
         self.add_button(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
-        self.add_button(Gtk.STOCK_CLEAR, Gtk.ResponseType.ACCEPT)
+        self.add_button(Gtk.STOCK_OK, Gtk.ResponseType.ACCEPT)
         self.set_default_response(Gtk.ResponseType.ACCEPT)
 
 class htd_warn_discard(Gtk.MessageDialog):
