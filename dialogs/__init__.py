@@ -19,3 +19,4 @@ import docprops
 import misc
 import prefs
 import labeledit
+import datepicker

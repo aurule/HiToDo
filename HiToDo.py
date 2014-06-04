@@ -30,7 +30,7 @@ import xml.etree.ElementTree as et
 import operator
 from cgi import escape
 
-import testing
+import testing # TODO optionally remove for public release
 import dialogs
 import file_parsers
 import undobuffer
@@ -650,9 +650,12 @@ class HiToDo(Gtk.Window):
         self.track_focus(widget=editor)
         self.title_key_press_catcher = editor.connect("key-press-event", self.title_keys_dn)
 
-    def combo_edit_start(self, renderer, editor, path):
-        '''Sets internal focus to the combot widget. See track_focus().'''
-        self.track_focus(widget=editor.get_child())
+    def combo_edit_start(self, renderer, editor, path, data):
+        '''Sets internal focus to the combo widget. See track_focus().'''
+        completer = Gtk.EntryCompletion(model=data, popup_completion=True, inline_completion=True, inline_selection=True, popup_single_match=False, minimum_key_length=0)
+        completer.set_text_column(0)
+        editor.set_completion(completer)
+        self.track_focus(widget=editor)
 
     def priority_edit_start(self, renderer, editor, path):
         '''Sets internal focus to the priority widget. See track_focus().'''
@@ -663,11 +666,11 @@ class HiToDo(Gtk.Window):
         have an icon which pops up a reference calendar. See track_focus().'''
         self.track_focus(widget = editor)
         editor.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "appointment-new")
-        editor.connect("icon-press", self.date_pick)
+        editor.connect("icon-press", self.date_pick, path)
 
     def date_pick(self, entry, pos, event, data=None):
         '''Displays a calendar popoup for date entry widgets. See date_edit_start().'''
-        #TODO add calendar picker popup
+        # self.cal_dlg.show_for_entry(data)
         pass
 
     def del_current_task(self, widget=None):
@@ -2042,6 +2045,7 @@ class HiToDo(Gtk.Window):
         self.docprops_dlg = dialogs.docprops.main(self)
         self.label_edit_dlg = dialogs.labeledit.main(self)
         self.version_warn_dlg = dialogs.misc.htd_version_warning(self)
+        self.cal_dlg = dialogs.datepicker.main(self)
 
         if self.open_last_file: self.__open_last()
 
@@ -2190,9 +2194,10 @@ class HiToDo(Gtk.Window):
         self.cols_available['complete date'] = col_completed
         self.cols.append(['complete date', 'Completed', True, True])
 
-        assigner = Gtk.CellRendererCombo(model=self.assigners, has_entry=True, editable=True, foreground="#999", text_column=0)
+        # assigner = Gtk.CellRendererCombo(model=self.assigners, has_entry=True, editable=True, foreground="#999", text_column=0)
+        assigner = Gtk.CellRendererText(editable=True, foreground="#999")
         assigner.connect("edited", self.commit_assigner)
-        assigner.connect("editing-started", self.combo_edit_start)
+        assigner.connect("editing-started", self.combo_edit_start, self.assigners)
         col_assigner = Gtk.TreeViewColumn("From", assigner, text=9, foreground_set=12)
         #col_assigner.set_reorderable(True)
         col_assigner.set_sort_column_id(9)
@@ -2200,9 +2205,10 @@ class HiToDo(Gtk.Window):
         self.cols_available['from'] = col_assigner
         self.cols.append(['from', 'From', True, True])
 
-        assignee = Gtk.CellRendererCombo(model=self.assignees, has_entry=True, editable=True, foreground="#999", text_column=0)
+        # assignee = Gtk.CellRendererCombo(model=self.assignees, has_entry=True, editable=True, foreground="#999", text_column=0)
+        assignee = Gtk.CellRendererText(editable=True, foreground="#999")
         assignee.connect("edited", self.commit_assignee)
-        assignee.connect("editing-started", self.combo_edit_start)
+        assignee.connect("editing-started", self.combo_edit_start, self.assignees)
         col_assignee = Gtk.TreeViewColumn("To", assignee, text=10, foreground_set=12)
         #col_assignee.set_reorderable(True)
         col_assignee.set_sort_column_id(10)
@@ -2210,9 +2216,10 @@ class HiToDo(Gtk.Window):
         self.cols_available['to'] = col_assignee
         self.cols.append(['to', 'To', True, True])
 
-        status = Gtk.CellRendererCombo(model=self.statii, has_entry=True, editable=True, foreground="#999", text_column=0)
+        # status = Gtk.CellRendererCombo(model=self.statii, has_entry=True, editable=True, foreground="#999", text_column=0)
+        status = Gtk.CellRendererText(editable=True, foreground="#999")
         status.connect("edited", self.commit_status)
-        status.connect("editing-started", self.combo_edit_start)
+        status.connect("editing-started", self.combo_edit_start, self.statii)
         col_status = Gtk.TreeViewColumn("Status", status, text=11, foreground_set=12)
         #col_status.set_reorderable(True)
         col_status.set_sort_column_id(11)
