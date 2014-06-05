@@ -33,6 +33,7 @@ from cgi import escape
 import testing # TODO optionally remove for public release
 import dialogs
 import file_parsers
+import widgets
 import undobuffer
 
 UI_XML = """
@@ -128,7 +129,7 @@ CSS = '''
 
 # Define the gui and its actions.
 class HiToDo(Gtk.Window):
-    program_version = "0.9.3"
+    PROGRAM_VERSION = "0.9.3"
 
     def skip(self, widget=None):
         '''Placeholder function for unimplemented UI actions.'''
@@ -529,11 +530,11 @@ class HiToDo(Gtk.Window):
 
         old_val = self.tasklist[path][field]
 
-        if new_date.lower() == "tomorrow":
-            #manually handle "tomorrow" keyword, along with others in the future
-            delta = timedelta(days=1)
-            dt = datetime.today() + delta
-        elif new_date == "":
+        # if new_date.lower() == "tomorrow":
+        #     #manually handle "tomorrow" keyword, along with others in the future
+        #     delta = timedelta(days=1)
+        #     dt = datetime.today() + delta
+        if new_date == "":
             dt = ""
         else:
             try:
@@ -665,13 +666,13 @@ class HiToDo(Gtk.Window):
         '''Sets up the date editing widget and sets internal focus to it. These
         have an icon which pops up a reference calendar. See track_focus().'''
         self.track_focus(widget = editor)
-        editor.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "appointment-new")
-        editor.connect("icon-press", self.date_pick, path)
+        # editor.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "appointment-new")
+        # editor.connect("icon-press", self.date_pick, path)
 
-    def date_pick(self, entry, pos, event, data=None):
-        '''Displays a calendar popoup for date entry widgets. See date_edit_start().'''
+    # def date_pick(self, entry, pos, event, data=None):
+        # '''Displays a calendar popoup for date entry widgets. See date_edit_start().'''
         # self.cal_dlg.show_for_entry(data)
-        pass
+        # pass
 
     def del_current_task(self, widget=None):
         '''Removes every selected row from the task list. These are stored in
@@ -2045,7 +2046,7 @@ class HiToDo(Gtk.Window):
         self.docprops_dlg = dialogs.docprops.main(self)
         self.label_edit_dlg = dialogs.labeledit.main(self)
         self.version_warn_dlg = dialogs.misc.htd_version_warning(self)
-        self.cal_dlg = dialogs.datepicker.main(self)
+        # self.cal_dlg = dialogs.datepicker.main(self)
 
         if self.open_last_file: self.__open_last()
 
@@ -2139,7 +2140,7 @@ class HiToDo(Gtk.Window):
         self.cols_available['tracked'] = col_tracking
         self.cols.append(['tracked', u'Tracking (\u231A)', True, True])
 
-        est_begin = Gtk.CellRendererText(editable=True, foreground="#999")
+        est_begin = widgets.CellRendererDate(editable=True, foreground="#999")
         est_begin.connect("edited", self.commit_date, 4)
         est_begin.connect("editing-started", self.date_edit_start)
         col_est_begin = Gtk.TreeViewColumn("Est Begin", est_begin, foreground_set=12)
@@ -2150,7 +2151,7 @@ class HiToDo(Gtk.Window):
         self.cols_available['est begin'] = col_est_begin
         self.cols.append(['est begin', 'Est Begin', False, True])
 
-        est_complete = Gtk.CellRendererText(editable=True, foreground="#999")
+        est_complete = widgets.CellRendererDate(editable=True, foreground="#999")
         est_complete.connect("edited", self.commit_date, 5)
         est_complete.connect("editing-started", self.date_edit_start)
         col_est_complete = Gtk.TreeViewColumn("Est Complete", est_complete, foreground_set=12)
@@ -2161,7 +2162,7 @@ class HiToDo(Gtk.Window):
         self.cols_available['est complete'] = col_est_complete
         self.cols.append(['est complete', 'Est Complete', False, True])
 
-        due = Gtk.CellRendererText(editable=True, foreground="#999")
+        due = widgets.CellRendererDate(editable=True, foreground="#999")
         due.connect("edited", self.commit_date, 8)
         due.connect("editing-started", self.date_edit_start)
         col_due = Gtk.TreeViewColumn("Due", due, foreground_set=12)
@@ -2172,7 +2173,7 @@ class HiToDo(Gtk.Window):
         self.cols_available['due date'] = col_due
         self.cols.append(['due date', 'Due', True, True])
 
-        act_begin = Gtk.CellRendererText(editable=True, foreground="#999")
+        act_begin = widgets.CellRendererDate(editable=True, foreground="#999")
         act_begin.connect("edited", self.commit_date, 6)
         act_begin.connect("editing-started", self.date_edit_start)
         col_act_begin = Gtk.TreeViewColumn("Begin", act_begin, foreground_set=12)
@@ -2183,7 +2184,8 @@ class HiToDo(Gtk.Window):
         self.cols_available['act begin'] = col_act_begin
         self.cols.append(['act begin', 'Begin', False, True])
 
-        completed = Gtk.CellRendererText(editable=True, foreground="#999")
+        # completed = Gtk.CellRendererText(editable=True, foreground="#999")
+        completed = widgets.CellRendererDate(editable=True, foreground="#999")
         completed.connect("edited", self.commit_date, 7)
         completed.connect("editing-started", self.date_edit_start)
         col_completed = Gtk.TreeViewColumn("Completed", completed, foreground_set=12, visible=12)
