@@ -81,21 +81,15 @@ class CellRendererDate(Gtk.CellRendererText):
         self.calendar_window.move(x, y)
 
         self.calendar_window.show()
-        # if response == Gtk.ResponseType.OK:
-        #     (year, month, day) = self.calendar.get_date()
-        #     ddate = date(year, month + 1, day)
-        #     ddate = ddate.strftime(self.date_format) # gtk.Calendar's month starts from zero
-        #     self.emit('edited', path, ddate)
-
-        return self.entry # don't return any editable, our gtk.Dialog did the work already
-        # TODO cancel should not cause drag event
+        return self.entry
 
     def _day_selected(self, calendar, event):
         # event == None for day selected via doubleclick
         if not event or event.type == Gdk.EventType.KEY_PRESS and Gdk.keyval_name(event.keyval) == 'Return':
             # self.calendar_window.response(Gtk.ResponseType.OK)
             self.entry.hide()
-            self.calendar_window.hide()
+            self.calendar_window.destroy()
+            self.calendar_window = None
             (year, month, day) = self.calendar.get_date()
             ddate = date(year, month + 1, day)
             ddate = ddate.strftime(self.date_format) # gtk.Calendar's month starts from zero
@@ -105,5 +99,6 @@ class CellRendererDate(Gtk.CellRendererText):
     def _selection_cancelled(self, calendar, event):
         # self.calendar_window.response(Gtk.ResponseType.CANCEL)
         self.entry.hide()
-        self.calendar_window.hide()
+        self.calendar_window.destroy()
+        self.calendar_window = None
         return True
