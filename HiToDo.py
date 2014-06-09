@@ -124,6 +124,7 @@ UI_XML = """
 </ui>
 """
 
+# TODO this is just a plceholder for now
 CSS = '''
 '''
 
@@ -215,45 +216,75 @@ class HiToDo(Gtk.Window):
         self.add_task(parent_iter = self.seliter)
 
     def commit_all(self):
-        '''Commit all possibly-in-progress edits.'''
+        '''Commit all possibly-in-progress edits.
+
+        The functions commit_title, commit_notes, commit_date, and
+        commit_priority are all invoked to ensure minimum data loss.
+        '''
         self.commit_title()
         self.commit_notes()
         self.commit_date(field = 8)
         self.commit_priority()
 
-    def commit_est(self, widget=None, path=None, new_est=None):
-        '''Save user-entered time estimate. Value of 'new_est' is expected to be
-        in hours, so it's converted to seconds before saving.
+    def commit_work(self, widget=None, path=None, new_work=-1.0, work_type=''):
+        '''Save user-entered work time.
 
-        Once saved, we recurse up our chain of parents, adding our value to
-        theirs.'''
+        Once our value is committed, we iterate up our parents, updating their values to account for ours.
+
+        Keyword args:
+        widget -- Gtk.Widget, optional, default None -- The calling widget. When populated, an undo entry will be pushed after execution.
+        path -- str or Gtk.TreePath -- Path to the relevant model row.
+        new_work -- float, default -1.0 -- Number of hours of work to commit. Non-float data aborts. Negative number causes a re-derive; see self.derive_work()
+        work_type -- str, default None -- Describes what kind of work is being saved. Either "est" or "spent"; others may be added in the future.
+        '''
+
+        # fail out on bad args
         if path is None: return
+        if work_type is None or work_type not in self.work_cols: return
         if type(path) is str and path == "": return
-        if not is_number(new_est): return
+        if not is_number(new_work): return
 
-        old_est = self.tasklist[path][2] #store for later
-        new_est = float(new_est)
-        out = floor(new_est * 3600) #convert to seconds
-        self.tasklist[path][2] = int(out) #save
+        work_col = self.work_cols[work_type]
+
+        new_work = float(new_work)
+        if new_work < 0:
+            # if we were set to 0, derive instead of committing a literal zero
+            self._derive_work(path, work_type)
+            return
+
+        old_work = self.tasklist[path][work_col] #store for later
+        out = floor(new_work * 3600) #convert to seconds
+        self.tasklist[path][work_col] = int(out) #save
 
         #now we need to adjust our parent's total
         parts = str(path).rpartition(':')
         parent_path = parts[0] #find parent path
         if parent_path != "":
-            parent_est = self.tasklist[parent_path][2]
-            pest = (parent_est + out - old_est)/3600 #calculate new parent estimate
-            self.commit_est(path=parent_path, new_est=pest) #commit up the chain
+            parent_work = self.tasklist[parent_path][work_col]
+            pwork = (parent_work + out - old_work)/3600 #calculate new parent work
+            self.commit_work(path=parent_path, new_work=pwork, work_type=work_type) #commit up the chain
 
         # Push undoable only on user click, not internal call. Very important since we recurse.
         if widget is not None:
-            self.__push_undoable("est", (path, old_est, int(out)))
+            self.__push_undoable(work_type, (path, old_work, int(out)))
 
-    def commit_est_iter(self, treeiter=None, new_est=0):
-        '''Helper function to save a time estimate (in hours) when all we have
-        is a treeiter. See 'commit_est'.'''
-        if treeiter is None: return
-        path = self.tasklist.get_path(treeiter).to_string()
-        self.commit_est(path=path, new_est=new_est)
+    def _derive_work(self, path=None, work_type=''):
+        work_col = self.work_cols[work_type]
+
+        total_work = 0
+        treeiter = self.tasklist.get_iter(path)
+        #no children means our work is 0 and we can stop
+        if self.tasklist.iter_has_child(treeiter):
+            #loop through our children and add their work total to ours
+            child_iter = self.tasklist.iter_children(treeiter)
+            while child_iter is not None:
+                total_work += self.tasklist[child_iter][work_col]
+                child_iter = self.tasklist.iter_next(child_iter)
+        old_work = self.tasklist[path][work_col]
+        self.commit_work(path = path, new_work = total_work/3600, work_type=work_type) #save it
+
+        #push undoable. We have to push our own because commit_work only pushes when called from the UI.
+        self.__push_undoable(work_type, (path, old_work, total_work))
 
     def est_edit_start(self, renderer, editor, path):
         '''Set up time estimate editing field. Converts saved seconds into
@@ -261,61 +292,6 @@ class HiToDo(Gtk.Window):
         val = self.tasklist[path][2]
         self.track_focus(widget = editor)
         editor.set_text(str(val/3600)) #don't display the H suffix during editing
-        editor.set_icon_from_stock(Gtk.EntryIconPosition.SECONDARY, Gtk.STOCK_REFRESH)
-        editor.set_icon_tooltip_text(Gtk.EntryIconPosition.SECONDARY, "Recalculate from children")
-        editor.connect("icon-press", self.derive_est, path)
-
-    def derive_est(self, entry=None, pos=None, event=None, path=None):
-        '''Recalculate our time estimate based on our children's estimates. We
-        assume our children are already calculated, so we only have to peek at
-        our top-level children's time estimates.'''
-        total_est = 0
-        treeiter = self.tasklist.get_iter(path)
-        #no children means our est is 0 and we can stop
-        if self.tasklist.iter_has_child(treeiter):
-            #loop through our children and add their est total to ours
-            child_iter = self.tasklist.iter_children(treeiter)
-            while child_iter is not None:
-                total_est += self.tasklist[child_iter][2]
-                child_iter = self.tasklist.iter_next(child_iter)
-        old_est = self.tasklist[path][2]
-        self.commit_est(path = path, new_est = total_est/3600) #save it
-
-        #push undoable. We have to push our own because commit_est only pushes when called from the UI.
-        self.__push_undoable("est", (path, old_est, total_est))
-
-    def commit_spent(self, widget=None, path=None, new_spent=None):
-        '''Save user-entered time spent. Value of 'new_spent' is expected to be
-        in hours, so it's converted to seconds before saving.
-
-        Once saved, we recurse up our chain of parents, adding our value to
-        theirs.'''
-        if path is None: return
-        if type(path) is str and path == "": return
-
-        if not is_number(new_spent): return
-        old_spent = self.tasklist[path][3]
-        new_spent = float(new_spent)
-        out = floor(new_spent * 3600)
-        self.tasklist[path][3] = int(out)
-
-        parts = str(path).rpartition(':')
-        parent_path = parts[0]
-        if parent_path != "":
-            parent_spent = self.tasklist[parent_path][3]
-            pspent = (parent_spent + out - old_spent)/3600
-            self.commit_spent(path=parent_path, new_spent=pspent)
-
-        #push undoable only on user click
-        if widget is not None:
-            self.__push_undoable("spent", (path, old_spent, int(out)))
-
-    def commit_spent_iter(self, treeiter=None, new_spent=0):
-        '''Helper function to save time spent (in hours) when all we have is a
-        treeiter. See 'commit_spent'.'''
-        if treeiter is None: return
-        path = self.tasklist.get_path(treeiter).to_string()
-        self.commit_spent(path=path, new_spent=new_spent)
 
     def spent_edit_start(self, renderer, editor, path):
         '''Set up time spent editing field. Converts saved seconds into
@@ -323,27 +299,6 @@ class HiToDo(Gtk.Window):
         val = self.tasklist[path][3]
         self.track_focus(widget = editor)
         editor.set_text(str(val/3600)) #don't display the H suffix during editing
-        editor.set_icon_from_stock(Gtk.EntryIconPosition.SECONDARY, Gtk.STOCK_REFRESH)
-        editor.set_icon_tooltip_text(Gtk.EntryIconPosition.SECONDARY, "Recalculate from children")
-        editor.connect("icon-press", self.derive_spent, path)
-
-    def derive_spent(self, entry=None, pos=None, event=None, path=None):
-        '''Recalculate our time spent based on our children's estimates. We
-        assume our children are already calculated, so we only have to peek at
-        our top-level children's time spent.'''
-        total_spent = 0
-        treeiter = self.tasklist.get_iter(path)
-        if self.tasklist.iter_has_child(treeiter):
-            n_children = self.tasklist.iter_n_children(treeiter)
-            child_iter = self.tasklist.iter_children(treeiter)
-            while child_iter is not None:
-                total_spent += self.tasklist[child_iter][3]
-                child_iter = self.tasklist.iter_next(child_iter)
-        old_spent = self.tasklist[path][3]
-        self.commit_spent(path=path, new_spent = total_spent) #save it
-
-        #push undoable
-        self.__push_undoable("spent", (path, old_spent, total_spent))
 
     def track_spent(self, action=None, data=None):
         '''Handles time spent tracking. Only really useful when called from the
@@ -374,7 +329,7 @@ class HiToDo(Gtk.Window):
             secs = int(diff.total_seconds())
             path = self.tasklist.get_path(self.tracking).to_string()
             nspent = (self.tasklist[self.tracking][3] + secs) / 3600
-            self.commit_spent(path=path, new_spent = nspent)
+            self.commit_work(path=path, new_work=nspent, work_type='spent')
             self.tasklist[self.tracking][17] = False
             self.make_dirty()
 
@@ -704,8 +659,10 @@ class HiToDo(Gtk.Window):
 
         #now we can remove them without invalidating paths
         for ref, path, pathlen in refs:
-            self.commit_spent_iter(ref, new_spent=0)
-            self.commit_est(ref, new_est=0)
+            # self.commit_spent_iter(ref, new_spent=0)
+            # self.commit_est(ref, new_est=0)
+            self.commit_work(path=path, new_work=0, work_type='spent')
+            self.commit_work(path=path, new_work=0, work_type='est')
 
             self.calc_parent_pct(str(path))
             self.tasklist.remove(ref)
@@ -720,8 +677,8 @@ class HiToDo(Gtk.Window):
             self.track_action.set_active(False)
         treeiter = self.tasklist.get_iter(path)
 
-        self.commit_spent(path=path, new_spent=0)
-        self.commit_est(path=path, new_est=0)
+        self.commit_work(path=path, new_work=0, work_type='spent')
+        self.commit_work(path=path, new_work=0, work_type='est')
         self.tasklist.remove(treeiter)
         self.calc_parent_pct(str(path))
 
@@ -1321,7 +1278,8 @@ class HiToDo(Gtk.Window):
                 last_row = treeiter
 
             #update time est and percent separately
-            self.commit_est_iter(treeiter, row[3]/3600)
+            path = self.tasklist.get_path(treeiter)
+            self.commit_work(path=path, new_work=row[3]/3600, work_type='est')
             self.calc_parent_pct(self.tasklist.get_path(treeiter).to_string())
 
         self.make_dirty()
@@ -1383,12 +1341,12 @@ class HiToDo(Gtk.Window):
             elif action[0] == "spent":
                 path = action[1][0]
                 oldval = action[1][1]
-                self.commit_spent(path=path, new_spent = oldval/3600)
+                self.commit_work(path=path, new_work=oldval/3600, work_type='spent')
                 self.redobuffer.append(action)
             elif action[0] == "est":
                 path = action[1][0]
                 oldval = action[1][1]
-                self.commit_est(path=path, new_est = oldval/3600)
+                self.commit_work(path=path, new_work=oldval/3600, work_type='est')
                 self.redobuffer.append(action)
             elif action[0] == "done":
                 path = action[1][0]
@@ -1402,8 +1360,9 @@ class HiToDo(Gtk.Window):
                     if self.tasklist[treeiter][17]:
                         self.track_action.set_active(False)
 
-                    self.commit_est_iter(treeiter, 0) #void our est time
-                    self.commit_spent_iter(treeiter, 0) #void our spent time
+                    path = self.tasklist.get_path(treeiter)
+                    self.commit_work(path=path, new_work=0, work_type='est')
+                    self.commit_work(path=path, new_work=0, work_type='spent')
                     self.tasklist.remove(treeiter)
 
                 #update parent pct done
@@ -1463,12 +1422,12 @@ class HiToDo(Gtk.Window):
             elif action[0] == "spent":
                 path = action[1][0]
                 newval = action[1][2]
-                self.commit_spent(path=path, new_spent = newval/3600)
+                self.commit_work(path=path, new_work=newval/3600, work_type='spent')
                 self.undobuffer.append(action)
             elif action[0] == "est":
                 path = action[1][0]
                 newval = action[1][2]
-                self.commit_est(path=path, new_est = newval/3600)
+                self.commit_work(path=path, new_work=newval/3600, work_type='est')
                 self.undobuffer.append(action)
             elif action[0] == "done":
                 path = action[1][0]
@@ -1489,8 +1448,9 @@ class HiToDo(Gtk.Window):
                     if self.tasklist[treeiter][17]:
                         self.track_action.set_active(False)
 
-                    self.commit_est_iter(treeiter, 0) #void our est time
-                    self.commit_spent_iter(treeiter, 0) #void our spent time
+                    path = self.tasklist.get_path(treeiter)
+                    self.commit_work(path=path, new_work=0, work_type='est')
+                    self.commit_work(path=path, new_work=0, work_type='spent')
                     self.tasklist.remove(treeiter)
 
                 #update parent pct done
@@ -1880,6 +1840,11 @@ class HiToDo(Gtk.Window):
             False   #spent tracked
         ]
 
+        self.work_cols = {
+            'est': 2,
+            'spent': 3
+        }
+
         self.assigners = Gtk.ListStore(str)
         self.assigners.set_sort_column_id(0, Gtk.SortType.ASCENDING)
         self.assigners_list = []
@@ -2112,7 +2077,7 @@ class HiToDo(Gtk.Window):
         self.cols.append(['pct complete', 'Percent Complete (%)', True, True])
 
         est = Gtk.CellRendererText(foreground="#999", editable=True)
-        est.connect("edited", self.commit_est)
+        est.connect("edited", self.commit_work, 'est')
         est.connect("editing-started", self.est_edit_start)
         col_est = Gtk.TreeViewColumn("Est", est, foreground_set=12)
         #col_est.set_reorderable(True)
@@ -2123,7 +2088,7 @@ class HiToDo(Gtk.Window):
         self.cols.append(['time est', 'Est', True, True])
 
         spent = Gtk.CellRendererText(foreground="#999", editable=True)
-        spent.connect("edited", self.commit_spent)
+        spent.connect("edited", self.commit_work, 'spent')
         spent.connect("editing-started", self.spent_edit_start)
         col_spent = Gtk.TreeViewColumn("Spent", spent, foreground_set=12)
         #col_spent.set_reorderable(True)
