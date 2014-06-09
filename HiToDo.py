@@ -538,7 +538,7 @@ class HiToDo(Gtk.Window):
             dt = ""
         else:
             try:
-                dt = dateparse(new_date, fuzzy=True)
+                dt = datetime.strptime(new_date, '%x')
             except ValueError:
                 dt = ""
 

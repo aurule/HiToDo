@@ -19,7 +19,7 @@
 # along with HiToDo.  If not, see <http://www.gnu.org/licenses/>.
 
 from datetime import datetime, date
-from gi.repository import Gtk, Gdk
+from gi.repository import Gtk, Gdk, GObject
 
 class CellRendererDate(Gtk.CellRendererText):
 
@@ -27,7 +27,6 @@ class CellRendererDate(Gtk.CellRendererText):
 
     def __init__(self, *args, **kwargs):
         Gtk.CellRendererText.__init__(self, *args, **kwargs)
-        self.date_format = '%m/%d/%Y'
         self.calendar_window = None
         self.calendar = None
 
@@ -44,7 +43,6 @@ class CellRendererDate(Gtk.CellRendererText):
         self.calendar.connect('focus-out-event', self._selection_cancelled)
         self.calendar_window.set_transient_for(None) # cancel the modality of dialog
         self.calendar_window.vbox.pack_start(self.calendar, False, False, 0)
-
 
         # necessary for getting the (width, height) of calendar_window
         self.calendar.show()
@@ -63,7 +61,7 @@ class CellRendererDate(Gtk.CellRendererText):
 
         # select cell's previously stored date if any exists - or today
         if self.get_property('text'):
-            ddate = datetime.strptime(self.get_property('text'), self.date_format)
+            ddate = datetime.strptime(self.get_property('text'), '%x')
         else:
             ddate = datetime.today()
         self.calendar.freeze_child_notify() # prevent flicker
@@ -86,18 +84,16 @@ class CellRendererDate(Gtk.CellRendererText):
     def _day_selected(self, calendar, event):
         # event == None for day selected via doubleclick
         if not event or event.type == Gdk.EventType.KEY_PRESS and Gdk.keyval_name(event.keyval) == 'Return':
-            # self.calendar_window.response(Gtk.ResponseType.OK)
             self.entry.hide()
             self.calendar_window.destroy()
             self.calendar_window = None
             (year, month, day) = self.calendar.get_date()
-            ddate = date(year, month + 1, day)
-            ddate = ddate.strftime(self.date_format) # gtk.Calendar's month starts from zero
+            ddate = date(year, month + 1, day) # gtk.Calendar's month starts from zero
+            ddate = ddate.strftime('%x')
             self.emit('edited', self.path, ddate)
             return True
 
     def _selection_cancelled(self, calendar, event):
-        # self.calendar_window.response(Gtk.ResponseType.CANCEL)
         self.entry.hide()
         self.calendar_window.destroy()
         self.calendar_window = None
