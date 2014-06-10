@@ -1810,6 +1810,9 @@ class HiToDo(Gtk.Window):
             bool,   #inverted done flag
             bool    #whether this row's spent time is currently tracked
         )
+        self.tasklist.set_sort_func(4, self.datecompare, None)
+        self.tasklist.set_sort_func(5, self.datecompare, None)
+        self.tasklist.set_sort_func(6, self.datecompare, None)
         self.tasklist.set_sort_func(7, self.datecompare, None)
         self.tasklist.set_sort_func(8, self.datecompare, None)
         self.tasklist.connect("row-changed", self.make_dirty)
@@ -1930,7 +1933,8 @@ class HiToDo(Gtk.Window):
         task_scroll_win = Gtk.ScrolledWindow()
         task_scroll_win.set_hexpand(True)
         task_scroll_win.set_vexpand(True)
-        self.task_view = Gtk.TreeView(self.tasklist_filter)
+        self.task_view = Gtk.TreeView()
+        self.task_view.set_model(self.tasklist_filter)
 
         #set up columns
         self.create_columns()
@@ -2147,7 +2151,6 @@ class HiToDo(Gtk.Window):
         self.cols_available['act begin'] = col_act_begin
         self.cols.append(['act begin', 'Begin', False, True])
 
-        # completed = Gtk.CellRendererText(editable=True, foreground="#999")
         completed = widgets.CellRendererDate(editable=True, foreground="#999")
         completed.connect("edited", self.commit_date, 7)
         completed.connect("editing-started", self.date_edit_start)
@@ -2159,7 +2162,6 @@ class HiToDo(Gtk.Window):
         self.cols_available['complete date'] = col_completed
         self.cols.append(['complete date', 'Completed', True, True])
 
-        # assigner = Gtk.CellRendererCombo(model=self.assigners, has_entry=True, editable=True, foreground="#999", text_column=0)
         assigner = Gtk.CellRendererText(editable=True, foreground="#999")
         assigner.connect("edited", self.commit_assigner)
         assigner.connect("editing-started", self.combo_edit_start, self.assigners)
@@ -2170,7 +2172,6 @@ class HiToDo(Gtk.Window):
         self.cols_available['from'] = col_assigner
         self.cols.append(['from', 'From', True, True])
 
-        # assignee = Gtk.CellRendererCombo(model=self.assignees, has_entry=True, editable=True, foreground="#999", text_column=0)
         assignee = Gtk.CellRendererText(editable=True, foreground="#999")
         assignee.connect("edited", self.commit_assignee)
         assignee.connect("editing-started", self.combo_edit_start, self.assignees)
@@ -2181,7 +2182,6 @@ class HiToDo(Gtk.Window):
         self.cols_available['to'] = col_assignee
         self.cols.append(['to', 'To', True, True])
 
-        # status = Gtk.CellRendererCombo(model=self.statii, has_entry=True, editable=True, foreground="#999", text_column=0)
         status = Gtk.CellRendererText(editable=True, foreground="#999")
         status.connect("edited", self.commit_status)
         status.connect("editing-started", self.combo_edit_start, self.statii)
