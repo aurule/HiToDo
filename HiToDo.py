@@ -285,28 +285,29 @@ class HiToDo(Gtk.Window):
         #push undoable. We have to push our own because commit_work only pushes when called from the UI.
         self.__push_undoable(work_type, (path, old_work, total_work))
 
-    def est_edit_start(self, renderer, editor, path):
-        '''Set up time estimate editing field. Converts saved seconds into
-        hours, and adds an icon for recalculating. See 'derive_est'.'''
-        val = self.tasklist[path][2]
-        self.track_focus(widget = editor)
-        editor.set_text(str(val/3600)) #don't display the H suffix during editing
+    def duration_edit_start(self, renderer, editor, path, col=0):
+        '''Set up time estimate editing field.
 
-    def spent_edit_start(self, renderer, editor, path):
-        '''Set up time spent editing field. Converts saved seconds into
-        hours, and adds an icon for recalculating. See 'derive_spent'.'''
-        val = self.tasklist[path][3]
+        Converts saved seconds into hours, truncating for brevity.
+        Overrides the edit_start function of Gtk.CellRendererEditable.
+        There is only one unique argument:
+        col -- int, default 0 -- The treemodel column whose value should be displayed
+        '''
+        val = self.tasklist[path][col]
         self.track_focus(widget = editor)
-        editor.set_text(str(val/3600)) #don't display the H suffix during editing
+        editor.set_text('' if val == 0 else '%1.2f' % (val/3600)) #don't display the H suffix during editing
 
     def track_spent(self, action=None, data=None):
-        '''Handles time spent tracking. Only really useful when called from the
+        '''Handles time spent tracking
+
+        Only really useful when called from the
         UI. When tracking is toggled on, a timestamp is saved. When tracking is
         toggled off, a new timestamp is fetched and the difference applied to
         that row's time spent total.
 
         Only one row (task) can be tracked at a time. We store a treeiter
-        pointing to that row as well as set the row's tracked flag (field 17).'''
+        pointing to that row as well as set the row's tracked flag (field 17).
+        '''
         on = action.get_active()
         if on:
             if self.seliter is None:
@@ -2075,7 +2076,7 @@ class HiToDo(Gtk.Window):
 
         est = Gtk.CellRendererText(foreground="#999", editable=True)
         est.connect("edited", self.commit_work, 'est')
-        est.connect("editing-started", self.est_edit_start)
+        est.connect("editing-started", self.duration_edit_start, 2)
         col_est = Gtk.TreeViewColumn("Est", est, foreground_set=12)
         #col_est.set_reorderable(True)
         col_est.set_sort_column_id(2)
@@ -2086,7 +2087,7 @@ class HiToDo(Gtk.Window):
 
         spent = Gtk.CellRendererText(foreground="#999", editable=True)
         spent.connect("edited", self.commit_work, 'spent')
-        spent.connect("editing-started", self.spent_edit_start)
+        spent.connect("editing-started", self.duration_edit_start, 3)
         col_spent = Gtk.TreeViewColumn("Spent", spent, foreground_set=12)
         #col_spent.set_reorderable(True)
         col_spent.set_sort_column_id(3)
