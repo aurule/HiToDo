@@ -46,7 +46,6 @@ Although it isn't completely finished, HiToDo is stable and fairly usable for no
 HiToDo requires at least:
 * Python 2.5
 * GTK+ 3.2 with python-gi bindings
-* python-dateutil 1.5
 * zlib 1.1.4
 
 ## Versioning

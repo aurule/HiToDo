@@ -24,7 +24,6 @@ from os import linesep
 from os.path import basename, dirname, splitext
 from urlparse import urlparse
 from urllib import unquote
-from dateutil.parser import parse as dateparse
 from math import floor
 import xml.etree.ElementTree as et
 import operator
@@ -479,8 +478,7 @@ class HiToDo(Gtk.Window):
 
     def commit_date(self, widget=None, path=None, new_date=None, field=None):
         '''Sets the value of a date field (due, complete, act begin, est begin,
-        est complete) to the value of 'new_date'. The dateparse module is used to
-        convert the string input into a datetime object.'''
+        est complete) to the value of 'new_date'.'''
         if path is None: return
 
         old_val = self.tasklist[path][field]
@@ -905,13 +903,12 @@ class HiToDo(Gtk.Window):
         force_save = False
         if native_version < file_version:
             response = self.version_warn_dlg.run()
+            self.version_warn_dlg.hide()
             if response == 2:
                 data['filename'] = self.pick_savefile()
                 force_save = True
             elif response == Gtk.ResponseType.CANCEL:
                 return
-
-            self.version_warn_dlg.hide()
 
         #load vars
         del self.cols_visible[:]
