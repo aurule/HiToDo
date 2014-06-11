@@ -22,8 +22,10 @@ from xml.etree.ElementTree import SubElement
 from dateutil.parser import parse as dateparse
 from datetime import datetime
 from os.path import splitext, isfile
+from os import remove as osremove
 from tempfile import mkstemp
 import gzip
+import tarfile
 
 def pick_filter(file_name):
     ext = splitext(file_name)[1]
@@ -41,12 +43,18 @@ class htd_filter(Gtk.FileFilter):
 
     def read_to_store(self, data):
         '''Reads todo list data from xml file. Data is a dictionary of data holders to fill.'''
-        f = gzip.open(data['filename'], 'rb')
-        document = ElementTree.parse(f)
-        f.close()
+        with tarfile.open(data['filename'], 'r:gz') as tar:
+            tar = tarfile.open(data['filename'], 'r:gz')
+            f = tar.extractfile('todo.data')
+            document = ElementTree.parse(f)
+            f.close()
+            v = tar.extractfile('version.data')
+            data['save_version'] = v.readline().rstrip() # version is in its own file
+            v.close()
+
         htd = document.getroot()
-        data['save_version'] = float(htd.get('version'))
-        data['our_version'] = float(self.file_version)
+        # data['save_version'] = float(htd.get('version'))
+        data['our_version'] = self.file_version
 
         #get assigners, assignees, and statii lists
         assigners = document.find("assigners")
@@ -209,24 +217,50 @@ class htd_filter(Gtk.FileFilter):
         #iterate tasks and add to tasklist element
         self.store_tasks(data['task_store'], tasklist)
 
-        #write to file
-        ofile = gzip.open(data['filename'], 'wb')
-        ofile.write(ElementTree.tostring(htd, encoding="UTF-8"))
-        ofile.close()
+        # create tgz-formatted output file and write
+        with tarfile.open(data['filename'], 'w:gz') as tar:
+            # store xml in a temp file
+            (datafile, datafile_path) = mkstemp()
+            datafile = open(datafile_path, 'wb')
+            datafile.write(ElementTree.tostring(htd, encoding="UTF-8"))
+            datafile.close()
+
+            # store version in a temp file
+            (verfile, verfile_path) = mkstemp()
+            verfile = open(verfile_path, 'wb')
+            verfile.write(self.file_version)
+            verfile.close()
+
+            tar.add(datafile_path, arcname="todo.data")
+            tar.add(verfile_path, arcname="version.data")
+
+            osremove(datafile_path)
+            osremove(verfile_path)
 
     def write_append(self, data):
         '''Appends tasks to an existing file. CAUTION: This function does not add or update anything besides tasks.'''
+        with tarfile.open(data['filename'], 'r:gz') as tar:
+            f = tar.extractfile('todo.data')
+            document = ElementTree.parse(f)
+            f.close()
 
-        document = ElementTree.parse(data['filename'])
         htd = document.getroot()
         tasklist = document.find("tasklist")
         # TODO update the rest of the saved info
         self.store_tasks(data['task_store'], tasklist)
 
         #write to file
-        ofile = gzip.open(data['filename'], 'wb')
-        ofile.write(ElementTree.tostring(htd, encoding="UTF-8"))
-        ofile.close()
+        with tarfile.open(data['filename'], 'w:gz') as tar:
+            # store xml in a temp file
+            (datafile, datafile_path) = mkstemp()
+            datafile = open(datafile_path, 'wb')
+            datafile.write(ElementTree.tostring(htd, encoding="UTF-8"))
+            datafile.close()
+
+            # create tgz-formatted output file and write
+            tar.add(datafile_path, arcname="todo.data")
+            tar.close()
+            osremove(datafile_path)
 
     def map_expanded(self, treeview, path, xml):
         row = SubElement(xml, 'path')
