@@ -4,7 +4,7 @@
 
 HiToDo is a heirarchical task list manager inspired by [ToDoList](http://www.abstractspoon.com/tdl_resources.html). It's designed to reproduce those features which I found most useful and necessary in day-to-day use. There's a lot more that ToDoList can do, so check it out if you run Windows!
 
-Although it isn't completely finished, HiToDo is stable and fairly usable for non-critical task management. However, I wouldn't recommend it for production use without a lot of backups and the patience to recreate lists as the format changes.
+Although it isn't completely finished, HiToDo is stable and fairly usable for non-critical task management. However, I wouldn't recommend it for production use without regular backups and the patience to recreate lists as the format changes.
 
 ## Features
 
@@ -14,21 +14,20 @@ Although it isn't completely finished, HiToDo is stable and fairly usable for no
 * Arbitrary numeric priority levels
 * Completion percent tracking/display
 * Time estimate field
-* Time taken field with live tracking (click a button and it starts to accrue time; click again and it adds that time to the task's spent total)
+* Time spent field with live tracking (click a button and it starts to accrue time; click again and it adds that time to the task's spent total)
 * Due date field
 * Completed date field
 * Assigner and Assignee fields with dropdown lists for convenience
 * Status field with dropdown list for convenience
 * Arbitrary-length plaintext notes for every task
-* Save/Open htdl format files - xml for easy portability
-* Cut, copy, paste, and paste-beneath operations for tasks
-* Cut, copy, and paste for title and notes fields
-* Undo/Redo for notes field
+* Save/Open htdl format files
+* Cut, copy, paste, and paste-as-child operations for tasks
+* Cut, copy, and paste within title and notes fields
+* Undo/redo for tasks
+* Text undo/Redo for notes field
 * Task reordering via drag-and-drop
-* Unlimited per-session undo/redo for tasks
 * Preferences stored with GSettings
 * Archive completed tasks
-* Compressed save files using gzip
 
 **Planned Features:**
 * Open multiple files at once via multiple windows (launched from within the program) or tabs in a single window
@@ -47,6 +46,10 @@ HiToDo requires at least:
 * Python 2.5
 * GTK+ 3.2 with python-gi bindings
 * zlib 1.1.4
+
+## Compatibility
+
+The Oxygen GTK theme has a bug which disables drag-and-drop reordering of tasks. The only workaround is to use a different GTK theme.
 
 ## Versioning
 
