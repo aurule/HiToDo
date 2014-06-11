@@ -20,6 +20,7 @@
 from __future__ import division
 from gi.repository import Gtk, Gdk, Pango, Gio
 from datetime import datetime, timedelta
+from xml.etree.ElementTree import ParseError
 from os import linesep
 from os.path import basename, dirname, splitext
 from urlparse import urlparse
@@ -896,7 +897,11 @@ class HiToDo(Gtk.Window):
             'geometry': ()
             #data also has save_version, our_version, expanded, and selected keys
         }
-        self.file_filter.read_to_store(data)
+        try:
+            self.file_filter.read_to_store(data)
+        except (ParseError, IOError):
+            self.open_warn_dlg.run()
+            return
 
         #check version compatability
         file_version = data['save_version']
@@ -1076,7 +1081,11 @@ class HiToDo(Gtk.Window):
             'cols': self.cols_visible,
             'geometry': (self.maximized, width, height, task_width)
         }
-        file_filter.write(data, append)
+        try:
+            file_filter.write(data, append)
+        except IOError:
+            self.save_warn_dlg.run()
+            return
 
         self.file_dirty = False
         self.update_title()
@@ -1516,6 +1525,11 @@ class HiToDo(Gtk.Window):
             path = self.tasklist.get_path(self.seliter)
             self.task_view.set_cursor_on_cell(path, self.col_title, self.title_cell, True)
             return True
+        # TODO We can override the spacebar to always mark/unmark our Done flag, but this breaks keyboard navigation
+        # if kvn == "space":
+        #     path = self.tasklist.get_path(self.seliter)
+        #     self.commit_done(path = str(path), new_done = not self.tasklist[path][12])
+        #     return True
 
     def title_keys_dn(self, widget=None, event=None):
         '''Catches key-down events for the task title editor. Lets us cancel
@@ -2013,7 +2027,8 @@ class HiToDo(Gtk.Window):
         self.docprops_dlg = dialogs.docprops.main(self)
         self.label_edit_dlg = dialogs.labeledit.main(self)
         self.version_warn_dlg = dialogs.misc.htd_version_warning(self)
-        # self.cal_dlg = dialogs.datepicker.main(self)
+        self.open_warn_dlg = dialogs.misc.htd_file_read_error(self)
+        self.save_warn_dlg = dialogs.misc.htd_file_write_error(self)
 
         if self.open_last_file: self.__open_last()
 

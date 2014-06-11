@@ -79,9 +79,21 @@ class htd_about(Gtk.AboutDialog):
 class htd_version_warning(Gtk.MessageDialog):
     def __init__(self, parent):
         flags = Gtk.DialogFlags.MODAL & Gtk.DialogFlags.DESTROY_WITH_PARENT
-        Gtk.MessageDialog.__init__(self, parent, flags, Gtk.MessageType.WARNING, Gtk.ButtonsType.NONE, "The file you selected is from a newer version of HiToDo.")
+        Gtk.MessageDialog.__init__(self, parent, flags, Gtk.MessageType.WARNING, Gtk.ButtonsType.NONE, "The file you selected is from a newer version of HiToDo")
         self.format_secondary_text("All the basics will work, but newer metadata and features will be lost if you overwrite the file.")
         self.add_button("_Open Anyway", 1)
         self.add_button(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
         self.add_button("Open a _Copy", 2)
         self.set_default_response(2)
+
+class htd_file_read_error(Gtk.MessageDialog):
+    def __init__(self, parent):
+        flags = Gtk.DialogFlags.MODAL & Gtk.DialogFlags.DESTROY_WITH_PARENT
+        Gtk.MessageDialog.__init__(self, parent, flags, Gtk.MessageType.ERROR, Gtk.ButtonsType.CANCEL, "The file you selected cannot be read")
+        self.format_secondary_text("Make sure you have permission to read the file.")
+
+class htd_file_write_error(Gtk.MessageDialog):
+    def __init__(self, parent):
+        flags = Gtk.DialogFlags.MODAL & Gtk.DialogFlags.DESTROY_WITH_PARENT
+        Gtk.MessageDialog.__init__(self, parent, flags, Gtk.MessageType.ERROR, Gtk.ButtonsType.CANCEL, "Cannot save to the file you selected")
+        self.format_secondary_text("Make sure you have permission to write to the file.")
