@@ -48,8 +48,6 @@ UI_XML = """
             <menuitem action="saveas_file" />
             <menuitem action="save_copy" />
             <separator />
-            <menuitem action="doc_props" />
-            <separator />
             <menuitem action='close' />
             <menuitem action='quit' />
         </menu>
@@ -823,7 +821,7 @@ class HiToDo(Gtk.Window):
 
         #reset to default columns
         self.cols_visible = self.cols_default[:]
-        self.display_columns()
+        self.display_columns(self.cols_default[:])
 
         #reset to default assigners, assignees, and statii
         self.assigners_list = self.assigners_default[:]
@@ -924,7 +922,7 @@ class HiToDo(Gtk.Window):
         self.assignees_list = data['to_list']
         self.statii_list = data['status_list']
         #self.tasklist is handled later
-        self.cols_visible = data['cols']
+        cols = data['cols']
         rows_to_expand = data['expanded']
         selme = data['selected']
 
@@ -941,17 +939,17 @@ class HiToDo(Gtk.Window):
         del templist
 
         #adjust for different column lists
-        if len(self.cols_visible) <= len(self.cols):
-            codes = []
-            for code, flag in self.cols_visible:
-                codes.append(code)
-            former = 0
-            for col in self.cols:
-                try:
-                    i = codes.index(col[0])
-                except ValueError:
-                    self.cols_visible.insert(former, (col[0], False))
-                former += 1
+        # if len(self.cols_visible) <= len(self.cols):
+        #     codes = []
+        #     for code, flag in self.cols_visible:
+        #         codes.append(code)
+        #     former = 0
+        #     for col in self.cols:
+        #         try:
+        #             i = codes.index(col[0])
+        #         except ValueError:
+        #             self.cols_visible.insert(former, (col[0], False))
+        #         former += 1
 
         #iterate assigners, assignees, and statii to put names into respective liststores
         self.assigners.clear()
@@ -965,7 +963,7 @@ class HiToDo(Gtk.Window):
             self.statii.append([n])
 
         #show requested columns
-        self.display_columns()
+        self.display_columns(cols)
 
         #set window geometry
         self.set_default_size(data['geometry'][1], data['geometry'][2])
@@ -1068,8 +1066,14 @@ class HiToDo(Gtk.Window):
         else:
             selpath = ''
 
+        # get window geometry bits
         width, height = self.get_size()
         task_width = width - self.task_pane.get_position()
+
+        # derive column visibility
+        present = [(col.code, True) for col in self.task_view.get_columns()]
+        absent = [(code, False) for code in self.cols_available.keys() if (code, True) not in present]
+
         data = {
             'filename': filename,
             'from_list': sorted(self.assigners_list),
@@ -1078,7 +1082,7 @@ class HiToDo(Gtk.Window):
             'task_store': tasklist,
             'task_view': self.task_view,
             'selection': selpath,
-            'cols': self.cols_visible,
+            'cols': present+absent,
             'geometry': (self.maximized, width, height, task_width)
         }
         try:
@@ -1473,16 +1477,19 @@ class HiToDo(Gtk.Window):
         self.undobuffer.append((action, data))
         del self.redobuffer[:]
 
-    def display_columns(self):
+    def display_columns(self, cols=None):
         '''Clears the currently displayed columns and loads the ones specified
         in 'self.cols_visible'. Order is honored.'''
+        if cols is None:
+            cols = self.cols_visible
+
         #clear current cols
         for col in self.task_view.get_columns():
             self.task_view.remove_column(col)
         cols_vis = []
 
-        #add columns from global var, in order specified
-        for col, vis in self.cols_visible:
+        #add columns in order specified
+        for col, vis in cols:
             if vis:
                 self.task_view.append_column(self.cols_available[col])
                 cols_vis.append(col)
@@ -1613,10 +1620,6 @@ class HiToDo(Gtk.Window):
         self.cols_visible[id2], self.cols_visible[id1] = self.cols_visible[id1], self.cols_visible[id2]
         colstore.swap(target, orig)
         self.make_dirty()
-
-    def reset_cols(self, widget):
-        self.cols_visible = self.cols_default[:]
-        self.display_columns()
 
     def make_stats(self, treeiter = None):
         '''Creates a dict of document statistics. Right now, it includes the
@@ -1952,7 +1955,7 @@ class HiToDo(Gtk.Window):
 
         #set up columns
         self.create_columns()
-        self.display_columns()
+        self.display_columns(self.cols_visible)
 
         #set up selection handling and add the completed table widget
         self.selection = self.task_view.get_selection()
@@ -2080,14 +2083,14 @@ class HiToDo(Gtk.Window):
         priority.connect("editing-started", self.priority_edit_start)
         col_priority = Gtk.TreeViewColumn("!", priority, text=0, foreground_set=12)
         col_priority.set_sort_column_id(0)
-        #col_priority.set_reorderable(True)
+        col_priority.set_reorderable(True)
         col_priority.code = "priority"
         self.cols_available['priority'] = col_priority
         self.cols.append(['priority', 'Priority (!)', True, True])
 
         pct = Gtk.CellRendererProgress()
         col_pct = Gtk.TreeViewColumn("%", pct, value=1, visible=16)
-        #col_pct.set_reorderable(True)
+        col_pct.set_reorderable(True)
         col_pct.set_sort_column_id(1)
         col_pct.code = "pct complete"
         self.cols_available['pct complete'] = col_pct
@@ -2097,7 +2100,7 @@ class HiToDo(Gtk.Window):
         est.connect("edited", self.commit_work, 'est')
         est.connect("editing-started", self.duration_edit_start, 2)
         col_est = Gtk.TreeViewColumn("Est", est, foreground_set=12)
-        #col_est.set_reorderable(True)
+        col_est.set_reorderable(True)
         col_est.set_sort_column_id(2)
         col_est.set_cell_data_func(est, self.duration_render, 2)
         col_est.code = "time est"
@@ -2108,7 +2111,7 @@ class HiToDo(Gtk.Window):
         spent.connect("edited", self.commit_work, 'spent')
         spent.connect("editing-started", self.duration_edit_start, 3)
         col_spent = Gtk.TreeViewColumn("Spent", spent, foreground_set=12)
-        #col_spent.set_reorderable(True)
+        col_spent.set_reorderable(True)
         col_spent.set_sort_column_id(3)
         col_spent.set_cell_data_func(spent, self.duration_render, 3)
         col_spent.code = "time spent"
@@ -2117,7 +2120,7 @@ class HiToDo(Gtk.Window):
 
         tracking = Gtk.CellRendererText(foreground="#b00", text=u"\u231A")
         col_tracking = Gtk.TreeViewColumn(u"\u231A", tracking, visible=17)
-        #col_tracking.set_reorderable(True)
+        col_tracking.set_reorderable(True)
         col_tracking.code = "tracked"
         self.cols_available['tracked'] = col_tracking
         self.cols.append(['tracked', u'Tracking (\u231A)', True, True])
@@ -2126,7 +2129,7 @@ class HiToDo(Gtk.Window):
         est_begin.connect("edited", self.commit_date, 4)
         est_begin.connect("editing-started", self.date_edit_start)
         col_est_begin = Gtk.TreeViewColumn("Est Begin", est_begin, foreground_set=12)
-        #col_est_begin.set_reorderable(True)
+        col_est_begin.set_reorderable(True)
         col_est_begin.set_sort_column_id(4)
         col_est_begin.set_cell_data_func(est_begin, self.date_render, 4)
         col_est_begin.code = "est begin"
@@ -2137,7 +2140,7 @@ class HiToDo(Gtk.Window):
         est_complete.connect("edited", self.commit_date, 5)
         est_complete.connect("editing-started", self.date_edit_start)
         col_est_complete = Gtk.TreeViewColumn("Est Complete", est_complete, foreground_set=12)
-        #col_est_complete.set_reorderable(True)
+        col_est_complete.set_reorderable(True)
         col_est_complete.set_sort_column_id(5)
         col_est_complete.set_cell_data_func(est_complete, self.date_render, 5)
         col_est_complete.code = "est begin"
@@ -2148,7 +2151,7 @@ class HiToDo(Gtk.Window):
         due.connect("edited", self.commit_date, 8)
         due.connect("editing-started", self.date_edit_start)
         col_due = Gtk.TreeViewColumn("Due", due, foreground_set=12)
-        #col_due.set_reorderable(True)
+        col_due.set_reorderable(True)
         col_due.set_sort_column_id(8)
         col_due.set_cell_data_func(due, self.date_render, 8)
         col_due.code = "due date"
@@ -2159,7 +2162,7 @@ class HiToDo(Gtk.Window):
         act_begin.connect("edited", self.commit_date, 6)
         act_begin.connect("editing-started", self.date_edit_start)
         col_act_begin = Gtk.TreeViewColumn("Begin", act_begin, foreground_set=12)
-        #col_act_begin.set_reorderable(True)
+        col_act_begin.set_reorderable(True)
         col_act_begin.set_sort_column_id(6)
         col_act_begin.set_cell_data_func(act_begin, self.date_render, 6)
         col_act_begin.code = "act begin"
@@ -2170,7 +2173,7 @@ class HiToDo(Gtk.Window):
         completed.connect("edited", self.commit_date, 7)
         completed.connect("editing-started", self.date_edit_start)
         col_completed = Gtk.TreeViewColumn("Completed", completed, foreground_set=12, visible=12)
-        #col_completed.set_reorderable(True)
+        col_completed.set_reorderable(True)
         col_completed.set_sort_column_id(7)
         col_completed.set_cell_data_func(completed, self.date_render, 7)
         col_completed.code = "complete date"
@@ -2181,7 +2184,7 @@ class HiToDo(Gtk.Window):
         assigner.connect("edited", self.commit_assigner)
         assigner.connect("editing-started", self.combo_edit_start, self.assigners)
         col_assigner = Gtk.TreeViewColumn("From", assigner, text=9, foreground_set=12)
-        #col_assigner.set_reorderable(True)
+        col_assigner.set_reorderable(True)
         col_assigner.set_sort_column_id(9)
         col_assigner.code = "from"
         self.cols_available['from'] = col_assigner
@@ -2191,7 +2194,7 @@ class HiToDo(Gtk.Window):
         assignee.connect("edited", self.commit_assignee)
         assignee.connect("editing-started", self.combo_edit_start, self.assignees)
         col_assignee = Gtk.TreeViewColumn("To", assignee, text=10, foreground_set=12)
-        #col_assignee.set_reorderable(True)
+        col_assignee.set_reorderable(True)
         col_assignee.set_sort_column_id(10)
         col_assignee.code = "to"
         self.cols_available['to'] = col_assignee
@@ -2201,7 +2204,7 @@ class HiToDo(Gtk.Window):
         status.connect("edited", self.commit_status)
         status.connect("editing-started", self.combo_edit_start, self.statii)
         col_status = Gtk.TreeViewColumn("Status", status, text=11, foreground_set=12)
-        #col_status.set_reorderable(True)
+        col_status.set_reorderable(True)
         col_status.set_sort_column_id(11)
         col_status.code = "status"
         self.cols_available['status'] = col_status
@@ -2211,7 +2214,7 @@ class HiToDo(Gtk.Window):
         done.connect("toggled", self.commit_done)
         col_done = Gtk.TreeViewColumn(u"\u2713", done, active=12)
         col_done.set_sort_column_id(12)
-        #col_done.set_reorderable(True)
+        col_done.set_reorderable(True)
         col_done.code = "done"
         self.cols_available['done'] = col_done
         self.cols.append(['done', u'Done (\u2713)', True, False])
@@ -2243,7 +2246,7 @@ class HiToDo(Gtk.Window):
             ("quit", Gtk.STOCK_QUIT, None, None, None, self.destroy),
             ("help_about", Gtk.STOCK_ABOUT, None, None, None, self.show_about),
             ("prefs", Gtk.STOCK_PREFERENCES, "Pr_eferences", None, None, self.set_prefs),
-            ("doc_props", Gtk.STOCK_PROPERTIES, "_Document Properties", None, None, self.set_docprops),
+            # ("doc_props", Gtk.STOCK_PROPERTIES, "_Document Properties", None, None, self.set_docprops),
             ("edit_assigners", None, "Assigne_rs (From)", None, "Manage this list's assigners", self.edit_assigners),
             ("edit_assignees", None, "Assigne_es (To)", None, "Manage this list's assignees", self.edit_assignees),
             ("edit_statii", None, "_Status", None, "Manage this list's status labels", self.edit_statii),

@@ -121,7 +121,7 @@ class main(Gtk.Dialog):
 
         defaultbtn = Gtk.Button("De_fault")
         defaultbtn.set_use_underline(True)
-        defaultbtn.connect("clicked", self.parent.reset_cols)
+        # defaultbtn.connect("clicked", self.parent.reset_cols)
         btnbox.pack_start(defaultbtn, False, False, 0)
 
         main_box.pack_start(btnbox, False, False, 0)
