@@ -127,27 +127,41 @@ UI_XML = """
 
 # Define the gui and its actions.
 class HiToDo(Gtk.Window):
-    PROGRAM_VERSION = "0.9.3"
-
-    def skip(self, widget=None):
-        '''Placeholder function for unimplemented UI actions.'''
-        pass
+    PROGRAM_VERSION = "0.9.4"
 
     def track_focus(self, widget, event=None):
-        '''Sets internal reference to the widget we consider to have focus. This
-        may not match with what *actually* has focus in the WM. The reference is
-        used to choose which action to take on undo, redo, cut, copy, paste, etc.'''
+        '''Updates internal focus tracking reference
+
+        Our internal focus is used to choose which action to take on undo, redo,
+        cut, copy, paste, etc.
+
+        It may not match with the global input focus, usually because we don't
+        always care about child widgets.
+
+        Arguments:
+        widget - Gtk.Widget - The widget we should consider as having focus
+        '''
         self.focus = widget
 
     def add_task(self, widget=None, parent_iter=None):
-        '''Adds a new task to the task list, underneath 'parent_iter'. When
-        'parent_iter' is None, it's inserted at the top level.
+        '''Adds a new task to the task list and begins editing
 
-        If a task other than the parent is selected, we append the new task as
-        its sibling.
+        Most of the time, parent_iter is None and the new task is added as a
+        sibling of the currently-selected task. If no task is selected, the new
+        task is added at the topmost level of the tree. The task is prepopulated
+        with data from self.defaults.
 
-        The new task is populated with data from 'self.defaults' and its parent,
-        if set. Its title field then receives focus for editing.'''
+        When parent_iter is given, the new task is prepended to that iter's
+        children. The task is then populated with data from self.defaults and
+        its parent. Inherited fields are priority, from, to, and the use due
+        time flag.
+
+        After being created, the new task's title field is given focus for
+        immediate editing.
+
+        Arguments:
+        parent_iter - Gtk.TreeIter - Iter to our parent task, or None
+        '''
         self.commit_all()
 
         #we can inherit some things if we're a new child
@@ -180,7 +194,6 @@ class HiToDo(Gtk.Window):
             self.defaults[17]       #spent tracked
         ]
 
-
         if self.seliter is not None and parent_iter is not self.seliter:
             new_row_iter = self.tasklist.insert_after(None, self.seliter, row_data)
         else:
@@ -209,7 +222,8 @@ class HiToDo(Gtk.Window):
         self.task_view.set_cursor_on_cell(path, self.col_title, self.title_cell, True)
 
     def add_subtask(self, widget=None):
-        '''Helper function to add a new task beneath the selected task. See add_task.'''
+        '''Wrapper for add_task to create new task as child of current selected task'''
+
         self.add_task(parent_iter = self.seliter)
 
     def commit_all(self):
@@ -266,6 +280,15 @@ class HiToDo(Gtk.Window):
             self.__push_undoable(work_type, (path, old_work, int(out)))
 
     def _derive_work(self, path=None, work_type=''):
+        '''Calculates task work time based on children
+
+        Iterates child tasks and sums up their work total, either est or spent.
+        That total is saved to the task at path.
+
+        Arguments:
+        path - Gtk.TreePath, default None - Path of the task to start from
+        work_type -- str, default None -- Describes what kind of work is being saved. Either "est" or "spent"; others may be added in the future.
+        '''
         work_col = self.work_cols[work_type]
 
         total_work = 0
@@ -336,17 +359,22 @@ class HiToDo(Gtk.Window):
             action.set_tooltip("Start tracking time toward current task")
 
     def commit_done(self, renderer=None, path=None, new_done=None):
-        '''Toggles a task's 'done' flag (field 12) and handles tracking and pct
-        propagation. Note that field 16 is the 'anti-done' flag and always set
-        to the opposite value of field 12.
+        '''Toggles a task's done flag and handles the fallout
 
-        When transition to done state, pct is set to 100, children are forced to
-        'done' state (see force_children_done), the 'completed' timestamp is
-        set, and tracking is toggled off if applicable.
+        Note: field 16 is the 'anti-done' flag and always set to the opposite value of field 12 ('done' flag).
 
-        When transition to the not-done state, our parent is set to not-done
-        (see force_parent_not_done), our parent's pct is recalculated (see
-        calc_parent_pct), and our own pct is recalculated (see calc_pct).'''
+        When moving to Done, a number of things happen:
+        1. Pct complete is set to 100
+        2. Children are forced to the Done state using __force_peers_done()
+        3. Complete datetime is set to datetime.now()
+        4. Tracking is canceled if applicable, which triggers its own handler, track_spent()
+
+        When moving to Not Done, various other things happen:
+        1. Our parent(s) are forced to the Not Done state using force_parent_not_done()
+        3. Our own pct complete is recalculated with calc_pct()
+
+        Finally, our parent's percent complete is always recalculated with calc_parent_pct()
+        '''
         if path is None: return
 
         done = not new_done if new_done is not None else self.tasklist[path][12]
@@ -355,14 +383,14 @@ class HiToDo(Gtk.Window):
             #we're transitioning from not-done to done
             self.tasklist[path][1] = 100 #no need to calculate; we're 100% complete
 
-            self.force_children_done(path)
+            child_iter = self.tasklist.iter_children(self.tasklist.get_iter(path))
+            self.__force_peers_done(child_iter)
             self.tasklist[path][7] = datetime.now()
             if self.tasklist[path][17]:
                 self.track_action.set_active(False)
         else:
             #we're transitioning from done to not-done
             self.force_parent_not_done(path)
-            self.calc_parent_pct(path)
             self.calc_pct(path)
 
         self.tasklist[path][12] = not done
@@ -375,41 +403,42 @@ class HiToDo(Gtk.Window):
         #recalculate our parent's pct complete, if we have one
         self.calc_parent_pct(path)
 
-    def force_children_done(self, path):
-        '''Finds the first child of 'path' and uses a private function to mark
-        it and all of its peers done. See __force_peers_done().'''
-        treeiter = self.tasklist.get_iter(path)
-        child_iter = self.tasklist.iter_children(treeiter)
-        self.__force_peers_done(child_iter)
-
     def __force_peers_done(self, treeiter):
-        '''Marks all tasks on this level as done, and recurses to every task's
-        children.
+        '''Recursively marks all tasks on this level as Done
 
-        See commit_done() for a description of what happens when transition to
-        the done state.'''
+        This involves a few steps:
+        1. Tracking is ended, which triggers its own handler, track_spent()
+        2. Pct complete is set to 100
+        3. Completed timestamp is set to datetime.now() unless it's already been set.
+        4. The Done flag and its sister are set
+        '''
         while treeiter != None:
             #handle tracking
             if self.tasklist[treeiter][17]:
                 self.track_action.set_active(False)
+
             #set pct complete
             self.tasklist[treeiter][1] = 100
+
             #set complete timestamp if not already present
             if self.tasklist[treeiter][7] == "":
                 self.tasklist[treeiter][7] = datetime.now()
+
             #set done and anti-done flags
             self.tasklist[treeiter][12] = True
             self.tasklist[treeiter][16] = False
+
             #recurse if necessary
             if self.tasklist.iter_has_child(treeiter):
                 child_iter = self.tasklist.iter_children(treeiter)
                 self.__force_peers_done(child_iter)
+
             #iterate to next sibling
             treeiter = self.tasklist.iter_next(treeiter)
 
     def force_parent_not_done(self, path):
-        '''Iterates all levels of path, marking the first row of each level
-        not done.'''
+        '''Sets Done flag and its sister for all direct parents of path'''
+
         parts = path.split(':')
         oldpath = ''
         for parent_path in parts:
@@ -420,8 +449,8 @@ class HiToDo(Gtk.Window):
             oldpath = newpath + ':'
 
     def calc_parent_pct(self, path):
-        '''Gets the parent path of 'path' and uses a private function to
-        calculate the parent's pct complete. See __do_pct().'''
+        '''Calculates the pct complete of the direct parent of path.'''
+
         parts = path.partition(':')
         parent_path = parts[0]
         if parent_path == path: return
@@ -430,11 +459,10 @@ class HiToDo(Gtk.Window):
         self.__do_pct(parent_iter)
 
     def calc_pct(self, path):
-        '''Uses a private function to calculate the pct complete of the row at
-        'path'. When the row has no children, its pct complete is set to zero
-        as a shortcut. See __do_pct().
+        '''Calculates the pct complete of the task at path
 
-        This function does not handle the case where the row is marked done.'''
+        Mostly a wrapper function for __do_pct, as that requires an inter.
+        '''
         treeiter = self.tasklist.get_iter(path)
         if self.tasklist.iter_n_children(treeiter) == 0:
             self.tasklist[treeiter][1] = 0
@@ -443,11 +471,15 @@ class HiToDo(Gtk.Window):
         self.__do_pct(treeiter)
 
     def __do_pct(self, treeiter):
-        '''Calculates the pct complete of the row at 'treeiter' from the number
-        of children marked done. Children with children of their own (branches)
-        are ignored.'''
-        n_children = 0 #This is not the liststore's child count. It omits children who have children of their own.
-        n_done = 0 #Also omits children who have children.
+        '''Calculates the pct complete of the row at 'treeiter'
+
+        Iterates through all levels of children, tallying the number marked Done
+        against the total number found. Both tallies ignore children with
+        children of their own (branches), since branches just summarize the pct
+        complete of their own children.
+        '''
+        n_children = 0 # This is not the liststore's child count. It omits children who have children of their own.
+        n_done = 0 # Also omits children who have children.
         child_iter = self.tasklist.iter_children(treeiter)
         while child_iter is not None:
             if self.tasklist.iter_n_children(child_iter):
@@ -465,7 +497,8 @@ class HiToDo(Gtk.Window):
         return n_children, n_done
 
     def commit_priority(self, widget=None, path=None, new_priority=None):
-        '''Sets the priority for 'path' to the value of 'new_priority'.'''
+        '''Sets the priority for 'path' to the value of new_priority'''
+
         if path is None: return
 
         old_val = self.tasklist[path][0]
@@ -477,7 +510,8 @@ class HiToDo(Gtk.Window):
 
     def commit_date(self, widget=None, path=None, new_date=None, field=None):
         '''Sets the value of a date field (due, complete, act begin, est begin,
-        est complete) to the value of 'new_date'.'''
+        est complete) to the value of new_date'''
+
         if path is None: return
 
         old_val = self.tasklist[path][field]
@@ -494,9 +528,11 @@ class HiToDo(Gtk.Window):
         self.__push_undoable("change", (path, field, old_val, dt))
 
     def commit_status(self, widget=None, path=None, new_status=None):
-        '''Set the status string of 'path' to the value of 'new_status'. That
-        value is also added to our internal list and liststore of status
-        strings, if not already present.'''
+        '''Sets the status string of 'path' to the value of new_status
+
+        The value of new_status is also compared to the internal statii list and
+        if it's new, it's added.
+        '''
         if path is None: return
 
         #add the new status to our lists if necessary
@@ -510,9 +546,11 @@ class HiToDo(Gtk.Window):
         self.__push_undoable("change", (path, 11, old_status, new_status))
 
     def commit_assigner(self, widget=None, path=None, new_assigner=None):
-        '''Set the status string of 'path' to the value of 'new_assigner'. That
-        value is also added to our internal list and liststore of assigner
-        strings, if not already present.'''
+        '''Sets the status string of 'path' to the value of new_assigner
+
+        The value of new_assigner is also compared to the internal from list and
+        if it's new, it's added.
+        '''
         if path is None: return
 
         if new_assigner != '' and new_assigner not in self.assigners_list:
@@ -525,9 +563,11 @@ class HiToDo(Gtk.Window):
         self.__push_undoable("change", (path, 9, old_assigner, new_assigner))
 
     def commit_assignee(self, widget=None, path=None, new_assignee=None):
-        '''Set the status string of 'path' to the value of 'new_assignee'. That
-        value is also added to our internal list and liststore of assignee
-        strings, if not already present.'''
+        '''Sets the status string of 'path' to the value of new_assignee
+
+        The value of new_assignee is also compared to the internal to list and
+        if it's new, it's added.
+        '''
         if path is None: return
 
         if new_assignee != '' and new_assignee not in self.assignees_list:
@@ -540,11 +580,10 @@ class HiToDo(Gtk.Window):
         self.__push_undoable("change", (path, 10, old_assignee, new_assignee))
 
     def commit_notes(self, widget=None, data=None):
-        '''Save the user-entered notes text to the notes field.'''
+        '''Saves the user-entered notes text to the notes field'''
+
         if self.seliter is None: return
-        if self.notes_view.has_focus():
-            self.task_view.grab_focus()
-        else:
+        if not self.notes_view.has_focus():
             return #just in case we were called when the notes view was not actually being used
 
         start = self.notes_buff.get_iter_at_offset(0)
@@ -557,15 +596,19 @@ class HiToDo(Gtk.Window):
         self.tasklist[self.seliter][14] = text
         self.__push_undoable("notes", (path, oldtext, text))
 
-    def commit_title(self, widget=None, path=None, new_title=None, write=True):
-        '''Save the user-entered title.
+    def commit_title(self, widget=None, path=None, new_title=None):
+        '''Saves the user-entered title.
 
-        When the entry is blank, we simply revert to the previous title. If the
-        title is made blank on a new task, however, the task is deleted instead,
-        as there is no previous title to use.
+        Behavior differs for blank fields based on whether the task is new or
+        not. If it's a new task (i.e. its existing title is blank), passing an
+        empty string for new_title deletes the task. If it's an existing task,
+        an empty new_title cancels the edit and the existing title is not
+        changed.
 
-        The 'write' flag is used when we want to evaluate 'new_title' against
-        the old title, but don't want to change anything if it doesn't revert.'''
+        Arguments:
+        path - Gtk.TreePath - Path of the task to change
+        new_title - string - New title string to set
+        '''
         if path is None:
             if self.title_editor is None: return
             #if we have no path, but there is an active title editing field, we can use that instead
@@ -585,42 +628,48 @@ class HiToDo(Gtk.Window):
             return # cancel the edit.
 
         #finally, set the new title if allowed
-        if write is True:
-            self.tasklist[path][13] = new_title
-            self.__push_undoable("change", (path, 13, old_title, new_title))
+        self.tasklist[path][13] = new_title
+        self.__push_undoable("change", (path, 13, old_title, new_title))
 
     def title_edit_start(self, renderer, editor, path):
-        '''Set up the title editor widget and store its edit path. We also set
-        the internal focus to the editor (see track_focus()) and attach a key
-        listener. See title_keys_dn().'''
+        '''Set up the title editor widget
+
+        We store the edit path, attach title_keys_dn() as a listener, and set
+        our internal focus tracker to the new editor widget using track_focus().
+        '''
         editor.set_text(self.tasklist[path][13])
         self.title_edit_path = path
         self.title_editor = editor
         self.track_focus(widget=editor)
         self.title_key_press_catcher = editor.connect("key-press-event", self.title_keys_dn)
 
-    def combo_edit_start(self, renderer, editor, path, data):
-        '''Sets internal focus to the combo widget. See track_focus().'''
-        completer = Gtk.EntryCompletion(model=data, popup_completion=True, inline_completion=True, inline_selection=True, popup_single_match=False, minimum_key_length=0)
+    def list_edit_start(self, renderer, editor, path, model):
+        '''Set up the widget for editing a list-backed field
+
+        Our editor is given an autocomplete component backed by model. Then we
+        set our internal focus tracker to the new editor using track_focus().
+        '''
+        completer = Gtk.EntryCompletion(model=model, popup_completion=True, inline_completion=True, inline_selection=True, popup_single_match=False, minimum_key_length=0)
         completer.set_text_column(0)
         editor.set_completion(completer)
         self.track_focus(widget=editor)
 
     def priority_edit_start(self, renderer, editor, path):
-        '''Sets internal focus to the priority widget. See track_focus().'''
+        '''Sets internal focus to the priority widget with track_focus()'''
+
         self.track_focus(widget = editor)
 
     def date_edit_start(self, renderer, editor, path):
-        '''Sets up the date editing widget and sets internal focus to it. These
-        have an icon which pops up a reference calendar. See track_focus().'''
+        '''Sets internal focus to the date picker widget with track_focus().'''
+
         self.track_focus(widget = editor)
 
     def del_current_task(self, widget=None):
-        '''Removes every selected row from the task list. These are stored in
-        self.sellist (see 'task_selected()').
+        '''Removes every selected row from the task list
 
         Spent time tracking is ended as needed. Parent pct complete, time spent,
-        and est are recaulculated.'''
+        and est are recaulculated.
+        '''
         if self.sellist is None: return
         refs = []
         #first we get references to each row
@@ -654,8 +703,10 @@ class HiToDo(Gtk.Window):
         self.task_selected(self.selection)
 
     def del_task(self, path):
-        '''Deletes the row at 'path'. Ceases tracking and recalculates parent
-        time spent, est, and pct complete.'''
+        '''Deletes the row at 'path'
+
+        Ends tracking and recalculates parent time spent, est, and pct complete.
+        '''
         #stop tracking if needed
         if self.tasklist[path][17]:
             self.track_action.set_active(False)
@@ -666,15 +717,12 @@ class HiToDo(Gtk.Window):
         self.tasklist.remove(treeiter)
         self.calc_parent_pct(str(path))
 
-    def del_task_iter(self, treeiter):
-        '''Deletes the row at 'treeiter'. Just a wrapper for del_task().'''
-        path = self.tasklist.get_path(treeiter)
-        self.del_task(path)
-
     def task_selected(self, widget):
-        '''Stores references to the task(s) selected by the user. Also sets the
-        correct buffer for notes editing and enables/disables row editing
-        controls (cut, copy, paste, etc.) as needed.'''
+        '''Stores references to the task(s) selected by the user
+
+        Sets the correct buffer for notes editing and enables/disables row
+        editing controls (cut, copy, paste, etc.) as needed.
+        '''
         self.selcount = widget.count_selected_rows()
         self.sellist = widget.get_selected_rows()[1]
 
@@ -711,9 +759,12 @@ class HiToDo(Gtk.Window):
         self.notes_buff.clear_undo()
 
     def select_all(self, widget=None):
-        '''Handles Select All events based on the internal focus pointer. If
-        focus is on the task list, controls are enabled/disabled as required.
-        Currently supports the task view, notes view, and title editor.'''
+        '''Handles Select All events based on the internal focus pointer
+
+        If focus is on the task list, controls are enabled/disabled as required.
+
+        Currently supports the task view, notes view, and all entry fields.
+        '''
         if self.focus == self.task_view:
             self.selection.select_all()
 
@@ -728,13 +779,16 @@ class HiToDo(Gtk.Window):
             self.notes_view.set_sensitive(False)
         elif self.focus == self.notes_view:
             self.focus.emit('select-all', True)
-        elif self.title_editor is not None and self.focus == self.title_editor:
+        elif type(self.focus) == Gtk.Entry:
             self.focus.select_region(0, -1)
 
     def select_none(self, widget=None):
-        '''Handles Select None events based on the internal focus pointer. If
-        focus is on the task list, controls are enabled/disabled as required.
-        Currently supports the task view, notes view, and title editor.'''
+        '''Handles Select None events based on the internal focus pointer
+
+        If focus is on the task list, controls are enabled/disabled as required.
+
+        Currently supports the task view, notes view, and all entry fields.
+        '''
         if self.focus == self.task_view:
             self.selection.unselect_all()
 
@@ -747,12 +801,16 @@ class HiToDo(Gtk.Window):
             self.task_del.set_sensitive(False)
         elif self.focus == self.notes_view:
             self.focus.emit('select-all', False)
-        elif self.title_editor is not None and self.focus == self.title_editor:
+        elif type(self.focus) == Gtk.Entry:
             self.focus.select_region(0,0)
 
     def select_inv(self, widget=None):
-        '''Inverts task selection: all selected tasks are unselected, and all
-        previously unselected tasks are selected. Uses select all or select none where possible, and otherwise calls a private function to invert recursively (see __invert_tasklist_selection()).'''
+        '''Inverts task selection
+
+        All selected tasks are unselected, and all previously unselected tasks
+        are selected. Uses select all or select none where possible. Otherwise
+        calls __invert_tasklist_selection().
+        '''
         if self.focus != self.task_view: return
 
         if self.selcount == 0:
@@ -769,7 +827,8 @@ class HiToDo(Gtk.Window):
             self.task_selected(self.selection)
 
     def __invert_tasklist_selection(self, treeiter):
-        '''Recursively switches each row's selected status, inverting the user's selection.'''
+        '''Recursively switches each row's selected status'''
+
         while treeiter != None:
             #swap selection state on iter
             if self.selection.iter_is_selected(treeiter):
@@ -784,27 +843,33 @@ class HiToDo(Gtk.Window):
             treeiter = self.tasklist_filter.iter_next(treeiter)
 
     def expand_all(self, widget=None):
-        '''Expands all tasks.'''
+        '''Expands all tasks'''
+
         self.task_view.expand_all()
 
     def collapse_all(self, widget=None):
-        '''Collapses all tasks.'''
+        '''Collapses all tasks'''
+
         self.task_view.collapse_all()
 
     def swap_focus(self, widget=None):
         '''Changes focus between Task list and Comments'''
+
         if self.notes_view.has_focus():
             self.task_view.grab_focus()
         else:
             self.notes_view.grab_focus()
 
     def new_file(self, widget=None):
-        '''Creates a new file by clearing the treestore, undo/redo buffer,
-        visible columns, assigners, assignees, statii, file name, etc.
+        '''Creates a new task list
+
+        Clears the treestore, undo/redo buffer, visible columns, assigners,
+        assignees, statii, file name, etc.
 
         Right now, it replaces the current file without question, but in the
         future will honor a settings variable to possibly open a new window or
-        tab instead.'''
+        tab instead.
+        '''
         if not self.confirm_discard(): return
 
         self.tasklist.clear()
@@ -837,8 +902,10 @@ class HiToDo(Gtk.Window):
         self.update_title()
 
     def open_file(self, widget=None):
-        '''Prompts the user the choose a file to load. Uses __do_open() to read
-        the file once it's known.'''
+        '''Prompts the user the choose a file to load
+
+        Uses __do_open() to read the file once it's known.
+        '''
         if not self.confirm_discard(): return
 
         retcode = self.open_dlg.run()
@@ -850,8 +917,10 @@ class HiToDo(Gtk.Window):
         self.__do_open()
 
     def open_recent(self, widget):
-        '''Opens a file from the Recent Files widget. Saves file information and
-        calls __do_open() for the real work.'''
+        '''Opens a file from the Recent Files widget
+
+        Saves file information and calls __do_open() for the real work.
+        '''
         if not self.confirm_discard(): return
 
         uri = widget.get_current_uri()
@@ -861,7 +930,11 @@ class HiToDo(Gtk.Window):
         self.__do_open()
 
     def __open_last(self):
-        '''Private function to open the most recent file on program start.'''
+        '''Opens the most recently used file
+
+        Meant to be run at the end of __init__()
+        '''
+
         retval = self.recent_files.get_uris()
         if retval == []: return
         if retval[0] == []: return
@@ -872,12 +945,12 @@ class HiToDo(Gtk.Window):
         self.__do_open()
 
     def __do_open(self):
-        '''Private function which opens the file at self.file_name using the
-        reader self.file_filter.
+        '''Loads the file at self.file_name using the reader self.file_filter
 
-        First, self.file_filter processes the file and puts the file's data into
-        a dict for loading. Save version is checked for compatability and then
-        things are loaded into our internal vars.'''
+        We let self.file_filter process the file and put its data into a dict.
+        Save version is checked for compatability and then we use that dict to
+        populate our real internal vars.
+        '''
         templist = copy_treemodel(self.tasklist)
         data = {
             'filename': self.file_name,
@@ -991,9 +1064,11 @@ class HiToDo(Gtk.Window):
             self.save_file()
 
     def pick_savefile(self):
-        '''Prompts the user to pick a save location. The chosen extension is
-        added automatically if the user left it out, and the resulting full path
-        is returned.'''
+        '''Prompts the user to pick a save location
+
+        The chosen extension is added automatically if the user left it out and
+        the resulting full path is returned.
+        '''
         #set up starting name
         if self.file_name != "":
             self.save_dlg.set_filename(self.file_name)
@@ -1015,14 +1090,19 @@ class HiToDo(Gtk.Window):
         return filename
 
     def save_file_as(self, widget=None):
-        '''Prompts user for a save location (see pick_savefile()) and then saves
-        there using __do_save(). The location is preserved for future saves.'''
+        '''Prompts user for a save location using pick_savefile() and then saves
+        there using __do_save()
+
+        The location is preserved for future saves.
+        '''
         self.file_name = self.pick_savefile()
         self.__do_save(self.file_name, self.tasklist)
 
     def save_file(self, widget=None):
-        '''Saves the current file at its known location. If we don't have a
-        location yet, the user is prompted to choose one.'''
+        '''Writes the current list to the saved file location
+
+        If we don't have a location yet, the user is prompted to choose one.
+        '''
         if self.file_name == "":
             self.save_file_as()
             return
@@ -1030,16 +1110,20 @@ class HiToDo(Gtk.Window):
         self.__do_save(self.file_name, self.tasklist)
 
     def save_copy(self, widget=None):
-        '''Prompts the user to pick a save location then saves the current file
-        there. However, the new location is then discarded and will not be used
-        for future saves.'''
+        '''Prompts user for a save location using pick_savefile() and then saves
+        there using __do_save()
+
+        Unlike save_file_as(), the location is NOT preserved for future saves.
+        '''
         filename = self.pick_savefile()
         self.__do_save(filename, self.tasklist)
 
     def __do_save(self, filename, tasklist, append=False, file_filter=None):
-        '''Private function to save our data to the file at 'filename'. The data
-        is bundled into a dict and all the writing is handled by a filter from
-        file_parsers.py.'''
+        '''Writes our data to the file at 'filename'
+
+        The data is bundled into a dict and all the writing is handled by a
+        filter from file_parsers.
+        '''
         if file_filter is None: file_filter = file_parsers.pick_filter(filename)
 
         if tasklist is self.tasklist and self.seliter is not None:
@@ -1077,9 +1161,12 @@ class HiToDo(Gtk.Window):
         self.last_save = datetime.now()
 
     def confirm_discard(self):
-        '''Prompts the user about discarding unsaved changes. Returns True if
-        the user wants to discard their changes, and False otherwise. Handles
-        saving with save_file().'''
+        '''Warns the user about discarding changes
+
+        Saves with save_file() if that option is chosen.
+
+        Returns True if the user wants to discard their changes, and False otherwise.
+        '''
         if not self.file_dirty: return True
 
         #get the right unit
@@ -1121,14 +1208,15 @@ class HiToDo(Gtk.Window):
             return False
 
     def make_dirty(self, path=None, it=None, data=None):
-        '''Marks our data as dirty (unsaved) and changes the title to reflect
-        this. See update_title().'''
+        '''Marks data as unsaved and changes the title to reflect this using update_title()'''
+
         self.file_dirty = True
         self.update_title()
 
     def update_title(self):
         '''Updates the window's title to reflect the current file's name, path,
-        and dirty state.'''
+        and dirty state'''
+
         if self.file_name != "":
             ttl = "%s (%s) - HiToDo" % (basename(self.file_name), dirname(self.file_name))
         else:
@@ -1139,18 +1227,22 @@ class HiToDo(Gtk.Window):
         self.set_title(self.title)
 
     def show_about(self, widget=None):
-        '''Shows the About dialog.'''
+        '''Shows the About dialog'''
+
         self.about_dlg.run()
         self.about_dlg.hide()
 
     def set_prefs(self, widget=None):
+        '''Shows the settings module's own preferences dialog'''
+
         self.settings.show_dialog(self)
 
     def do_cut(self, widget=None):
-        '''Applies cut operation depending on current internal focus. For notes
-        or title, the 'cut-clipboard' signal is emitted. For the task list, the
-        selected rows are copied to internal storage and the clipboard, then
-        deleted. See __do_copy_real().'''
+        '''Applies cut operation depending on current internal focus
+
+        For notes or title, the 'cut-clipboard' signal is emitted. For the task
+        list, __do_copy_real() is used and the rows are deleted.
+        '''
         if self.focus == self.notes_view or (self.title_editor is not None and self.focus == self.title_editor):
             self.focus.emit('cut-clipboard')
         elif self.focus == self.task_view:
@@ -1160,10 +1252,11 @@ class HiToDo(Gtk.Window):
             self.del_current_task() #this also pushes an undo action
 
     def do_copy(self, widget=None):
-        '''Applies copy operation depending on current internal focus. For notes
-        or title, the 'copy-clipboard' signal is emitted. For the task list, the
-        selected rows are copied to internal storage and the clipboard. See
-        __do_copy_real().'''
+        '''Applies copy operation depending on current internal focus
+
+        For notes or title, the 'copy-clipboard' signal is emitted. For the task
+        list, __do_copy_real() is used.
+        '''
         if self.focus == self.notes_view or (self.title_editor is not None and self.focus == self.title_editor):
             self.focus.emit('copy-clipboard')
         elif self.focus == self.task_view:
@@ -1172,8 +1265,11 @@ class HiToDo(Gtk.Window):
             self.clipboard.set_text("\n".join(row_texts), -1)
 
     def __do_copy_real(self, subject, rowlist):
-        '''Iterates selected rows and their children, storing shallow copies of
-        their data with [:]. See __copy_children() for child recursion.'''
+        '''Stores shallow copies of selected rows and their children to rowlist
+
+        Returns list of row titles for clipboard use. Uses __copy_children() for
+        recursion.
+        '''
         row_texts = []
         del rowlist[:]
         for path in subject:
@@ -1188,7 +1284,8 @@ class HiToDo(Gtk.Window):
 
     def __copy_children(self, treeiter, parent_index, rowlist):
         '''Iterates a list of children and recurses to their own children,
-        storing shallow copies of their data with [:].'''
+        storing shallow copies of their data to rowlist'''
+
         child_iter = self.tasklist.iter_children(treeiter)
         while child_iter != None:
             rowlist.append([parent_index] + self.tasklist[child_iter][:])
@@ -1196,10 +1293,12 @@ class HiToDo(Gtk.Window):
             child_iter = self.tasklist.iter_next(child_iter)
 
     def do_paste(self, widget=None):
-        '''Applies paste operation depending on current internal focus. For
-        notes or title, the 'paste-clipboard' signal is emitted. For the task
-        list, new rows are created after the current row and populated with data
-        our internal 'clipboard' of rows. See __do_paste_real().'''
+        '''Applies paste operation depending on current internal focus
+
+        For notes or title, the 'paste-clipboard' signal is emitted. For the
+        task list, new rows are created after the current row and populated with
+        data from our internal 'clipboard' of rows using __do_paste_real().
+        '''
         if self.focus == self.notes_view or (self.title_editor is not None and self.focus == self.title_editor):
             self.focus.emit('paste-clipboard')
         elif self.focus == self.task_view:
@@ -1225,14 +1324,14 @@ class HiToDo(Gtk.Window):
             spath = self.sellist[0] if self.seliter is not None else None
             self.__push_undoable("paste", (ppath, spath, self.copied_rows[:], new_iters))
 
-    def __do_paste_real(self, parent_iter, sibling_iter, row_data, apply_filter=True):
-        '''Private function which creates new rows and populates them with data
-        from the internal clipboard.
+    def __do_paste_real(self, parent_iter, sibling_iter, row_data, sanitize=True):
+        '''Creates new rows and populates them with data from the internal clipboard
 
-        If apply_filter is True, the data is first filtered to remove done
+        If sanitize is True, the data is first filtered to remove done
         state, completion date, etc. as these are often undesirable in pasted
         rows. Setting that flag to false forces all row data to be copied
-        verbatim, which is good when dealing with undo/redo operations.'''
+        verbatim, which is good when dealing with undo/redo operations.
+        '''
         new_iters = []
         # Since row data is stored in a flat list, we have to track parentage and siblings manually.
         parents = [parent_iter] # List of parents by index. Top level always points to the meta-parent we were given.
@@ -1241,7 +1340,7 @@ class HiToDo(Gtk.Window):
         #iterate row data and add it
         for row in row_data:
             new_row = self.defaults[:]
-            if apply_filter:
+            if sanitize:
                 inherit = [0,4,5,8,9,10,11,13,14] #columns to preserve from original row
                 for i in inherit:
                     new_row[i] = row[i+1]
@@ -1273,8 +1372,8 @@ class HiToDo(Gtk.Window):
         return new_iters
 
     def do_paste_into(self, widget=None):
-        '''Sets up a paste operation with a row as the new parent. See
-        __do_paste_real().'''
+        '''Pastes rows underneath current selection'''
+
         if self.focus != self.task_view: return
         if self.seliter is None: return
 
@@ -1287,11 +1386,13 @@ class HiToDo(Gtk.Window):
         self.make_dirty()
 
     def do_undo(self, widget=None):
-        '''Handles undo logic. For the notes entry, it just calls that object's
-        own undo() function (see undobuffer module). For the task list, it
-        relies on a list of undoable actions pushed by every function which
-        supports undo (see __push_undoable()). Each action has its own undo
-        procedure.'''
+        '''Handles undo logic
+
+        For the notes entry, it just calls that object's own undo() function
+        (see undobuffer module). For the task list, it relies on a list of
+        undoable actions pushed by every function which supports undo (see
+        __push_undoable()). Each action has its own undo procedure.
+        '''
         #Note that we never set the undo or redo action's sensitivities. They
         #must always be sensitive to allow for undo/redo within the notes_view
         #widget, regardless of the task undo/redo buffers' statii.
@@ -1367,10 +1468,13 @@ class HiToDo(Gtk.Window):
                 self.redobuffer.append(("del", (data[0], data[1], data[2], new_iters)))
 
     def do_redo(self, widget=None):
-        '''Handles redo logic. For the notes entry, it just calls that object's
-        own redo() function (see undobuffer module). For the task list, it
-        relies on a list of undoable actions which were pushed to the redo stack
-        by do_undo(). Each action has its own redo procedure.'''
+        '''Handles redo logic
+
+        For the notes entry, it just calls that object's own redo() function
+        (see undobuffer module). For the task list, it relies on a list of
+        redoable actions pushed by every function which supports redo (see
+        __push_undoable()). Each action has its own redo procedure.
+        '''
         if self.focus == self.notes_view:
             self.notes_buff.redo()
         elif self.focus == self.task_view:
@@ -1447,15 +1551,19 @@ class HiToDo(Gtk.Window):
                 self.undobuffer.append(("del", (data[0], data[1], data[2])))
 
     def __push_undoable(self, action, data):
-        '''Pushes a tuple onto the undobuffer list consisting of the action name
-        and accompanying data. The name must be recognized by do_undo() and
-        do_redo().'''
+        '''Pushes a tuple onto the undobuffer list
+
+        The data tuple must consist of the action name and related data. The
+        name must be recognized by do_undo() and do_redo().'''
         self.undobuffer.append((action, data))
         del self.redobuffer[:]
 
     def display_columns(self, cols=None):
-        '''Clears the currently displayed columns and loads the ones specified
-        in 'self.cols_visible'. Order is honored.'''
+        '''Clears the currently displayed columns and loads the ones in
+        self.cols_visible
+
+        Order is honored.
+        '''
         if cols is None:
             cols = self.cols_visible
 
@@ -1477,9 +1585,11 @@ class HiToDo(Gtk.Window):
         self.task_view.set_properties(expander_column=self.col_title)
 
     def notes_keys_dn(self, widget=None, event=None):
-        '''Catches key-down events in the notes editor to enable custom actions.
+        '''Catches key-down events in the notes editor to enable custom actions
+
         Currently it tracks the status of the Control_* and Enter keys. When
-        Control+Enter appear together, the contents of the editor are saved.'''
+        Control+Enter appear together, the contents of the editor are saved.
+        '''
         kvn = Gdk.keyval_name(event.keyval)
         if kvn == "Control_L" or kvn == "Control_R":
             self.notes_ctl_mask = True
@@ -1489,16 +1599,20 @@ class HiToDo(Gtk.Window):
             return True
 
     def notes_keys_up(self, widget=None, event=None):
-        '''Catches key-up events in the notes editor. Used to clear the
-        Control-key state mask.'''
+        '''Catches key-up events in the notes editor
+
+        Used to clear the Control-key state mask.
+        '''
         kvn = Gdk.keyval_name(event.keyval)
         if kvn == "Control_L" or kvn == "Control_R":
             self.notes_ctl_mask = False
 
     def tasks_keys_dn(self, widget=None, event=None):
-        '''Catches key-down events for the task list itself. This allows us to
-        bind the Delete key to del_current_task() and force F2 to begin editing
-        the current row's title.'''
+        '''Catches key-down events for the task list
+
+        Allows us to bind the Delete key to del_current_task() and force F2 to
+        begin editing the current row's title.
+        '''
         kvn = Gdk.keyval_name(event.keyval)
         if kvn == "Delete":
             self.del_current_task()
@@ -1507,22 +1621,26 @@ class HiToDo(Gtk.Window):
             path = self.tasklist.get_path(self.seliter)
             self.task_view.set_cursor_on_cell(path, self.col_title, self.title_cell, True)
             return True
-        # TODO We can override the spacebar to always mark/unmark our Done flag, but this breaks keyboard navigation
+        # NOTE We can override the spacebar to always mark/unmark our Done flag, but this breaks keyboard navigation
         # if kvn == "space":
         #     path = self.tasklist.get_path(self.seliter)
         #     self.commit_done(path = str(path), new_done = not self.tasklist[path][12])
         #     return True
 
     def title_keys_dn(self, widget=None, event=None):
-        '''Catches key-down events for the task title editor. Lets us cancel
-        in-progress edits when the Escape key is pressed.'''
+        '''Catches key-down events for the task title editor
+
+        Lets us cancel in-progress edits when the Escape key is pressed.
+        '''
         kvn = Gdk.keyval_name(event.keyval)
         if kvn == "Escape":
-            self.commit_title(path=self.title_edit_path, new_title='', write=False)
+            # widget.emit('editing-canceled')
+            self.commit_title(path=self.title_edit_path, new_title='')
 
     def tasks_mouse_click(self, widget=None, event=None):
-        '''Catches mouse clicks for the task list. Allows us to show the context
-        menu on a right-click.'''
+        '''Catches mouse clicks for the task list
+
+        Used to show the context menu on a right-click.'''
         if event.button == 3 and event.type == Gdk.EventType.BUTTON_PRESS:
             self.task_popup.show_all()
             self.task_popup.popup(None, None,
@@ -1533,18 +1651,21 @@ class HiToDo(Gtk.Window):
             return True
 
     def track_maximized(self, widget, event, data=None):
-        '''Tracks the window's maximized state. We save this as part of the
-        window geometry in htdl files.'''
+        '''Tracks the window's maximized state
+
+        We store this as part of the window geometry in save files.
+        '''
         mask = Gdk.WindowState.MAXIMIZED
         self.maximized = (widget.get_window().get_state() & mask) == mask
 
     def toggle_col_visible(self, widget, path, data=None):
-        '''Adds and removes columns from the task list. Used by Document
-        Properties.'''
+        '''Adds and removes columns from the task list'''
+
         code = self.cols[path][0] #internal name of the column
         visible_now = self.cols[path][2] #current state
         real_idex = self.cols_visible.index((code, visible_now)) #index of the row
         idex = real_idex
+
         # Now we modify the index based on the visibility of the other columns.
         # This gives us an index relative to the columns displayed by the task
         # list.
@@ -1562,71 +1683,9 @@ class HiToDo(Gtk.Window):
         self.cols[path][2] = not visible_now
         self.make_dirty()
 
-    def move_col(self, widget, sel, offset):
-        '''Shift a column up or down in the column list. Effectively moves
-        columns left or right within the task list's display. Used by Document
-        Properties dialog.'''
-        colstore, orig = sel.get_selected()
-        if orig is None: return
-
-        #store the treeiter we'll swap with
-        if offset == "up":
-            target = colstore.iter_previous(orig)
-        else:
-            target = colstore.iter_next(orig)
-
-        #store column tuples; consists of column name and visible flag
-        col1 = (colstore[orig][0], colstore[orig][2])
-        col2 = (colstore[target][0], colstore[target][2])
-        #now cache their indexes
-        id1 = self.cols_visible.index(col1)
-        id2 = self.cols_visible.index(col2)
-
-        # We can only actually shift in one direction, so we work out how to do
-        # that using the relative indices of the columns. I.e. we move the
-        # smaller index in front of the bigger index.
-        small = min(id1, id2)
-        big = max(id1, id2)
-        s = self.cols_available[self.cols_visible[small][0]]
-        b = self.cols_available[self.cols_visible[big][0]]
-        self.task_view.move_column_after(s, b) #do the shift
-
-        #swap positions in 'cols_visible' list and 'colstore' liststore
-        self.cols_visible[id2], self.cols_visible[id1] = self.cols_visible[id1], self.cols_visible[id2]
-        colstore.swap(target, orig)
-        self.make_dirty()
-
-    def make_stats(self, treeiter = None):
-        '''Creates a dict of document statistics. Right now, it includes the
-        total number of tasks, number open, and number done. Used by Document
-        Properties dialog.'''
-        if treeiter is None:
-            treeiter = self.tasklist.get_iter_first()
-
-        total = 0
-        total_open = 0
-        total_done = 0
-
-        while treeiter is not None:
-            if self.tasklist.iter_n_children(treeiter):
-                childiter = self.tasklist.iter_children(treeiter)
-                ret = self.make_stats(childiter)
-                total += ret['total']
-                total_open += ret['open']
-                total_done += ret['done']
-            total += 1
-            if self.tasklist[treeiter][12]:
-                total_done += 1
-            else:
-                total_open += 1
-            treeiter = self.tasklist.iter_next(treeiter)
-
-        return {'total': total, 'open': total_open, 'done': total_done}
-
     def edit_assigners(self, widget, data=None):
-        '''Wrapper for the label edit dialog (see the 'labeledit' module). Sets
-        up the dialog's title, the liststore to edit, and the list to use for
-        reference.'''
+        '''Assigners wrapper for the label edit dialog'''
+
         self.label_edit_dlg.set_title("Manage Assigners (From)")
         self.label_edit_dlg.set_frame_label("Manage Assigners")
         self.label_edit_dlg.set_store(self.assigners)
@@ -1635,9 +1694,8 @@ class HiToDo(Gtk.Window):
         self.label_edit_dlg.show_all()
 
     def edit_assignees(self, widget, data=None):
-        '''Wrapper for the label edit dialog (see the 'labeledit' module). Sets
-        up the dialog's title, the liststore to edit, and the list to use for
-        reference.'''
+        '''Assignees wrapper for the label edit dialog'''
+
         self.label_edit_dlg.set_title("Manage Assignees (To)")
         self.label_edit_dlg.set_frame_label("Manage Assignees")
         self.label_edit_dlg.set_store(self.assignees)
@@ -1646,9 +1704,8 @@ class HiToDo(Gtk.Window):
         self.label_edit_dlg.show_all()
 
     def edit_statii(self, widget, data=None):
-        '''Wrapper for the label edit dialog (see the 'labeledit' module). Sets
-        up the dialog's title, the liststore to edit, and the list to use for
-        reference.'''
+        '''Status wrapper for the label edit dialog'''
+
         self.label_edit_dlg.set_title("Manage Status Labels")
         self.label_edit_dlg.set_frame_label("Manage Status Labels")
         self.label_edit_dlg.set_store(self.statii)
@@ -1657,12 +1714,13 @@ class HiToDo(Gtk.Window):
         self.label_edit_dlg.show_all()
 
     def main_filter(self, model, treeiter, data=None):
-        '''Task list filtering function. Currently a placeholder.'''
+        '''Task list filtering function'''
+        # TODO apply filter text from an entry
         return True
 
     def archive_done(self, widget, data=None):
         '''Saves top-level done tasks (and descendents) to a separate archive
-        file, then deletes them. Currently a placeholder.'''
+        file, then deletes them'''
 
         # show the export dialog
         dlg = dialogs.misc.htd_warn_archive(self)
@@ -1711,9 +1769,8 @@ class HiToDo(Gtk.Window):
             return False
 
     def toggle_toolbar(self, widget=None, event=None):
-        '''Toggles visibility of the toolbar. Toggles the gsettings var, whose
-        update triggers a separate function to update the bar's visibility
-        setting and our internal flag.'''
+        '''Toggles visibility of the toolbar'''
+
         vis = widget.get_active()
         self.toolbar.set_visible(vis)
 
@@ -1924,8 +1981,10 @@ class HiToDo(Gtk.Window):
         if self.settings.get("reopen"): self.__open_last()
 
     def date_render(self, col, cell, model, tree_iter, data):
-        '''Cell renderer for date cells. Converts datetime objects from the
-        tasklist model to displayable strings.'''
+        '''Renders date cells
+
+        Converts datetime objects from the tasklist model to displayable strings.
+        '''
         val = model[tree_iter][data]
         duetime = model[tree_iter][15]
 
@@ -1934,8 +1993,10 @@ class HiToDo(Gtk.Window):
         cell.set_property("text", str(out))
 
     def datecompare(self, model, row1, row2, data=None):
-        '''Sorting function for date cells. Compares datetime objects from two
-        rows.'''
+        '''Sorts date cells
+
+        Compares datetime objects from two rows.
+        '''
         sort_column, _ = model.get_sort_column_id()
         value1 = model.get_value(row1, sort_column)
         if value1 is "": value1 = datetime.min
@@ -1950,22 +2011,28 @@ class HiToDo(Gtk.Window):
             return 1
 
     def title_render(self, col, cell, model, tree_iter, data):
-        '''Cell renderer for notes field. Eliminates line breaks so that no task
-        entry takes up multiple lines.'''
+        '''Render title and notes together
+
+        Eliminates line breaks in notes so that no task entry takes up multiple lines.
+        '''
         text = model[tree_iter][13]
         notes = model[tree_iter][14]
         out = escape(text) if notes == '' else "%s  <span color=\"#999\">[%s]</span>" % (escape(text), escape(notes.replace(linesep, ' ')))
         cell.set_property("markup", out)
 
     def duration_render(self, col, cell, model, tree_iter, data):
-        '''Cell renderer for est and spent cells. Converts seconds into hours
-        with a suffix. May expand later to intelligently use other units.'''
+        '''Render est and spent cells
+
+        Converts stored seconds into hours with a suffix. May expand later to
+        intelligently use other units.
+        '''
         val = model[tree_iter][data]
         out = '' if val == 0 else '%1.2fH' % (val/3600)
         cell.set_property("text", out)
 
     def create_columns(self):
-        '''Creates the columns used by the task list view.'''
+        '''Creates the columns used by the task list view'''
+
         priority = Gtk.CellRendererText(editable=True, foreground="#999")
         priority.connect("edited", self.commit_priority)
         priority.connect("editing-started", self.priority_edit_start)
@@ -2070,7 +2137,7 @@ class HiToDo(Gtk.Window):
 
         assigner = Gtk.CellRendererText(editable=True, foreground="#999")
         assigner.connect("edited", self.commit_assigner)
-        assigner.connect("editing-started", self.combo_edit_start, self.assigners)
+        assigner.connect("editing-started", self.list_edit_start, self.assigners)
         col_assigner = Gtk.TreeViewColumn("From", assigner, text=9, foreground_set=12)
         col_assigner.set_reorderable(True)
         col_assigner.set_sort_column_id(9)
@@ -2080,7 +2147,7 @@ class HiToDo(Gtk.Window):
 
         assignee = Gtk.CellRendererText(editable=True, foreground="#999")
         assignee.connect("edited", self.commit_assignee)
-        assignee.connect("editing-started", self.combo_edit_start, self.assignees)
+        assignee.connect("editing-started", self.list_edit_start, self.assignees)
         col_assignee = Gtk.TreeViewColumn("To", assignee, text=10, foreground_set=12)
         col_assignee.set_reorderable(True)
         col_assignee.set_sort_column_id(10)
@@ -2090,7 +2157,7 @@ class HiToDo(Gtk.Window):
 
         status = Gtk.CellRendererText(editable=True, foreground="#999")
         status.connect("edited", self.commit_status)
-        status.connect("editing-started", self.combo_edit_start, self.statii)
+        status.connect("editing-started", self.list_edit_start, self.statii)
         col_status = Gtk.TreeViewColumn("Status", status, text=11, foreground_set=12)
         col_status.set_reorderable(True)
         col_status.set_sort_column_id(11)
@@ -2110,7 +2177,7 @@ class HiToDo(Gtk.Window):
         self.title_cell = Gtk.CellRendererText(editable=True, ellipsize=Pango.EllipsizeMode.MIDDLE, foreground="#999")
         self.title_cell.connect("edited", self.commit_title)
         self.title_cell.connect("editing-started", self.title_edit_start)
-        self.title_cell.connect("editing-canceled", self.commit_title, None, None, True)
+        self.title_cell.connect("editing-canceled", self.commit_title, None, None)
         self.col_title = Gtk.TreeViewColumn("Title")
         self.col_title.pack_start(self.title_cell, True)
         self.col_title.add_attribute(self.title_cell, "foreground-set", 12)
@@ -2122,8 +2189,8 @@ class HiToDo(Gtk.Window):
         self.cols.append(['title', 'Title', True, False])
 
     def create_top_actions(self, action_group):
-        '''Creates actions for UI menus and buttons. These are application-wide
-        actions.'''
+        '''Creates application-wide actions for UI menus and buttons'''
+
         action_group.add_actions([
             ("new_file", Gtk.STOCK_NEW, None, "", None, self.new_file),
             ("open_file", Gtk.STOCK_OPEN, None, None, "Open file", self.open_file),
@@ -2166,8 +2233,8 @@ class HiToDo(Gtk.Window):
 
 
     def create_task_actions(self, action_group):
-        '''Creates actions for UI menus and buttons. These are task-specific
-        actions.'''
+        '''Creates task-specific actions for UI menus and buttons'''
+
         action_group.add_actions([
             ("task_newsub", Gtk.STOCK_INDENT, "New S_ubtask", "<Primary><Shift>N", "Add a new subtask", self.add_subtask),
             ("sel_all", Gtk.STOCK_SELECT_ALL, None, "<Primary>A", None, self.select_all),
@@ -2221,7 +2288,8 @@ class HiToDo(Gtk.Window):
         action_group.add_action_with_accel(self.track_action, "<Primary>T")
 
     def create_ui_manager(self):
-        '''Constructs a ui manager, complete with acceleratorgroup.'''
+        '''Constructs a ui manager, complete with accelerator group'''
+
         uimanager = Gtk.UIManager()
 
         # Throws exception if something went wrong
@@ -2233,12 +2301,14 @@ class HiToDo(Gtk.Window):
         return uimanager
 
     def destroy(self, widget=None, data=None):
-        '''Shows the 'confirm discard' dialog before closing, if applicable.'''
+        '''Shows the 'confirm discard' dialog before closing, if applicable'''
+
         if not self.confirm_discard(): return True
         Gtk.main_quit()
 
 def copy_treemodel(orig):
-    '''Create a new treemodel with the same columns as 'model'.'''
+    '''Create a new treemodel with the same columns as model'''
+
     column_types = []
     column_numbers = range(orig.get_n_columns())
     for i in column_numbers:
@@ -2247,8 +2317,11 @@ def copy_treemodel(orig):
     return copy
 
 def append_row(orig, path, treeiter, copy):
-    '''Append a row to the treemodel 'copy' from the treemodel 'orig' while preserving parent-child relationships.
-    Meant to be run as 'orig.foreach(append_row, copy)'.'''
+    '''Append a row to the treemodel copy from the treemodel orig
+
+    Preserves parent-child relationships. Meant to be run as
+    'orig.foreach(append_row, copy)'
+    '''
     strpath = path.to_string()
 
     parts = strpath.rsplit(':', 1)
@@ -2258,10 +2331,14 @@ def append_row(orig, path, treeiter, copy):
     copy.append(parent_iter, orig[treeiter][:])
 
 def main():
+    '''Starts the Gtk main loop'''
+
     Gtk.main()
     return
 
 def is_number(s):
+    '''Determines whether s can be cast to a float'''
+
     try:
         float(s)
         return True
