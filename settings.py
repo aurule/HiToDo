@@ -21,7 +21,9 @@ from gi.repository import Gtk
 class settings(object):
     '''Settings handler for HiToDo
 
-    Loads, stores, and saves config data for HiToDo. Takes care of both the loading and saving of the configuration file, and the management of the preferences dialog.
+    Loads, stores, and saves config data for HiToDo. Takes care of both the
+    loading and saving of the configuration file, and the management of the
+    preferences dialog.
 
     Settings are stored in $XDG_CONFIG_HOME/hitodo/settings.json
     '''
@@ -43,6 +45,11 @@ class settings(object):
 '''
 
     def __init__(self, parent):
+        '''Load settings
+
+        Loads settings from our config file, if present. Otherwise uses the
+        static self.defaults string.
+        '''
         # set config file location
         config = os.getenv("XDG_CONFIG_HOME")
         if not config:
@@ -62,8 +69,6 @@ class settings(object):
         if not self._settings:
             self._settings = json.loads(self.defaults)
 
-        self.init_dialog(parent)
-
     def set(self, setting, value):
         '''Set the value of a named setting.
 
@@ -82,16 +87,27 @@ class settings(object):
         Returns:
         The value of the named setting, or Mone if that setting does not exist.
         '''
-
         try:
             return self._settings[setting]
         except KeyError:
             return None
 
-    def show_dialog(self):
-        self.prefs_dialog.show_all()
+    def show_dialog(self, parent):
+        '''Shows our prefs editing dialog
+
+        If the dialog doesn't exist yet, we create it. Either way, its parent is
+        set to our calling window.
+        '''
+        if not self.prefs_dialog:
+            self.__init_dialog(parent)
+        else:
+            self.prefs_dialog.set_parent(parent)
+
+        self.prefs_dialog.run()
 
     def save_prefs(self, widget):
+        '''Save current settings to our config file'''
+
         self.prefs_dialog.hide()
         conf = self.config_dir + "/settings.json"
         if not os.path.exists(self.config_dir):
@@ -100,12 +116,23 @@ class settings(object):
         with open(conf, 'wb+') as f:
             json.dump(self._settings, f, indent=4, sort_keys=True)
 
-    def init_dialog(self, parent):
+    def reset_prefs(self, widget):
+        '''Load default prefs string, overwriting custom settings'''
+
+        self._settings = json.loads(self.defaults)
+        # TODO update dialog pieces
+
+    def __init_dialog(self, parent):
+        '''Create preferences editing dialog'''
+
         flags = Gtk.DialogFlags.DESTROY_WITH_PARENT
-        self.prefs_dialog = Gtk.Dialog("HiToDo Preferences", parent, flags)
+        self.prefs_dialog = Gtk.Dialog("HiToDo Preferences", parent, flags, modal=True, resizable=False)
 
         close = self.prefs_dialog.add_button(Gtk.STOCK_OK, Gtk.ResponseType.CLOSE)
         close.connect("clicked", self.save_prefs)
+        reset = self.prefs_dialog.add_button("Default", Gtk.ResponseType.CANCEL)
+        reset.connect("clicked", self.reset_prefs)
+
         content = self.prefs_dialog.get_content_area()
         nb = Gtk.Notebook()
         nb.set_property("margin", 10)
