@@ -77,6 +77,8 @@ UI_XML = """
             <separator />
             <menuitem action='expand_all' />
             <menuitem action='collapse_all' />
+            <separator />
+            <menuitem action='swap_focus' />
         </menu>
         <menu action='TaskMenu'>
             <menuitem action='task_new' />
@@ -791,6 +793,7 @@ class HiToDo(Gtk.Window):
                 self.selection.unselect_iter(treeiter)
             else:
                 self.selection.select_iter(treeiter)
+
             #probe children
             if self.tasklist_filter.iter_has_child(treeiter):
                 child_iter = self.tasklist_filter.iter_children(treeiter)
@@ -804,6 +807,13 @@ class HiToDo(Gtk.Window):
     def collapse_all(self, widget=None):
         '''Collapses all tasks.'''
         self.task_view.collapse_all()
+
+    def swap_focus(self, widget=None):
+        '''Changes focus between Task list and Comments'''
+        if self.notes_view.has_focus():
+            self.task_view.grab_focus()
+        else:
+            self.notes_view.grab_focus()
 
     def new_file(self, widget=None):
         '''Creates a new file by clearing the treestore, undo/redo buffer,
@@ -1164,7 +1174,7 @@ class HiToDo(Gtk.Window):
         self.about_dlg.hide()
 
     def set_prefs(self, widget=None):
-        self.settings.show_dialog()
+        self.settings.show_dialog(self)
         # self.prefs_dlg.show_all()
 
     # def set_docprops(self, widget=None):
@@ -2291,7 +2301,8 @@ class HiToDo(Gtk.Window):
             ("sel_inv", None, "_Invert Selection", None, None, self.select_inv),
             ("sel_none", None, "Select _None", "<Primary><Shift>A", None, self.select_none),
             ("expand_all", None, "_Expand All", None, "Expand all tasks", self.expand_all),
-            ("collapse_all", None, "_Collapse All", None, "Collapse all tasks", self.collapse_all)
+            ("collapse_all", None, "_Collapse All", None, "Collapse all tasks", self.collapse_all),
+            ("swap_focus", None, "Swap _Focus", "F11", "Change focus between Tasks and Comments", self.swap_focus)
         ])
 
         self.task_del = Gtk.Action("task_del", "Delete task", "Delete selected task(s)", Gtk.STOCK_REMOVE)
