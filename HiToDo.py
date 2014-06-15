@@ -30,9 +30,10 @@ import xml.etree.ElementTree as et
 import operator
 from cgi import escape
 
-import testing # TODO optionally remove for public release
+import testing # TODO remove for public release
 import dialogs
 import file_parsers
+import settings
 import widgets
 import undobuffer
 
@@ -820,13 +821,13 @@ class HiToDo(Gtk.Window):
         del self.redobuffer[:]
 
         #reset to default columns
-        self.cols_visible = self.cols_default[:]
-        self.display_columns(self.cols_default[:])
+        self.cols_visible = self.settings.get("default-columns")[:]
+        self.display_columns(self.cols_visible)
 
         #reset to default assigners, assignees, and statii
-        self.assigners_list = self.assigners_default[:]
-        self.assignees_list = self.assignees_default[:]
-        self.statii_list = self.statii_default[:]
+        self.assigners_list = self.settings.get("default-from")[:]
+        self.assignees_list = self.settings.get("default-to")[:]
+        self.statii_list = self.settings.get("default-status")[:]
 
         self.assigners.clear()
         self.assignees.clear()
@@ -1163,12 +1164,13 @@ class HiToDo(Gtk.Window):
         self.about_dlg.hide()
 
     def set_prefs(self, widget=None):
-        self.prefs_dlg.show_all()
+        self.settings.show_dialog()
+        # self.prefs_dlg.show_all()
 
-    def set_docprops(self, widget=None):
-        '''Shows the Document Properties dialog. See move_col() and
-        toggle_col_visible() for how column settings are manipulated.'''
-        self.docprops_dlg.show_all()
+    # def set_docprops(self, widget=None):
+    #     '''Shows the Document Properties dialog. See move_col() and
+    #     toggle_col_visible() for how column settings are manipulated.'''
+    #     self.docprops_dlg.show_all()
 
     def do_cut(self, widget=None):
         '''Applies cut operation depending on current internal focus. For notes
@@ -1489,10 +1491,9 @@ class HiToDo(Gtk.Window):
         cols_vis = []
 
         #add columns in order specified
-        for col, vis in cols:
-            if vis:
-                self.task_view.append_column(self.cols_available[col])
-                cols_vis.append(col)
+        for col in cols:
+            self.task_view.append_column(self.cols_available[col])
+            cols_vis.append(col)
 
         #mark new visibilities
         for row in self.cols:
@@ -1738,65 +1739,67 @@ class HiToDo(Gtk.Window):
             #cancel or any other code (like from esc key)
             return False
 
-    def import_settings(self):
-        '''Loads global setting vars from gsettings object.'''
-        #parse column order and visibility
-        col_order = self.settings.get_value("col-order")
-        col_mask = self.settings.get_value("col-visibility")
-        for i in range(len(col_order)):
-            self.cols_visible.append((col_order[i], col_mask[i]))
-            self.cols_default.append((col_order[i], col_mask[i]))
+    # def import_settings(self):
+    #     '''Loads global setting vars from gsettings object.'''
+    #     #parse column order and visibility
+    #     col_order = self.settings.get_value("col-order")
+    #     col_mask = self.settings.get_value("col-visibility")
+    #     for i in range(len(col_order)):
+    #         self.cols_visible.append((col_order[i], col_mask[i]))
+    #         self.cols_default.append((col_order[i], col_mask[i]))
 
-        #add assigners, assignees, statii
-        self.assigners_default = list(self.settings.get_value("default-assigners"))
-        self.assignees_default = list(self.settings.get_value("default-assignees"))
-        self.statii_default = list(self.settings.get_value("default-statii"))
+    #     add assigners, assignees, statii
+    #     self.assigners_default = list(self.settings.get_value("default-assigners"))
+    #     self.assignees_default = list(self.settings.get_value("default-assignees"))
+    #     self.statii_default = list(self.settings.get_value("default-statii"))
 
-        #store open last file
-        self.open_last_file = self.settings.get_boolean("reopen")
+    #     store open last file
+    #     self.open_last_file = self.settings.get_boolean("reopen")
 
-        #store use_tabs
-        self.use_tabs = self.settings.get_boolean("use-tabs")
+    #     store use_tabs
+    #     self.use_tabs = self.settings.get_boolean("use-tabs")
 
-        #store toolbar vis
-        self.toolbar_visible = self.settings.get_boolean("show-toolbar")
+    #     store toolbar vis
+    #     self.toolbar_visible = self.settings.get_boolean("show-toolbar")
 
-        #store whether to clobber current file on open
-        self.clobber = self.settings.get_boolean("clobber-on-new")
+    #     store whether to clobber current file on open
+    #     self.clobber = self.settings.get_boolean("clobber-on-new")
 
     def toggle_toolbar(self, widget=None, event=None):
-        '''Toggles visibility of the toolbar. Toggles the gsettings far, whose
+        '''Toggles visibility of the toolbar. Toggles the gsettings var, whose
         update triggers a separate function to update the bar's visibility
         setting and our internal flag.'''
-        self.settings.set_boolean("show-toolbar", widget.get_active())
+        vis = widget.get_active()
+        # self.settings.set("show-toolbar", widget.get_active())
+        self.toolbar.set_visible(vis)
 
-    def settings_toolbar_vis_changed(self, settings, key, data=None):
-        '''Handles external changes to the toolbar visibility setting.'''
-        self.toolbar_visible = settings.get_boolean("show-toolbar")
-        self.toolbar.set_visible(self.toolbar_visible)
-        self.toolbar_action.set_active(self.toolbar_visible)
+    # def settings_toolbar_vis_changed(self, settings, key, data=None):
+    #     '''Handles external changes to the toolbar visibility setting.'''
+    #     self.toolbar_visible = settings.get_boolean("show-toolbar")
+    #     self.toolbar.set_visible(self.toolbar_visible)
+    #     self.toolbar_action.set_active(self.toolbar_visible)
 
     def toggle_reopen(self, widget, data=None):
         self.settings.set_boolean("reopen", widget.get_active())
 
-    def settings_reopen_changed(self, settings, key, data=None):
-        self.open_last_file = settings.get_boolean("reopen")
-        self.prefs_dlg.reopen_toggle.set_active(self.open_last_file)
+    # def settings_reopen_changed(self, settings, key, data=None):
+    #     self.open_last_file = settings.get_boolean("reopen")
+    #     self.prefs_dlg.reopen_toggle.set_active(self.open_last_file)
 
     def toggle_clobber(self, widget, data=None):
         self.settings.set_boolean("clobber-on-new", widget.get_active())
 
-    def settings_clobber_changed(self, settings, key, data=None):
-        self.clobber = settings.get_boolean("clobber-on-new")
-        self.prefs_dlg.clobber_toggle.set_active(self.clobber)
+    # def settings_clobber_changed(self, settings, key, data=None):
+    #     self.clobber = settings.get_boolean("clobber-on-new")
+    #     self.prefs_dlg.clobber_toggle.set_active(self.clobber)
 
     def toggle_use_tabs(self, widget, data=None):
         self.settings.set_boolean("use-tabs", widget.get_active())
 
-    def settings_use_tabs_changed(self, settings, key, data=None):
-        self.use_tabs = settings.get_boolean("use-tabs")
-        self.prefs_dlg.use_tabs_toggle.set_active(self.use_tabs)
-        self.prefs_dlg.use_wins_toggle.set_active(not self.use_tabs)
+    # def settings_use_tabs_changed(self, settings, key, data=None):
+    #     self.use_tabs = settings.get_boolean("use-tabs")
+    #     self.prefs_dlg.use_tabs_toggle.set_active(self.use_tabs)
+    #     self.prefs_dlg.use_wins_toggle.set_active(not self.use_tabs)
 
     def __init__(self):
         '''Program setup and initialization. Sets up internal variables and
@@ -1866,15 +1869,15 @@ class HiToDo(Gtk.Window):
         self.assigners = Gtk.ListStore(str)
         self.assigners.set_sort_column_id(0, Gtk.SortType.ASCENDING)
         self.assigners_list = []
-        self.assigners_default = []
+        # self.assigners_default = []
         self.assignees = Gtk.ListStore(str)
         self.assignees.set_sort_column_id(0, Gtk.SortType.ASCENDING)
         self.assignees_list = []
-        self.assignees_default = []
+        # self.assignees_default = []
         self.statii = Gtk.ListStore(str)
         self.statii.set_sort_column_id(0, Gtk.SortType.ASCENDING)
         self.statii_list = []
-        self.statii_default = []
+        # self.statii_default = []
         self.seliter = None
         self.sellist = None
         self.selcount = 0
@@ -1894,31 +1897,33 @@ class HiToDo(Gtk.Window):
         self.copied_rows = []
         self.cols_available = {}
         self.cols_visible = []
-        self.cols_default = []
+        # self.cols_default = []
         self.cols = Gtk.ListStore(str, str, bool, bool) #code, label for settings screen, visible flag, can hide flag
         self.undobuffer = []
         self.redobuffer = []
         self.maximized = False
 
         #construct settings object and changed::* bindings
-        self.settings = Gio.Settings.new("apps.hitodo")
-        self.settings.connect("changed::col-order", self.skip)
-        self.settings.connect("changed::col-visibility", self.skip)
-        self.settings.connect("changed::default-assigners", self.skip)
-        self.settings.connect("changed::default-assignees", self.skip)
-        self.settings.connect("changed::default-statii", self.skip)
-        self.settings.connect("changed::reopen", self.settings_reopen_changed)
-        self.settings.connect("changed::use-tabs", self.settings_use_tabs_changed)
-        self.settings.connect("changed::show-toolbar", self.settings_toolbar_vis_changed)
-        self.settings.connect("changed::clobber-on-new", self.settings_clobber_changed)
+        self.settings = settings.settings(self)
+        self.cols_visible = self.settings.get("default-columns")
+        # Gio.Settings.new("apps.hitodo")
+        # self.settings.connect("changed::col-order", self.skip)
+        # self.settings.connect("changed::col-visibility", self.skip)
+        # self.settings.connect("changed::default-assigners", self.skip)
+        # self.settings.connect("changed::default-assignees", self.skip)
+        # self.settings.connect("changed::default-statii", self.skip)
+        # self.settings.connect("changed::reopen", self.settings_reopen_changed)
+        # self.settings.connect("changed::use-tabs", self.settings_use_tabs_changed)
+        # self.settings.connect("changed::show-toolbar", self.settings_toolbar_vis_changed)
+        # self.settings.connect("changed::clobber-on-new", self.settings_clobber_changed)
 
         #These are overwridden by GSettings object
-        self.toolbar_visible = True
-        self.clobber = False
-        self.use_tabs = False
-        self.open_last_file = True
+        # self.toolbar_visible = True
+        # self.clobber = False
+        # self.use_tabs = False
+        # self.open_last_file = True
 
-        self.import_settings()
+        # self.import_settings()
 
         #create action groups
         top_actions = Gtk.ActionGroup("top_actions")
@@ -2019,21 +2024,21 @@ class HiToDo(Gtk.Window):
         self.show_all()
 
         #now we can hide the toolbar
-        self.toolbar.set_visible(self.toolbar_visible)
+        self.toolbar.set_visible(self.settings.get("show-toolbar"))
 
         #set up our dialogs
         self.open_dlg = dialogs.misc.htd_open(self)
         self.save_dlg = dialogs.misc.htd_save(self)
         self.about_dlg = dialogs.misc.htd_about(self)
-        self.prefs_dlg = dialogs.prefs.main(self)
-        self.settings_use_tabs_changed(self.settings, key=None, data=None) #toggle visibility here to avoid errors from a spurious "toggled" event
+        # self.prefs_dlg = dialogs.prefs.main(self)
+        # self.settings_use_tabs_changed(self.settings, key=None, data=None) #toggle visibility here to avoid errors from a spurious "toggled" event
         self.docprops_dlg = dialogs.docprops.main(self)
         self.label_edit_dlg = dialogs.labeledit.main(self)
         self.version_warn_dlg = dialogs.misc.htd_version_warning(self)
         self.open_warn_dlg = dialogs.misc.htd_file_read_error(self)
         self.save_warn_dlg = dialogs.misc.htd_file_write_error(self)
 
-        if self.open_last_file: self.__open_last()
+        if self.settings.get("reopen"): self.__open_last()
 
     def date_render(self, col, cell, model, tree_iter, data):
         '''Cell renderer for date cells. Converts datetime objects from the
@@ -2258,7 +2263,7 @@ class HiToDo(Gtk.Window):
             ("LabelMenu", None, "_Manage Labels")
         ])
         self.toolbar_action = Gtk.ToggleAction("show_toolbar", "_Toolbar", "Show or hide the toolbar", None)
-        self.toolbar_action.set_active(self.toolbar_visible)
+        self.toolbar_action.set_active(self.settings.get("show-toolbar"))
         self.toolbar_action.connect("activate", self.toggle_toolbar)
         action_group.add_action(self.toolbar_action)
 
