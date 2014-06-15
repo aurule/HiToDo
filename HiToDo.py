@@ -18,7 +18,7 @@
 # along with HiToDo.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import division
-from gi.repository import Gtk, Gdk, Pango, Gio
+from gi.repository import Gtk, Gdk, Pango
 from datetime import datetime, timedelta
 from xml.etree.ElementTree import ParseError
 from os import linesep
@@ -124,10 +124,6 @@ UI_XML = """
     </popup>
 </ui>
 """
-
-# TODO this is just a plceholder for now
-CSS = '''
-'''
 
 # Define the gui and its actions.
 class HiToDo(Gtk.Window):
@@ -486,10 +482,6 @@ class HiToDo(Gtk.Window):
 
         old_val = self.tasklist[path][field]
 
-        # if new_date.lower() == "tomorrow":
-        #     #manually handle "tomorrow" keyword, along with others in the future
-        #     delta = timedelta(days=1)
-        #     dt = datetime.today() + delta
         if new_date == "":
             dt = ""
         else:
@@ -622,13 +614,6 @@ class HiToDo(Gtk.Window):
         '''Sets up the date editing widget and sets internal focus to it. These
         have an icon which pops up a reference calendar. See track_focus().'''
         self.track_focus(widget = editor)
-        # editor.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "appointment-new")
-        # editor.connect("icon-press", self.date_pick, path)
-
-    # def date_pick(self, entry, pos, event, data=None):
-        # '''Displays a calendar popoup for date entry widgets. See date_edit_start().'''
-        # self.cal_dlg.show_for_entry(data)
-        # pass
 
     def del_current_task(self, widget=None):
         '''Removes every selected row from the task list. These are stored in
@@ -660,8 +645,6 @@ class HiToDo(Gtk.Window):
 
         #now we can remove them without invalidating paths
         for ref, path, pathlen in refs:
-            # self.commit_spent_iter(ref, new_spent=0)
-            # self.commit_est(ref, new_est=0)
             self.commit_work(path=path, new_work=0, work_type='spent')
             self.commit_work(path=path, new_work=0, work_type='est')
 
@@ -949,19 +932,6 @@ class HiToDo(Gtk.Window):
         templist.foreach(append_row, self.tasklist)
         del templist
 
-        #adjust for different column lists
-        # if len(self.cols_visible) <= len(self.cols):
-        #     codes = []
-        #     for code, flag in self.cols_visible:
-        #         codes.append(code)
-        #     former = 0
-        #     for col in self.cols:
-        #         try:
-        #             i = codes.index(col[0])
-        #         except ValueError:
-        #             self.cols_visible.insert(former, (col[0], False))
-        #         former += 1
-
         #iterate assigners, assignees, and statii to put names into respective liststores
         self.assigners.clear()
         self.assignees.clear()
@@ -1175,12 +1145,6 @@ class HiToDo(Gtk.Window):
 
     def set_prefs(self, widget=None):
         self.settings.show_dialog(self)
-        # self.prefs_dlg.show_all()
-
-    # def set_docprops(self, widget=None):
-    #     '''Shows the Document Properties dialog. See move_col() and
-    #     toggle_col_visible() for how column settings are manipulated.'''
-    #     self.docprops_dlg.show_all()
 
     def do_cut(self, widget=None):
         '''Applies cut operation depending on current internal focus. For notes
@@ -1712,17 +1676,14 @@ class HiToDo(Gtk.Window):
             bits = splitext(self.file_name)
             archive_path = bits[0]+'_archive'+bits[1]
 
-            # someplace to store the DONE entries
-            # templist = copy_treemodel(self.tasklist)
-
             # disable signals while we make big changes to the model
             self.task_view.freeze_child_notify()
 
-            # loop through self.tasklist, adding DONE entries and descendents to templist and removing them from our list
+            # set up a filter for our Done entries
             archive_filter = self.tasklist.filter_new(None)
             archive_filter.set_visible_column(12)
 
-            # append our rows to the selected file
+            # append to the selected file
             self.__do_save(archive_path, archive_filter, True)
             del archive_filter
 
@@ -1749,71 +1710,19 @@ class HiToDo(Gtk.Window):
             #cancel or any other code (like from esc key)
             return False
 
-    # def import_settings(self):
-    #     '''Loads global setting vars from gsettings object.'''
-    #     #parse column order and visibility
-    #     col_order = self.settings.get_value("col-order")
-    #     col_mask = self.settings.get_value("col-visibility")
-    #     for i in range(len(col_order)):
-    #         self.cols_visible.append((col_order[i], col_mask[i]))
-    #         self.cols_default.append((col_order[i], col_mask[i]))
-
-    #     add assigners, assignees, statii
-    #     self.assigners_default = list(self.settings.get_value("default-assigners"))
-    #     self.assignees_default = list(self.settings.get_value("default-assignees"))
-    #     self.statii_default = list(self.settings.get_value("default-statii"))
-
-    #     store open last file
-    #     self.open_last_file = self.settings.get_boolean("reopen")
-
-    #     store use_tabs
-    #     self.use_tabs = self.settings.get_boolean("use-tabs")
-
-    #     store toolbar vis
-    #     self.toolbar_visible = self.settings.get_boolean("show-toolbar")
-
-    #     store whether to clobber current file on open
-    #     self.clobber = self.settings.get_boolean("clobber-on-new")
-
     def toggle_toolbar(self, widget=None, event=None):
         '''Toggles visibility of the toolbar. Toggles the gsettings var, whose
         update triggers a separate function to update the bar's visibility
         setting and our internal flag.'''
         vis = widget.get_active()
-        # self.settings.set("show-toolbar", widget.get_active())
         self.toolbar.set_visible(vis)
 
-    # def settings_toolbar_vis_changed(self, settings, key, data=None):
-    #     '''Handles external changes to the toolbar visibility setting.'''
-    #     self.toolbar_visible = settings.get_boolean("show-toolbar")
-    #     self.toolbar.set_visible(self.toolbar_visible)
-    #     self.toolbar_action.set_active(self.toolbar_visible)
-
-    def toggle_reopen(self, widget, data=None):
-        self.settings.set_boolean("reopen", widget.get_active())
-
-    # def settings_reopen_changed(self, settings, key, data=None):
-    #     self.open_last_file = settings.get_boolean("reopen")
-    #     self.prefs_dlg.reopen_toggle.set_active(self.open_last_file)
-
-    def toggle_clobber(self, widget, data=None):
-        self.settings.set_boolean("clobber-on-new", widget.get_active())
-
-    # def settings_clobber_changed(self, settings, key, data=None):
-    #     self.clobber = settings.get_boolean("clobber-on-new")
-    #     self.prefs_dlg.clobber_toggle.set_active(self.clobber)
-
-    def toggle_use_tabs(self, widget, data=None):
-        self.settings.set_boolean("use-tabs", widget.get_active())
-
-    # def settings_use_tabs_changed(self, settings, key, data=None):
-    #     self.use_tabs = settings.get_boolean("use-tabs")
-    #     self.prefs_dlg.use_tabs_toggle.set_active(self.use_tabs)
-    #     self.prefs_dlg.use_wins_toggle.set_active(not self.use_tabs)
-
     def __init__(self):
-        '''Program setup and initialization. Sets up internal variables and
-        constructs the UI with some helper functions.'''
+        '''Program setup and initialization.
+
+        Initializes internal variables and constructs the UI with some helper
+        functions.
+        '''
         Gtk.Window.__init__(self)
         self.set_default_size(1100, 700)
         self.title = "Untitled List - HiToDo"
@@ -1879,15 +1788,12 @@ class HiToDo(Gtk.Window):
         self.assigners = Gtk.ListStore(str)
         self.assigners.set_sort_column_id(0, Gtk.SortType.ASCENDING)
         self.assigners_list = []
-        # self.assigners_default = []
         self.assignees = Gtk.ListStore(str)
         self.assignees.set_sort_column_id(0, Gtk.SortType.ASCENDING)
         self.assignees_list = []
-        # self.assignees_default = []
         self.statii = Gtk.ListStore(str)
         self.statii.set_sort_column_id(0, Gtk.SortType.ASCENDING)
         self.statii_list = []
-        # self.statii_default = []
         self.seliter = None
         self.sellist = None
         self.selcount = 0
@@ -1907,7 +1813,6 @@ class HiToDo(Gtk.Window):
         self.copied_rows = []
         self.cols_available = {}
         self.cols_visible = []
-        # self.cols_default = []
         self.cols = Gtk.ListStore(str, str, bool, bool) #code, label for settings screen, visible flag, can hide flag
         self.undobuffer = []
         self.redobuffer = []
@@ -1916,24 +1821,6 @@ class HiToDo(Gtk.Window):
         #construct settings object and changed::* bindings
         self.settings = settings.settings(self)
         self.cols_visible = self.settings.get("default-columns")
-        # Gio.Settings.new("apps.hitodo")
-        # self.settings.connect("changed::col-order", self.skip)
-        # self.settings.connect("changed::col-visibility", self.skip)
-        # self.settings.connect("changed::default-assigners", self.skip)
-        # self.settings.connect("changed::default-assignees", self.skip)
-        # self.settings.connect("changed::default-statii", self.skip)
-        # self.settings.connect("changed::reopen", self.settings_reopen_changed)
-        # self.settings.connect("changed::use-tabs", self.settings_use_tabs_changed)
-        # self.settings.connect("changed::show-toolbar", self.settings_toolbar_vis_changed)
-        # self.settings.connect("changed::clobber-on-new", self.settings_clobber_changed)
-
-        #These are overwridden by GSettings object
-        # self.toolbar_visible = True
-        # self.clobber = False
-        # self.use_tabs = False
-        # self.open_last_file = True
-
-        # self.import_settings()
 
         #create action groups
         top_actions = Gtk.ActionGroup("top_actions")
@@ -1985,13 +1872,11 @@ class HiToDo(Gtk.Window):
 
         #add notes area
         notes_box = Gtk.Frame()
-        #notes_box.set_orientation(Gtk.Orientation.VERTICAL)
         notes_box.set_shadow_type(Gtk.ShadowType.NONE)
         notes_lbl = Gtk.Label()
         notes_lbl.set_markup("<b>_Comments</b>")
         notes_lbl.set_property("use-underline", True)
         notes_box.set_label_widget(notes_lbl)
-        #notes_box.pack_start(notes_lbl, False, False, 3)
 
         notes_scroll_win = Gtk.ScrolledWindow()
         notes_scroll_win.set_hexpand(True)
@@ -2008,7 +1893,6 @@ class HiToDo(Gtk.Window):
 
         notes_lbl.set_mnemonic_widget(self.notes_view)
 
-        #notes_box.pack_start(notes_scroll_win, True, True, 0)
         notes_box.add(notes_scroll_win)
         self.task_pane.pack2(notes_box, True, True)
 
@@ -2018,36 +1902,25 @@ class HiToDo(Gtk.Window):
         #commit the ui
         self.add(main_box)
 
-        #set up styling
-        style_provider = Gtk.CssProvider()
-        style_provider.load_from_data(CSS)
-        Gtk.StyleContext.add_provider_for_screen(
-            Gdk.Screen.get_default(),
-            style_provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
-
         # create a clipboard for easy copying
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
         self.connect("delete-event", self.destroy)
         self.connect("window-state-event", self.track_maximized)
         self.show_all()
 
-        #now we can hide the toolbar
+        # now we can hide or show the toolbar as desired
         self.toolbar.set_visible(self.settings.get("show-toolbar"))
 
-        #set up our dialogs
+        # set up our dialogs
         self.open_dlg = dialogs.misc.htd_open(self)
         self.save_dlg = dialogs.misc.htd_save(self)
         self.about_dlg = dialogs.misc.htd_about(self)
-        # self.prefs_dlg = dialogs.prefs.main(self)
-        # self.settings_use_tabs_changed(self.settings, key=None, data=None) #toggle visibility here to avoid errors from a spurious "toggled" event
-        self.docprops_dlg = dialogs.docprops.main(self)
         self.label_edit_dlg = dialogs.labeledit.main(self)
         self.version_warn_dlg = dialogs.misc.htd_version_warning(self)
         self.open_warn_dlg = dialogs.misc.htd_file_read_error(self)
         self.save_warn_dlg = dialogs.misc.htd_file_write_error(self)
 
+        # open last file if requested
         if self.settings.get("reopen"): self.__open_last()
 
     def date_render(self, col, cell, model, tree_iter, data):
