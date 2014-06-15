@@ -1229,6 +1229,9 @@ class HiToDo(Gtk.Window):
     def show_about(self, widget=None):
         '''Shows the About dialog'''
 
+        if self.about_dlg is None:
+            self.about_dlg = dialogs.misc.htd_about(self)
+
         self.about_dlg.run()
         self.about_dlg.hide()
 
@@ -1971,11 +1974,11 @@ class HiToDo(Gtk.Window):
         # set up our dialogs
         self.open_dlg = dialogs.misc.htd_open(self)
         self.save_dlg = dialogs.misc.htd_save(self)
-        self.about_dlg = dialogs.misc.htd_about(self)
         self.label_edit_dlg = dialogs.labeledit.main(self)
         self.version_warn_dlg = dialogs.misc.htd_version_warning(self)
         self.open_warn_dlg = dialogs.misc.htd_file_read_error(self)
         self.save_warn_dlg = dialogs.misc.htd_file_write_error(self)
+        self.about_dlg = None # create as needed later
 
         # open last file if requested
         if self.settings.get("reopen"): self.__open_last()
