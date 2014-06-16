@@ -140,3 +140,8 @@ class settings(object):
         # TODO set up our preferences dialog
 
         content.add(nb)
+
+    def __toggle_bool(self, widget, setting):
+        '''Updates the given setting to match the state of the widget'''
+
+        self.settings[setting] = widget.get_active()
