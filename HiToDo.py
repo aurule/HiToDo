@@ -1017,7 +1017,7 @@ class HiToDo(Gtk.Window):
             self.statii.append([n])
 
         #show requested columns
-        self.display_columns(cols)
+        self.display_columns([n for n, v in cols if v])
 
         #set window geometry
         self.set_default_size(data['geometry'][1], data['geometry'][2])
