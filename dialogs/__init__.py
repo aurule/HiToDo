@@ -15,7 +15,5 @@
 # You should have received a copy of the GNU General Public License
 # along with HiToDo.  If not, see <http://www.gnu.org/licenses/>.
 
-import docprops
 import misc
-import prefs
 import labeledit
