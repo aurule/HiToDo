@@ -32,7 +32,7 @@ from cgi import escape
 
 import testing # TODO remove for public release
 import dialogs
-import file_parsers
+from file_parsers import fileParser
 import settings
 import widgets
 import undobuffer
@@ -127,7 +127,7 @@ UI_XML = """
 
 # Define the gui and its actions.
 class HiToDo(Gtk.Window):
-    PROGRAM_VERSION = "0.9.4"
+    PROGRAM_VERSION = "0.9.5"
 
     def track_focus(self, widget, event=None):
         '''Updates internal focus tracking reference
@@ -926,7 +926,7 @@ class HiToDo(Gtk.Window):
         uri = widget.get_current_uri()
         fpath = urlparse(uri).path
         self.file_name = unquote(fpath)
-        self.file_filter = file_parsers.pick_filter(fpath)
+        self.file_filter = fileParser.pick_filter(fpath)
         self.__do_open()
 
     def __open_last(self):
@@ -941,7 +941,7 @@ class HiToDo(Gtk.Window):
         uri = retval[0]
         fpath = urlparse(uri).path
         self.file_name = unquote(fpath)
-        self.file_filter = file_parsers.pick_filter(fpath)
+        self.file_filter = fileParser.pick_filter(fpath)
         self.__do_open()
 
     def __do_open(self):
@@ -1124,7 +1124,7 @@ class HiToDo(Gtk.Window):
         The data is bundled into a dict and all the writing is handled by a
         filter from file_parsers.
         '''
-        if file_filter is None: file_filter = file_parsers.pick_filter(filename)
+        if file_filter is None: file_filter = fileParser.pick_filter(filename)
 
         if tasklist is self.tasklist and self.seliter is not None:
             selpath = tasklist.get_path(self.seliter).to_string()

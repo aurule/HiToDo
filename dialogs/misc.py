@@ -26,11 +26,12 @@ class htd_open(Gtk.FileChooserDialog):
         self.set_local_only(True)
 
         #set supported types
-        htd = file_parsers.htd_filter()
-        self.add_filter(htd)
+        loadable = file_parsers.fileParser.get_loadable()
+        for f in loadable:
+            self.add_filter(f)
 
         #set default filter
-        self.set_filter(htd)
+        self.set_filter(loadable[0])
 
 class htd_save(Gtk.FileChooserDialog):
     def __init__(self, parent):
@@ -40,11 +41,12 @@ class htd_save(Gtk.FileChooserDialog):
         self.set_local_only(True)
 
         #set supported types
-        htd = file_parsers.htd_filter()
-        self.add_filter(htd)
+        saveable = file_parsers.fileParser.get_saveable()
+        for f in saveable:
+            self.add_filter(f)
 
         #set default filter
-        self.set_filter(htd)
+        self.set_filter(saveable[0])
 
 class htd_warn_archive(Gtk.MessageDialog):
     def __init__(self, parent):
