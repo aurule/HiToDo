@@ -1573,19 +1573,17 @@ class HiToDo(Gtk.Window):
         #clear current cols
         for col in self.task_view.get_columns():
             self.task_view.remove_column(col)
-        cols_vis = []
 
         #add columns in order specified
         for col in cols:
             self.task_view.append_column(self.cols_available[col])
-            cols_vis.append(col)
 
         #mark new visibilities
         for row in self.cols:
-            row[2] = row[0] in cols_vis
+            row[2] = row[0] in cols
 
         #ensure the title column always expands to show children
-        self.task_view.set_properties(expander_column=self.col_title)
+        self.task_view.set_properties(expander_column=self.cols_available['title'])
 
     def notes_keys_dn(self, widget=None, event=None):
         '''Catches key-down events in the notes editor to enable custom actions
