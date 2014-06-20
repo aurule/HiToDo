@@ -29,8 +29,9 @@ class main(Gtk.Dialog):
         #handle dialog init
         flags = Gtk.DialogFlags.DESTROY_WITH_PARENT
         Gtk.Dialog.__init__(self, "Visible Columns", parent, flags)
-        self.add_button(Gtk.STOCK_OK, Gtk.ResponseType.CLOSE)
+        self.add_button(Gtk.STOCK_OK, Gtk.ResponseType.OK)
         self.add_button(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
+        self.add_button("Save as Default", Gtk.ResponseType.ACCEPT)
         self.set_default_response(Gtk.ResponseType.CLOSE)
         content = self.get_content_area()
         self.parent = parent
@@ -59,13 +60,16 @@ class main(Gtk.Dialog):
         content.pack_start(colframe, True, True, 0)
         self.show_all()
 
-    def update(self):
+    def update(self, cols_visible = None):
         '''Update checkboxes to reflect current visibility'''
+
+        if cols_visible is None:
+            cols_visible = self.parent.cols_visible
 
         for col in self.parent.cols:
             code = col[0]
             x = self._pickers[code]
-            x.set_active(code in self.parent.cols_visible)
+            x.set_active(code in cols_visible)
 
     def go(self):
         '''Show ourselves and then collate checkbox states into a list'''
@@ -76,8 +80,8 @@ class main(Gtk.Dialog):
 
         # create new column list from our checked boxes
         newcols = []
-        if ret == Gtk.ResponseType.CLOSE:
+        if ret != Gtk.ResponseType.CANCEL:
             newcols = [code for code, x in self._pickers.items() if x.get_active()]
-            return newcols
+            return (newcols, ret)
 
         return None

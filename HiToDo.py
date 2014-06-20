@@ -872,8 +872,9 @@ class HiToDo(Gtk.Window):
         else:
             self.colpicker_dlg.update()
 
-        collist = self.colpicker_dlg.go()
-        if collist is not None:
+        ret = self.colpicker_dlg.go()
+        if ret is not None:
+            collist, action = ret
             pull = [c for c in self.cols_visible if c not in set(collist)]
             push = [c for c in collist if c not in set(self.cols_visible)]
             for code in pull:
@@ -882,6 +883,10 @@ class HiToDo(Gtk.Window):
             for code in push:
                 self.task_view.insert_column(self.cols_available[code], 0)
                 self.cols_visible.insert(0, code)
+
+            if action is Gtk.ResponseType.ACCEPT:
+                self.settings.set("default-columns", collist)
+                self.settings.save_prefs()
 
     def new_file(self, widget=None):
         '''Creates a new task list
@@ -1688,7 +1693,8 @@ class HiToDo(Gtk.Window):
         self.label_edit_dlg.set_store(self.assigners)
         self.label_edit_dlg.set_list(self.assigners_list)
         self.label_edit_dlg.set_instructions("Assigners", "From")
-        self.label_edit_dlg.show_all()
+        self.label_edit_dlg.set_pref('default-from')
+        ret = self.label_edit_dlg.show_all()
 
     def edit_assignees(self, widget, data=None):
         '''Assignees wrapper for the label edit dialog'''
@@ -1698,7 +1704,8 @@ class HiToDo(Gtk.Window):
         self.label_edit_dlg.set_store(self.assignees)
         self.label_edit_dlg.set_list(self.assignees_list)
         self.label_edit_dlg.set_instructions("Assignees", "To")
-        self.label_edit_dlg.show_all()
+        self.label_edit_dlg.set_pref('default-to')
+        ret = self.label_edit_dlg.run()
 
     def edit_statii(self, widget, data=None):
         '''Status wrapper for the label edit dialog'''
@@ -1708,7 +1715,8 @@ class HiToDo(Gtk.Window):
         self.label_edit_dlg.set_store(self.statii)
         self.label_edit_dlg.set_list(self.statii_list)
         self.label_edit_dlg.set_instructions("Status labels", "Status")
-        self.label_edit_dlg.show_all()
+        self.label_edit_dlg.set_pref('default-status')
+        ret = self.label_edit_dlg.run()
 
     def main_filter(self, model, treeiter, data=None):
         '''Task list filtering function'''
@@ -2303,6 +2311,7 @@ class HiToDo(Gtk.Window):
         '''Shows the 'confirm discard' dialog before closing, if applicable'''
 
         if not self.confirm_discard(): return True
+        self.settings.save_prefs()
         Gtk.main_quit()
 
 def copy_treemodel(orig):

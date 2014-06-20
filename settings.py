@@ -17,6 +17,7 @@ from __future__ import with_statement
 import json
 import os
 from gi.repository import Gtk
+from dialogs import colpicker
 
 class settings(object):
     '''Settings handler for HiToDo
@@ -104,11 +105,12 @@ class settings(object):
             self.prefs_dialog.set_parent(parent)
 
         self.prefs_dialog.run()
+        self.prefs_dialog.hide()
+        self.update_settings()
 
-    def save_prefs(self, widget):
+    def save_prefs(self, widget=None):
         '''Save current settings to our config file'''
 
-        self.prefs_dialog.hide()
         conf = self.config_dir + "/settings.json"
         if not os.path.exists(self.config_dir):
             os.makedirs(self.config_dir)
@@ -120,26 +122,50 @@ class settings(object):
         '''Load default prefs string, overwriting custom settings'''
 
         self._settings = json.loads(self.defaults)
-        # TODO update dialog pieces
+        self.update_dialog()
+
+    def update_dialog(self):
+        '''Ensure dialog elements reflect settings'''
+
+        self.reopen_x.set_active(self._settings['reopen'])
+        self.toolbar_x.set_active(self._settings['show-toolbar'])
+
+    def update_settings(self):
+        '''Ensure settings reflect dialog elements'''
+
+        self._settings['reopen'] = self.reopen_x.get_active()
+        self._settings['show-toolbar'] = self.toolbar_x.get_active()
 
     def __init_dialog(self, parent):
         '''Create preferences editing dialog'''
 
         flags = Gtk.DialogFlags.DESTROY_WITH_PARENT
         self.prefs_dialog = Gtk.Dialog("HiToDo Preferences", parent, flags, modal=True, resizable=False)
-
         close = self.prefs_dialog.add_button(Gtk.STOCK_OK, Gtk.ResponseType.CLOSE)
-        close.connect("clicked", self.save_prefs)
-        reset = self.prefs_dialog.add_button("Default", Gtk.ResponseType.CANCEL)
-        reset.connect("clicked", self.reset_prefs)
+        # close.connect("clicked", self.save_prefs)
+        self.prefs_dialog.set_default_response(Gtk.ResponseType.CLOSE)
 
         content = self.prefs_dialog.get_content_area()
-        nb = Gtk.Notebook()
-        nb.set_property("margin", 10)
+        # nb = Gtk.Notebook(margin=10)
 
-        # TODO set up our preferences dialog
+        box1 = Gtk.Grid(margin=5)
+        self.reopen_x = Gtk.CheckButton.new_with_label("Open the last file when HiToDo starts")
+        box1.attach(self.reopen_x, 0, 0, 1, 1)
+        self.toolbar_x = Gtk.CheckButton.new_with_label("Show the toolbar when HiToDo starts")
+        box1.attach(self.toolbar_x, 0, 1, 1, 1)
+        # TODO implement other flags as they become relevant
 
-        content.add(nb)
+        # TODO show controls for default columns
+        # TODO show a reset button?
+
+        # box2 = Gtk.Grid(margin=5)
+
+        # nb.append_page(box2, Gtk.Label(""))
+
+        # content.add(nb)
+        content.add(box1)
+        self.update_dialog()
+        self.prefs_dialog.show_all()
 
     def __toggle_bool(self, widget, setting):
         '''Updates the given setting to match the state of the widget'''
