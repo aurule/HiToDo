@@ -17,3 +17,4 @@
 
 import misc
 import labeledit
+import colpicker

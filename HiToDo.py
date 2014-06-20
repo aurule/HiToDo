@@ -79,6 +79,7 @@ UI_XML = """
             <menuitem action='collapse_all' />
             <separator />
             <menuitem action='swap_focus' />
+            <menuitem action='pick_cols' />
         </menu>
         <menu action='TaskMenu'>
             <menuitem action='task_new' />
@@ -860,6 +861,28 @@ class HiToDo(Gtk.Window):
         else:
             self.notes_view.grab_focus()
 
+    def pick_cols(self, widget=None):
+        '''Changes column visibility based on the results of the column picker dialog
+
+        New columns are always prepended.
+        '''
+
+        if self.colpicker_dlg is None:
+            self.colpicker_dlg = dialogs.colpicker.main(self)
+        else:
+            self.colpicker_dlg.update()
+
+        collist = self.colpicker_dlg.go()
+        if collist is not None:
+            pull = [c for c in self.cols_visible if c not in set(collist)]
+            push = [c for c in collist if c not in set(self.cols_visible)]
+            for code in pull:
+                self.task_view.remove_column(self.cols_available[code])
+                self.cols_visible.remove(code)
+            for code in push:
+                self.task_view.insert_column(self.cols_available[code], 0)
+                self.cols_visible.insert(0, code)
+
     def new_file(self, widget=None):
         '''Creates a new task list
 
@@ -879,7 +902,7 @@ class HiToDo(Gtk.Window):
         del self.redobuffer[:]
 
         #reset to default columns
-        self.cols_visible = self.settings.get("default-columns")[:]
+        self.cols_visible = self.settings.get("default-columns")
         self.display_columns(self.cols_visible)
 
         #reset to default assigners, assignees, and statii
@@ -981,9 +1004,6 @@ class HiToDo(Gtk.Window):
             elif response == Gtk.ResponseType.CANCEL:
                 return
 
-        #load vars
-        del self.cols_visible[:]
-
         self.file_name = data['filename']
         self.assigners_list = data['from_list']
         self.assignees_list = data['to_list']
@@ -1017,7 +1037,8 @@ class HiToDo(Gtk.Window):
             self.statii.append([n])
 
         #show requested columns
-        self.display_columns([n for n, v in cols if v])
+        self.cols_visible = [n for n, v in cols if v]
+        self.display_columns(self.cols_visible)
 
         #set window geometry
         self.set_default_size(data['geometry'][1], data['geometry'][2])
@@ -1659,31 +1680,6 @@ class HiToDo(Gtk.Window):
         mask = Gdk.WindowState.MAXIMIZED
         self.maximized = (widget.get_window().get_state() & mask) == mask
 
-    def toggle_col_visible(self, widget, path, data=None):
-        '''Adds and removes columns from the task list'''
-
-        code = self.cols[path][0] #internal name of the column
-        visible_now = self.cols[path][2] #current state
-        real_idex = self.cols_visible.index((code, visible_now)) #index of the row
-        idex = real_idex
-
-        # Now we modify the index based on the visibility of the other columns.
-        # This gives us an index relative to the columns displayed by the task
-        # list.
-        for col in self.cols_visible[:real_idex]:
-            if not col[1]: idex -= 1
-
-        #remove or insert as necessary
-        if visible_now:
-            self.task_view.remove_column(self.cols_available[code])
-        else:
-            self.task_view.insert_column(self.cols_available[code], idex)
-
-        #update flags in 'cols_visible' list, 'cols' liststore
-        self.cols_visible[real_idex] = (code, not visible_now)
-        self.cols[path][2] = not visible_now
-        self.make_dirty()
-
     def edit_assigners(self, widget, data=None):
         '''Assigners wrapper for the label edit dialog'''
 
@@ -1870,7 +1866,6 @@ class HiToDo(Gtk.Window):
         self.focus = None
         self.copied_rows = []
         self.cols_available = {}
-        self.cols_visible = []
         self.cols = Gtk.ListStore(str, str, bool, bool) #code, label for settings screen, visible flag, can hide flag
         self.undobuffer = []
         self.redobuffer = []
@@ -1976,7 +1971,9 @@ class HiToDo(Gtk.Window):
         self.version_warn_dlg = dialogs.misc.htd_version_warning(self)
         self.open_warn_dlg = dialogs.misc.htd_file_read_error(self)
         self.save_warn_dlg = dialogs.misc.htd_file_write_error(self)
-        self.about_dlg = None # create as needed later
+        # create as needed later
+        self.about_dlg = None
+        self.colpicker_dlg = None
 
         # open last file if requested
         if self.settings.get("reopen"): self.__open_last()
@@ -2243,7 +2240,8 @@ class HiToDo(Gtk.Window):
             ("sel_none", None, "Select _None", "<Primary><Shift>A", None, self.select_none),
             ("expand_all", None, "_Expand All", None, "Expand all tasks", self.expand_all),
             ("collapse_all", None, "_Collapse All", None, "Collapse all tasks", self.collapse_all),
-            ("swap_focus", None, "Swap _Focus", "F11", "Change focus between Tasks and Comments", self.swap_focus)
+            ("swap_focus", None, "Swap _Focus", "F11", "Change focus between Tasks and Comments", self.swap_focus),
+            ("pick_cols", None, "_Show Columns...", None, "Choose which columns are visible", self.pick_cols)
         ])
 
         self.task_del = Gtk.Action("task_del", "Delete task", "Delete selected task(s)", Gtk.STOCK_REMOVE)
