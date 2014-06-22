@@ -44,6 +44,7 @@ UI_XML = """
             <menuitem action="new_file" />
             <menuitem action="open_file" />
             <menuitem action="recents" />
+            <menuitem action="toggle_reopen" />
             <separator />
             <menuitem action="save_file" />
             <menuitem action="saveas_file" />
@@ -70,7 +71,6 @@ UI_XML = """
                 <menuitem action='edit_assignees' />
                 <menuitem action='edit_statii' />
             </menu>
-            <menuitem action='prefs' />
         </menu>
         <menu action="ViewMenu">
             <menuitem action='show_toolbar' />
@@ -1778,6 +1778,14 @@ class HiToDo(Gtk.Window):
 
         vis = widget.get_active()
         self.toolbar.set_visible(vis)
+        self.settings.set('show-toolbar', vis)
+
+    def toggle_reopen(self, widget=None, event=None):
+        '''Toggles the "open last used file on start" flag'''
+
+        vis = widget.get_active()
+        self.settings.set('reopen', vis)
+        self.settings.save_prefs()
 
     def __init__(self):
         '''Program setup and initialization.
@@ -2231,6 +2239,11 @@ class HiToDo(Gtk.Window):
         self.recent_files.add_filter(htdl_filter)
         self.recent_files.connect("item-activated", self.open_recent)
         action_group.add_action(self.recent_files)
+
+        self.reopen_action = Gtk.ToggleAction("toggle_reopen", "_Reopen last file on start", "Reopen the last used file on program startup", None)
+        self.reopen_action.set_active(self.settings.get("reopen"))
+        self.reopen_action.connect("activate", self.toggle_reopen)
+        action_group.add_action(self.reopen_action)
 
         save_file = Gtk.Action("save_file", None, "Save task list", Gtk.STOCK_SAVE)
         save_file.connect("activate", self.save_file)
