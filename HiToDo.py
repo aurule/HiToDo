@@ -21,6 +21,7 @@ from __future__ import division
 from gi.repository import Gtk, Gdk, Pango
 from datetime import datetime, timedelta
 from xml.etree.ElementTree import ParseError
+from tarfile import ReadError
 from os import linesep
 from os.path import basename, dirname, splitext
 from urlparse import urlparse
@@ -994,8 +995,10 @@ class HiToDo(Gtk.Window):
         }
         try:
             self.file_filter.read_to_store(data)
-        except (ParseError, IOError):
-            self.open_warn_dlg.run()
+        except (ParseError, IOError, ReadError):
+            dlg = dialogs.misc.htd_file_read_error(self, self.file_name)
+            dlg.run()
+            dlg.destroy()
             return
 
         #check version compatability
@@ -1987,7 +1990,6 @@ class HiToDo(Gtk.Window):
         self.save_dlg = dialogs.misc.htd_save(self)
         self.label_edit_dlg = dialogs.labeledit.main(self)
         self.version_warn_dlg = dialogs.misc.htd_version_warning(self)
-        self.open_warn_dlg = dialogs.misc.htd_file_read_error(self)
         self.save_warn_dlg = dialogs.misc.htd_file_write_error(self)
         # create as needed later
         self.about_dlg = None

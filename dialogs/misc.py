@@ -89,10 +89,10 @@ class htd_version_warning(Gtk.MessageDialog):
         self.set_default_response(2)
 
 class htd_file_read_error(Gtk.MessageDialog):
-    def __init__(self, parent):
+    def __init__(self, parent, fname):
         flags = Gtk.DialogFlags.MODAL & Gtk.DialogFlags.DESTROY_WITH_PARENT
-        Gtk.MessageDialog.__init__(self, parent, flags, Gtk.MessageType.ERROR, Gtk.ButtonsType.CANCEL, "The file you selected cannot be read")
-        self.format_secondary_text("Make sure you have permission to read the file.")
+        Gtk.MessageDialog.__init__(self, parent, flags, Gtk.MessageType.ERROR, Gtk.ButtonsType.CANCEL, "The file \"%s\" cannot be opened" % fname)
+        self.format_secondary_text("You might not have permission to view this file, or it may be corrupted.")
 
 class htd_file_write_error(Gtk.MessageDialog):
     def __init__(self, parent):
