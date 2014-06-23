@@ -29,11 +29,13 @@ from math import floor
 import xml.etree.ElementTree as et
 import operator
 from cgi import escape
+import sys
 
 import testing # TODO remove for public release
 import dialogs
 from file_parsers import fileParser
 import settings
+import tools
 import widgets
 import undobuffer
 
@@ -254,7 +256,7 @@ class HiToDo(Gtk.Window):
         if path is None: return
         if work_type is None or work_type not in self.work_cols: return
         if type(path) is str and path == "": return
-        if not is_number(new_work): return
+        if not tools.is_number(new_work): return
 
         work_col = self.work_cols[work_type]
 
@@ -979,7 +981,7 @@ class HiToDo(Gtk.Window):
         Save version is checked for compatability and then we use that dict to
         populate our real internal vars.
         '''
-        templist = copy_treemodel(self.tasklist)
+        templist = tools.copy_treemodel(self.tasklist)
         data = {
             'filename': self.file_name,
             'from_list': [],
@@ -1027,7 +1029,7 @@ class HiToDo(Gtk.Window):
         #self.tasklist_filter.refilter()
 
         #now we can import the task list data from templist
-        templist.foreach(append_row, self.tasklist)
+        templist.foreach(tools.append_row, self.tasklist)
         del templist
 
         #iterate assigners, assignees, and statii to put names into respective liststores
@@ -1991,8 +1993,16 @@ class HiToDo(Gtk.Window):
         self.about_dlg = None
         self.colpicker_dlg = None
 
+        # if a filename was given on the command line, open it
+        if len(sys.argv) >= 2:
+            self.file_name = unquote(sys.argv[1])
+            self.file_filter = fileParser.pick_filter(sys.argv[1])
+            self.__do_open()
+            return
+
         # open last file if requested
-        if self.settings.get("reopen"): self.__open_last()
+        if self.settings.get("reopen"):
+            self.__open_last()
 
     def date_render(self, col, cell, model, tree_iter, data):
         '''Renders date cells
@@ -2327,44 +2337,11 @@ class HiToDo(Gtk.Window):
         self.settings.save_prefs()
         Gtk.main_quit()
 
-def copy_treemodel(orig):
-    '''Create a new treemodel with the same columns as model'''
-
-    column_types = []
-    column_numbers = range(orig.get_n_columns())
-    for i in column_numbers:
-        column_types.append(orig.get_column_type(i))
-    copy = Gtk.TreeStore(*column_types)
-    return copy
-
-def append_row(orig, path, treeiter, copy):
-    '''Append a row to the treemodel copy from the treemodel orig
-
-    Preserves parent-child relationships. Meant to be run as
-    'orig.foreach(append_row, copy)'
-    '''
-    strpath = path.to_string()
-
-    parts = strpath.rsplit(':', 1)
-    parent_path = parts[0]
-    parent_iter = None if parent_path == strpath else copy.get_iter(parent_path)
-
-    copy.append(parent_iter, orig[treeiter][:])
-
 def main():
     '''Starts the Gtk main loop'''
 
     Gtk.main()
     return
-
-def is_number(s):
-    '''Determines whether s can be cast to a float'''
-
-    try:
-        float(s)
-        return True
-    except ValueError:
-        return False
 
 if __name__ == "__main__":
     htd = HiToDo()
