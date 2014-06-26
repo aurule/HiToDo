@@ -220,6 +220,7 @@ class HiToDo(Gtk.Window):
 
         #select new row and immediately edit title field
         self.tasklist_filter.convert_child_iter_to_iter(new_row_iter)
+        self.selection.unselect_all()
         self.selection.select_iter(new_row_iter)
         if parent_iter is not None:
             self.task_view.expand_to_path(path)
@@ -1298,11 +1299,11 @@ class HiToDo(Gtk.Window):
             row_texts = self.__do_copy_real(self.sellist, self.copied_rows)
             self.clipboard.set_text("\n".join(row_texts), -1)
 
-    def __do_copy_real(self, subject, rowlist):
+    def __do_copy_real(self, subject, rowlist, recurse=True):
         '''Stores shallow copies of selected rows and their children to rowlist
 
         Returns list of row titles for clipboard use. Uses __copy_children() for
-        recursion.
+        recursion when flag is set.
         '''
         row_texts = []
         del rowlist[:]
@@ -1311,20 +1312,30 @@ class HiToDo(Gtk.Window):
             # We store a parent reference along with each row's data. At the top
             # level, that reference is obviously nothing, but children refer to
             # their parent iters to maintain the tree.
-            rowlist.append([0] + self.tasklist[path][:])
+            rowlist.append(self.tasklist[path][:])
             treeiter = self.tasklist.get_iter(path)
-            self.__copy_children(treeiter, len(rowlist), rowlist)
+            if recurse:
+                rowlist[-1].append(self.__copy_children(treeiter))
         return row_texts
 
-    def __copy_children(self, treeiter, parent_index, rowlist):
-        '''Iterates a list of children and recurses to their own children,
-        storing shallow copies of their data to rowlist'''
+    def __copy_children(self, treeiter):
+        '''Makes shallow copies of the children of treeiter
+
+        Iterates through treeiter's children and copies their data to
+        a list. Recurses automatically to children's children.
+
+        Returns a list of children.
+        '''
+
+        children = []
 
         child_iter = self.tasklist.iter_children(treeiter)
         while child_iter != None:
-            rowlist.append([parent_index] + self.tasklist[child_iter][:])
-            self.__copy_children(child_iter, len(rowlist), rowlist)
-            child_iter = self.tasklist.iter_next(child_iter)
+            children.append(self.tasklist[child_iter][:]) # append the child
+            children[-1].append(self.__copy_children(child_iter)) # stick a list of its children on the end
+            child_iter = self.tasklist.iter_next(child_iter) # move to the next child
+
+        return children
 
     def do_paste(self, widget=None):
         '''Applies paste operation depending on current internal focus
@@ -1358,6 +1369,9 @@ class HiToDo(Gtk.Window):
             spath = self.sellist[0] if self.seliter is not None else None
             self.__push_undoable("paste", (ppath, spath, self.copied_rows[:], new_iters))
 
+            self.selection.unselect_all()
+            self.selection.select_iter(new_iters[0])
+
     def __do_paste_real(self, parent_iter, sibling_iter, row_data, sanitize=True):
         '''Creates new rows and populates them with data from the internal clipboard
 
@@ -1367,9 +1381,6 @@ class HiToDo(Gtk.Window):
         verbatim, which is good when dealing with undo/redo operations.
         '''
         new_iters = []
-        # Since row data is stored in a flat list, we have to track parentage and siblings manually.
-        parents = [parent_iter] # List of parents by index. Top level always points to the meta-parent we were given.
-        last_row = sibling_iter # Track previous sibling to maintain row order
 
         #iterate row data and add it
         for row in row_data:
@@ -1377,30 +1388,24 @@ class HiToDo(Gtk.Window):
             if sanitize:
                 inherit = [0,4,5,8,9,10,11,13,14] #columns to preserve from original row
                 for i in inherit:
-                    new_row[i] = row[i+1]
+                    new_row[i] = row[i]
             else:
                 for i in range(len(self.defaults)):
-                    new_row[i] = row[i+1]
+                    new_row[i] = row[i]
 
-            #handle parent/sibling logic
-            parent = parents[row[0]]
-            if parent == parent_iter:
-                sibling = last_row
-            else:
-                sibling = None
             #add the new row with its data
-            treeiter = self.tasklist.insert_after(parent, sibling, new_row)
+            treeiter = self.tasklist.insert_after(parent_iter, sibling_iter, new_row)
+            new_iters.append(treeiter)
 
-            #add new parent to the lsit
-            parents.append(treeiter)
-            if parent == parent_iter:
-                new_iters.append(treeiter)
-                last_row = treeiter
+            if row[-1]:
+                self.__do_paste_real(treeiter, None, row[-1], sanitize)
+
+            sibling_iter = treeiter # next row should be our sibling
 
             #update time est and percent separately
             path = self.tasklist.get_path(treeiter)
-            self.commit_work(path=path, new_work=row[3]/3600, work_type='est')
-            self.calc_parent_pct(self.tasklist.get_path(treeiter).to_string())
+            self.commit_work(path=path, new_work=row[2]/3600, work_type='est')
+            self.calc_parent_pct(path.to_string())
 
         self.make_dirty()
         return new_iters
@@ -1417,6 +1422,9 @@ class HiToDo(Gtk.Window):
         ppath = self.sellist[0]
         self.__push_undoable("paste", (ppath, None, self.copied_rows[:], new_iters))
 
+        self.task_view.expand_to_path(self.tasklist.get_path(new_iters[0]))
+        self.selection.unselect_all()
+        self.selection.select_iter(new_iters[0])
         self.make_dirty()
 
     def do_undo(self, widget=None):
