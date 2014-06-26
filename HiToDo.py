@@ -389,13 +389,13 @@ class HiToDo(Gtk.Window):
             self.tasklist[path][1] = 100 #no need to calculate; we're 100% complete
 
             child_iter = self.tasklist.iter_children(self.tasklist.get_iter(path))
-            self.__force_peers_done(child_iter)
+            forced = self.__force_peers_done(child_iter)
             self.tasklist[path][7] = datetime.now()
             if self.tasklist[path][17]:
                 self.track_action.set_active(False)
         else:
             #we're transitioning from done to not-done
-            self.force_parent_not_done(path)
+            forced = self.force_parent_not_done(path)
             self.calc_pct(path)
 
         self.tasklist[path][12] = not done
@@ -403,7 +403,7 @@ class HiToDo(Gtk.Window):
 
         #add undo action only on user click
         if renderer is not None:
-            self.__push_undoable("done", (path, done, not done))
+            self.__push_undoable("done", (path, done, not done, forced))
 
         #recalculate our parent's pct complete, if we have one
         self.calc_parent_pct(path)
@@ -416,8 +416,15 @@ class HiToDo(Gtk.Window):
         2. Pct complete is set to 100
         3. Completed timestamp is set to datetime.now() unless it's already been set.
         4. The Done flag and its sister are set
+
+        Returns a list of paths which were forced to be done
         '''
+
+        forced = []
         while treeiter != None:
+            if self.tasklist[treeiter][12] == False:
+                forced.append(self.tasklist.get_path(treeiter))
+
             #handle tracking
             if self.tasklist[treeiter][17]:
                 self.track_action.set_active(False)
@@ -436,26 +443,34 @@ class HiToDo(Gtk.Window):
             #recurse if necessary
             if self.tasklist.iter_has_child(treeiter):
                 child_iter = self.tasklist.iter_children(treeiter)
-                self.__force_peers_done(child_iter)
+                forced += self.__force_peers_done(child_iter)
 
             #iterate to next sibling
             treeiter = self.tasklist.iter_next(treeiter)
+        return forced
 
     def force_parent_not_done(self, path):
-        '''Sets Done flag and its sister for all direct parents of path'''
+        '''Sets Done flag and its sister to False for all direct parents of path'''
 
+        forced = []
+        if not isinstance(path, basestring):
+            path = path.to_string()
         parts = path.split(':')
         oldpath = ''
         for parent_path in parts:
             newpath = oldpath + parent_path
+            forced.append(newpath)
             parent_iter = self.tasklist.get_iter(newpath)
             self.tasklist[parent_iter][12] = False
             self.tasklist[parent_iter][16] = True
             oldpath = newpath + ':'
+        return forced
 
     def calc_parent_pct(self, path):
         '''Calculates the pct complete of the direct parent of path.'''
 
+        if not isinstance(path, basestring):
+            path = path.to_string()
         parts = path.partition(':')
         parent_path = parts[0]
         if parent_path == path: return
@@ -466,7 +481,7 @@ class HiToDo(Gtk.Window):
     def calc_pct(self, path):
         '''Calculates the pct complete of the task at path
 
-        Mostly a wrapper function for __do_pct, as that requires an inter.
+        Mostly a wrapper function for __do_pct, as that requires an iter.
         '''
         treeiter = self.tasklist.get_iter(path)
         if self.tasklist.iter_n_children(treeiter) == 0:
@@ -1481,7 +1496,10 @@ class HiToDo(Gtk.Window):
             elif action[0] == "done":
                 path = action[1][0]
                 oldval = action[1][1]
+                forced = action[1][3]
                 self.commit_done(path=path, new_done = oldval)
+                for path in forced:
+                    self.commit_done(path=path, new_done=oldval)
                 self.redobuffer.append(action)
             elif action[0] == "paste":
                 data = action[1]
@@ -1565,14 +1583,21 @@ class HiToDo(Gtk.Window):
             elif action[0] == "done":
                 path = action[1][0]
                 newval = action[1][1]
+                forced = action[1][3]
                 self.commit_done(path=path, new_done = newval)
+                for path in forced:
+                    self.commit_done(path=path, new_done=newval)
                 self.undobuffer.append(action)
             elif action[0] == "paste":
-                #TODO clean up task order
                 data = action[1]
                 parent_iter = self.tasklist.get_iter(data[0]) if data[0] is not None else None
                 sibling_iter = self.tasklist.get_iter(data[1]) if data[1] is not None else None
                 new_iters = self.__do_paste_real(parent_iter, sibling_iter, data[2])
+
+                self.task_view.expand_to_path(self.tasklist.get_path(new_iters[0]))
+                self.selection.unselect_all()
+                self.selection.select_iter(new_iters[0])
+
                 self.undobuffer.append(("paste", (data[0], data[1], data[2], new_iters)))
             elif action[0] == "del":
                 data = action[1]
