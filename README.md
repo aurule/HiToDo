@@ -25,7 +25,6 @@ Although it isn't completely finished, HiToDo is stable and fairly usable for no
 * Cut, copy, and paste within title and notes fields
 * Undo/redo for tasks
 * Text undo/Redo for notes field
-* Task reordering via drag-and-drop
 * Preferences stored with GSettings
 * Archive completed tasks
 
@@ -39,6 +38,7 @@ Although it isn't completely finished, HiToDo is stable and fairly usable for no
 * Attach URLs to tasks
 * Built-in encryption?
 * ToDoList save/open
+* Task reordering via drag-and-drop?
 
 # Requirements
 
@@ -49,7 +49,7 @@ HiToDo requires at least:
 
 ## Compatibility
 
-The Oxygen GTK theme has a bug which disables drag-and-drop reordering of tasks. The only workaround is to use a different GTK theme.
+The Oxygen GTK theme has a bug which disables drag-and-drop reordering of columns. The only workaround is to use a different GTK theme.
 
 ## Versioning
 
