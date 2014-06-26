@@ -1621,7 +1621,8 @@ class HiToDo(Gtk.Window):
         '''Pushes a tuple onto the undobuffer list
 
         The data tuple must consist of the action name and related data. The
-        name must be recognized by do_undo() and do_redo().'''
+        name must be recognized by do_undo() and do_redo().
+        '''
         self.undobuffer.append((action, data))
         del self.redobuffer[:]
 
@@ -1705,7 +1706,8 @@ class HiToDo(Gtk.Window):
     def tasks_mouse_click(self, widget=None, event=None):
         '''Catches mouse clicks for the task list
 
-        Used to show the context menu on a right-click.'''
+        Used to show the context menu on a right-click.
+        '''
         if event.button == 3 and event.type == Gdk.EventType.BUTTON_PRESS:
             self.task_popup.show_all()
             self.task_popup.popup(None, None,
@@ -1758,7 +1760,8 @@ class HiToDo(Gtk.Window):
 
     def main_filter(self, model, treeiter, data=None):
         '''Task list filtering function'''
-        # TODO apply filter text from an entry
+
+        # TODO implement me
         return True
 
     def archive_done(self, widget, data=None):
