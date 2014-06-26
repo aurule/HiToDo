@@ -1973,7 +1973,8 @@ class HiToDo(Gtk.Window):
         self.selection = self.task_view.get_selection()
         self.selection.set_mode(Gtk.SelectionMode.MULTIPLE)
         self.sel_changed_handler = self.selection.connect("changed", self.task_selected)
-        self.task_view.set_properties(enable_tree_lines=True, reorderable=True, enable_search=True, search_column=13, rules_hint=True)
+        self.task_view.set_properties(enable_tree_lines=True, reorderable=False, enable_search=True, search_column=13, rules_hint=True)
+        # TODO think about allowing and tracking reorder in the future
         self.task_view.connect('key-press-event', self.tasks_keys_dn)
         self.task_view.connect('focus-in-event', self.track_focus)
         self.task_view.connect('button-press-event', self.tasks_mouse_click)
