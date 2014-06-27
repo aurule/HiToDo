@@ -1038,7 +1038,7 @@ class HiToDo(Gtk.Window):
         }
         try:
             self.file_filter.read_to_store(data)
-        except (ParseError, IOError, ReadError):
+        except (ParseError, IOError, ReadError, KeyError):
             dlg = dialogs.misc.htd_file_read_error(self, self.file_name)
             dlg.run()
             dlg.destroy()

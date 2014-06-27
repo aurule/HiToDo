@@ -94,8 +94,16 @@ class FileFilter(xml_filter.FileFilter):
             datafile = open(datafile_path, 'wb')
             datafile.write(ElementTree.tostring(htd, encoding="UTF-8"))
             datafile.close()
+ 
+            # store version in a temp file
+            (verfile, verfile_path) = mkstemp()
+            verfile = open(verfile_path, 'wb')
+            verfile.write(self.file_version)
+            verfile.close()
 
             # create tgz-formatted output file and write
             tar.add(datafile_path, arcname="todo.data")
+            tar.add(verfile_path, arcname="version.data")
             tar.close()
             osremove(datafile_path)
+            osremove(verfile_path)
