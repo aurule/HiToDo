@@ -347,7 +347,7 @@ class HiToDo(Gtk.Window):
         val = self.tasklist[path][col]
         self.track_focus(widget = editor)
 
-    def track_spent(self, action=None, data=None):
+    def track_spent(self, action=None, path=None, state=None):
         '''Handles time spent tracking
 
         Only really useful when called from the
@@ -358,30 +358,40 @@ class HiToDo(Gtk.Window):
         Only one row (task) can be tracked at a time. We store a treeiter
         pointing to that row as well as set the row's tracked flag (field 17).
         '''
-        on = action.get_active()
+
+        on = action.get_active() if state is None else state
+
         if on:
-            if self.seliter is None:
+            # if we're already tracking something, abort
+            if self.tracking is not None:
+                return
+
+            # get our tracking iter and check for sanity
+            trackiter = self.seliter if path is None else self.tasklist.get_iter(path)
+            if trackiter is None:
                 action.set_active(False)
                 return
-            if self.tasklist[self.seliter][12]:
+            if self.tasklist[trackiter][12]:
                 action.set_active(False)
                 return
 
-            self.tracking = self.seliter
+            # set flags and store a timer object
+            self.tracking = trackiter
             self.timer_start = datetime.now()
-            title = self.tasklist[self.tracking][13]
-            self.tasklist[self.tracking][17] = True
+            title = self.tasklist[trackiter][13]
+            self.tasklist[trackiter][17] = True
             action.set_tooltip("Stop tracking time toward '%s'" % title)
+            self.__push_undoable('track_spent', (self.tasklist.get_path(trackiter)))
         else:
-            if self.tracking is None: return
-
-            diff = datetime.now() - self.timer_start
-            secs = int(diff.total_seconds())
-            path = self.tasklist.get_path(self.tracking).to_string()
-            nspent = (self.tasklist[self.tracking][3] + secs) / 3600
-            self.commit_work(path=path, new_work=nspent, work_type='spent')
-            self.tasklist[self.tracking][17] = False
-            self.make_dirty()
+            # only track if we have an iter to track on
+            if self.tracking is not None:
+                diff = datetime.now() - self.timer_start
+                secs = int(diff.total_seconds())
+                path = self.tasklist.get_path(self.tracking)
+                nspent = (self.tasklist[self.tracking][3] + secs) / 3600
+                self.commit_work(path=path, new_work=nspent, work_type='spent')
+                self.tasklist[self.tracking][17] = False
+                self.make_dirty()
 
             self.tracking = None
             self.timer_start = None
@@ -1553,6 +1563,12 @@ class HiToDo(Gtk.Window):
                 new_iters = self.__do_paste_real(parent_iter, sibling_iter, data[2], False)
                 self.task_selected(self.selection)
                 self.redobuffer.append(("del", (data[0], data[1], data[2], new_iters)))
+            elif action[0] == 'track_spent':
+                path = action[1][0]
+                self.tasklist[path][17] = False
+                self.tracking = None
+                self.track_action.set_active(False)
+                self.redobuffer.append(('track_spent', (str(path))))
 
     def do_redo(self, widget=None):
         '''Handles redo logic
@@ -1643,6 +1659,11 @@ class HiToDo(Gtk.Window):
                     self.calc_pct(data[0])
 
                 self.undobuffer.append(("del", (data[0], data[1], data[2])))
+            elif action[0] == 'track_spent':
+                path = action[1][0]
+                self.track_spent(self.track_action, path, True)
+                self.track_action.set_active(True)
+                self.undobuffer.append(('track_spent', (str(path))))
 
     def __push_undoable(self, action, data):
         '''Pushes a tuple onto the undobuffer list
