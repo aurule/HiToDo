@@ -31,8 +31,8 @@ import xml.etree.ElementTree as et
 import operator
 from cgi import escape
 import sys
+import re
 
-import testing # TODO remove for public release
 import dialogs
 from file_parsers import fileParser
 import settings
@@ -242,8 +242,31 @@ class HiToDo(Gtk.Window):
         self.commit_date(field = 8)
         self.commit_priority()
 
-    def commit_work(self, widget=None, path=None, new_work=-1.0, work_type=''):
+    def save_work(self, widget, path, new_work, work_type):
         '''Save user-entered work time.
+
+        This function takes data from an entry and converts it to hours before
+        handing off to commit_work() for the heavy lifting.
+        '''
+
+        if isinstance(new_work, basestring):
+            # interpret and convert to hours as needed
+            new_work = new_work.strip()
+            parts = re.match(r'(\d+\.?\d*)([\w ]*)', new_work)
+            if parts:
+                number = float(parts.group(1))
+                unit = parts.group(2).strip()
+
+                if unit in ('min', 'minutes', 'm'):
+                    new_work = number / 60
+                elif unit in ('day', 'days', 'd'):
+                    new_work = number * 24
+
+        self.commit_work(widget, path, new_work, work_type)
+
+
+    def commit_work(self, widget=None, path=None, new_work=-1.0, work_type=''):
+        '''Change a task's work time.
 
         Once our value is committed, we iterate up our parents, updating their values to account for ours.
 
@@ -321,7 +344,6 @@ class HiToDo(Gtk.Window):
         '''
         val = self.tasklist[path][col]
         self.track_focus(widget = editor)
-        editor.set_text('' if val == 0 else '%1.2f' % (val/3600)) #don't display the H suffix during editing
 
     def track_spent(self, action=None, data=None):
         '''Handles time spent tracking
@@ -513,7 +535,10 @@ class HiToDo(Gtk.Window):
                 n_done += self.tasklist[child_iter][12]
             child_iter = self.tasklist.iter_next(child_iter)
 
-        self.tasklist[treeiter][1] = int((n_done / n_children) * 100)
+        if n_children is 0:
+            self.tasklist[treeiter][1] = 0
+        else:
+            self.tasklist[treeiter][1] = int((n_done / n_children) * 100)
         return n_children, n_done
 
     def commit_priority(self, widget=None, path=None, new_priority=None):
@@ -2092,11 +2117,23 @@ class HiToDo(Gtk.Window):
     def duration_render(self, col, cell, model, tree_iter, data):
         '''Render est and spent cells
 
-        Converts stored seconds into hours with a suffix. May expand later to
-        intelligently use other units.
+        Converts stored seconds into hours or minutes with a suffix.
         '''
         val = model[tree_iter][data]
-        out = '' if val == 0 else '%1.2fH' % (val/3600)
+
+        if val == 0:
+            out = ''
+            tip = '';
+        else:
+            minutes = '%2im' % round(val / 60)
+            hours = '%1.2fh' % (val/3600)
+            days = '%1.2fd' % (val/86400)
+            if val < 3600:
+                out = minutes
+            else:
+                out = hours
+            tip = "Minutes: "+minutes+"\nHours: "+hours+"\nDays: "+days
+            # TODO use this for tooltip text, somehow
         cell.set_property("text", out)
 
     def create_columns(self):
@@ -2121,7 +2158,7 @@ class HiToDo(Gtk.Window):
         self.cols.append(['pct complete', 'Percent Complete (%)', True, True])
 
         est = Gtk.CellRendererText(foreground="#999", editable=True)
-        est.connect("edited", self.commit_work, 'est')
+        est.connect("edited", self.save_work, 'est')
         est.connect("editing-started", self.duration_edit_start, 2)
         col_est = Gtk.TreeViewColumn("Est", est, foreground_set=12)
         col_est.set_reorderable(True)
@@ -2132,7 +2169,7 @@ class HiToDo(Gtk.Window):
         self.cols.append(['time est', 'Est', True, True])
 
         spent = Gtk.CellRendererText(foreground="#999", editable=True)
-        spent.connect("edited", self.commit_work, 'spent')
+        spent.connect("edited", self.save_work, 'spent')
         spent.connect("editing-started", self.duration_edit_start, 3)
         col_spent = Gtk.TreeViewColumn("Spent", spent, foreground_set=12)
         col_spent.set_reorderable(True)
