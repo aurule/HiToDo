@@ -2137,7 +2137,7 @@ class HiToDo(Gtk.Window):
         out = escape(text) if notes == '' else "%s  <span color=\"#999\">[%s]</span>" % (escape(text), escape(notes.replace(linesep, ' ')))
         cell.set_property("markup", out)
 
-    def duration_render(self, col, cell, model, tree_iter, data):
+    def work_render(self, col, cell, model, tree_iter, data):
         '''Render est and spent cells
 
         Converts stored seconds into hours or minutes with a suffix.
@@ -2148,7 +2148,7 @@ class HiToDo(Gtk.Window):
             out = ''
             tip = '';
         else:
-            minutes = '%2im' % round(val / 60)
+            minutes = '%im' % round(val / 60)
             hours = '%1.2fh' % (val/3600)
             days = '%1.2fd' % (val/86400)
             if val < 3600:
@@ -2186,7 +2186,7 @@ class HiToDo(Gtk.Window):
         col_est = Gtk.TreeViewColumn("Est", est, foreground_set=12)
         col_est.set_reorderable(True)
         col_est.set_sort_column_id(2)
-        col_est.set_cell_data_func(est, self.duration_render, 2)
+        col_est.set_cell_data_func(est, self.work_render, 2)
         col_est.code = "time est"
         self.cols_available['time est'] = col_est
         self.cols.append(['time est', 'Est', True, True])
@@ -2197,7 +2197,7 @@ class HiToDo(Gtk.Window):
         col_spent = Gtk.TreeViewColumn("Spent", spent, foreground_set=12)
         col_spent.set_reorderable(True)
         col_spent.set_sort_column_id(3)
-        col_spent.set_cell_data_func(spent, self.duration_render, 3)
+        col_spent.set_cell_data_func(spent, self.work_render, 3)
         col_spent.code = "time spent"
         self.cols_available['time spent'] = col_spent
         self.cols.append(['time spent', 'Spent', True, True])
