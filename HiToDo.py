@@ -261,6 +261,8 @@ class HiToDo(Gtk.Window):
                     new_work = number / 60
                 elif unit in ('day', 'days', 'd'):
                     new_work = number * 24
+                else:
+                    new_work = number
 
         self.commit_work(widget, path, new_work, work_type)
 
@@ -742,8 +744,8 @@ class HiToDo(Gtk.Window):
             self.commit_work(path=path, new_work=0, work_type='spent')
             self.commit_work(path=path, new_work=0, work_type='est')
 
-            self.calc_parent_pct(str(path))
             self.tasklist.remove(ref)
+            self.calc_parent_pct(path)
 
         self.task_selected(self.selection)
 
