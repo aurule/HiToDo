@@ -493,8 +493,9 @@ class HiToDo(Gtk.Window):
         oldpath = ''
         for parent_path in parts:
             newpath = oldpath + parent_path
-            forced.append(newpath)
             parent_iter = self.tasklist.get_iter(newpath)
+            if self.tasklist[parent_iter][12]:
+                forced.append(newpath)
             self.tasklist[parent_iter][12] = False
             self.tasklist[parent_iter][16] = True
             oldpath = newpath + ':'
@@ -1534,9 +1535,37 @@ class HiToDo(Gtk.Window):
                 path = action[1][0]
                 oldval = action[1][1]
                 forced = action[1][3]
-                self.commit_done(path=path, new_done = oldval)
-                for path in forced:
-                    self.commit_done(path=path, new_done=oldval)
+
+                if oldval:
+                    # we're undoing a move from done to not-done
+
+                    # mark path done
+                    self.tasklist[path][1] = 100
+                    self.tasklist[path][12] = True
+                    self.tasklist[path][16] = False
+
+                    # mark forced rows done
+                    for row in forced:
+                        self.tasklist[row][12] = True
+                        self.tasklist[row][16] = False
+                else:
+                    # we're undoing a move from not-done to done
+
+                    # mark path Not Done
+                    self.tasklist[path][12] = False
+                    self.tasklist[path][16] = True
+
+                    # mark forced rows Not Done
+                    for row in forced:
+                        self.tasklist[row][1] = 0
+                        self.tasklist[row][12] = False
+                        self.tasklist[row][16] = True
+
+                    # recalc self pct complete
+                    self.calc_pct(path)
+
+                self.calc_parent_pct(path)
+
                 self.redobuffer.append(action)
             elif action[0] == "paste":
                 data = action[1]
@@ -1626,10 +1655,8 @@ class HiToDo(Gtk.Window):
             elif action[0] == "done":
                 path = action[1][0]
                 newval = action[1][1]
-                forced = action[1][3]
-                self.commit_done(path=path, new_done = newval)
-                for path in forced:
-                    self.commit_done(path=path, new_done=newval)
+                self.commit_done(path = path, new_done = not newval)
+
                 self.undobuffer.append(action)
             elif action[0] == "paste":
                 data = action[1]
